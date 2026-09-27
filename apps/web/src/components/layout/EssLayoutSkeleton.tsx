@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { NexoraLogo } from '../common/NexoraLogo';
 import {
   Clock,
@@ -14,7 +15,9 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-0">
       {/* Top Header */}
       <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
-        <NexoraLogo />
+        <Link href="/">
+          <NexoraLogo />
+        </Link>
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -38,22 +41,22 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 z-50 flex items-center justify-around px-2 shadow-lg">
-        <button className="flex flex-col items-center gap-1 text-indigo-600">
+        <Link href="/ess/attendance" className="flex flex-col items-center gap-1 text-indigo-600">
           <Clock className="w-5 h-5" />
           <span className="text-[10px] font-semibold">Presensi</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
+        </Link>
+        <Link href="#cuti" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
           <CalendarDays className="w-5 h-5" />
           <span className="text-[10px] font-medium">Cuti</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
+        </Link>
+        <Link href="#payroll" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
           <FileText className="w-5 h-5" />
           <span className="text-[10px] font-medium">Slip Gaji</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
+        </Link>
+        <Link href="#profile" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
           <User className="w-5 h-5" />
           <span className="text-[10px] font-medium">Profil</span>
-        </button>
+        </Link>
       </nav>
     </div>
   );
