@@ -1,0 +1,30 @@
+{
+  "name": "nexora-hris",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NEXORA — Enterprise Human Resource Information System (HRIS)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run start:dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": [
+    "hris",
+    "human-resources",
+    "payroll",
+    "attendance",
+    "leave-management",
+    "modular-monolith",
+    "nestjs",
+    "nextjs",
+    "typescript"
+  ],
+  "author": "Ahmat Gebyar Gumelar <ahmadgebyar90@gmail.com>",
+  "license": "UNLICENSED"
+}
