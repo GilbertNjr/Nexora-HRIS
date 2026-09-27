@@ -78,6 +78,20 @@ export function AdminLayoutSkeleton({ children }: { children: React.ReactNode })
               <CreditCard className="w-4 h-4" />
               <span>Payroll & PPh 21 TER</span>
             </Link>
+            <Link
+              href="/admin/reports"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              <FileBarChart className="w-4 h-4" />
+              <span>Laporan & Analitik</span>
+            </Link>
+            <Link
+              href="/admin/audit"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Audit Trail (ISO 27001)</span>
+            </Link>
           </nav>
         </div>
 
