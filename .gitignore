@@ -49,6 +49,8 @@ out/
 *.sqlite3
 *.db
 *.dump
+!prisma/migrations/**/*.sql
+!apps/*/prisma/migrations/**/*.sql
 
 # Local uploads (KTP, selfie presensi, surat dokter, slip gaji lokal)
 /uploads/

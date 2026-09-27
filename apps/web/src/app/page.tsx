@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { NexoraLogo } from '@/components/common/NexoraLogo';
 import {
   Users,
@@ -96,8 +97,16 @@ export default function HomePage() {
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
             >
               <Server className="w-3.5 h-3.5" />
-              <span>Swagger API Docs</span>
+              <span>Swagger API</span>
             </a>
+
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
+            >
+              <span>Masuk Portal</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       </header>
@@ -169,13 +178,13 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <button
+              <Link
+                href="/admin/employees"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md transition-all group"
-                onClick={() => alert('Pondasi modul Auth & Dashboard Admin sedang aktif disiapkan.')}
               >
-                <span>Buka HR Admin Dashboard</span>
+                <span>Buka Direktori Karyawan</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
+              </Link>
             </div>
 
             {/* Admin Feature Modules Grid */}
@@ -236,13 +245,13 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <button
+              <Link
+                href="/login"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition-all group"
-                onClick={() => alert('Pondasi modul ESS Karyawan sedang aktif disiapkan.')}
               >
                 <span>Masuk Portal Karyawan</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
+              </Link>
             </div>
 
             {/* ESS Feature Modules Grid */}
