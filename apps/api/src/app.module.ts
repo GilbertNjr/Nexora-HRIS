@@ -5,6 +5,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmployeeModule } from './modules/employees/employee.module';
 import { HealthModule } from './modules/health/health.module';
+import { LeaveModule } from './modules/leave/leave.module';
 import { OrganizationModule } from './modules/organization/organization.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     OrganizationModule,
     EmployeeModule,
     AttendanceModule,
+    LeaveModule,
   ],
 })
 export class AppModule {}

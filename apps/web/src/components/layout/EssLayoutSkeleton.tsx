@@ -36,26 +36,53 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      {/* Desktop Sub Navigation */}
+      <div className="hidden md:flex bg-white border-b border-slate-200 px-6">
+        <div className="max-w-4xl mx-auto w-full flex items-center gap-8">
+          <Link
+            href="/ess/attendance"
+            className="py-3 text-sm font-medium text-slate-600 hover:text-indigo-600 border-b-2 border-transparent hover:border-indigo-600 transition-colors flex items-center gap-2"
+          >
+            <Clock className="w-4 h-4" />
+            <span>Presensi Mandiri</span>
+          </Link>
+          <Link
+            href="/ess/leave"
+            className="py-3 text-sm font-medium text-slate-600 hover:text-indigo-600 border-b-2 border-transparent hover:border-indigo-600 transition-colors flex items-center gap-2"
+          >
+            <CalendarDays className="w-4 h-4" />
+            <span>Manajemen Cuti & Izin</span>
+          </Link>
+          <Link
+            href="/ess/payroll"
+            className="py-3 text-sm font-medium text-slate-400 hover:text-indigo-600 border-b-2 border-transparent hover:border-indigo-600 transition-colors flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Slip Gaji (Payslip)</span>
+          </Link>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="max-w-4xl mx-auto w-full p-4 sm:p-6 flex-1">{children}</main>
 
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 z-50 flex items-center justify-around px-2 shadow-lg">
-        <Link href="/ess/attendance" className="flex flex-col items-center gap-1 text-indigo-600">
+        <Link href="/ess/attendance" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
           <Clock className="w-5 h-5" />
           <span className="text-[10px] font-semibold">Presensi</span>
         </Link>
-        <Link href="#cuti" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
+        <Link href="/ess/leave" className="flex flex-col items-center gap-1 text-indigo-600">
           <CalendarDays className="w-5 h-5" />
           <span className="text-[10px] font-medium">Cuti</span>
         </Link>
-        <Link href="#payroll" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
+        <Link href="/ess/payroll" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
           <FileText className="w-5 h-5" />
           <span className="text-[10px] font-medium">Slip Gaji</span>
         </Link>
-        <Link href="#profile" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
+        <Link href="/login" className="flex flex-col items-center gap-1 text-slate-500 hover:text-indigo-600">
           <User className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Profil</span>
+          <span className="text-[10px] font-medium">Keluar</span>
         </Link>
       </nav>
     </div>

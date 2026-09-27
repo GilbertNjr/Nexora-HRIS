@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { NexoraLogo } from '../common/NexoraLogo';
 import {
   LayoutDashboard,
@@ -23,79 +24,60 @@ export function AdminLayoutSkeleton({ children }: { children: React.ReactNode })
         <div>
           {/* Logo */}
           <div className="h-16 px-6 flex items-center border-b border-slate-800">
-            <NexoraLogo variant="dark" />
+            <Link href="/">
+              <NexoraLogo variant="dark" />
+            </Link>
           </div>
 
           {/* Navigation Links */}
           <nav className="p-4 space-y-1 text-sm font-medium">
-            <a
-              href="#dashboard"
+            <Link
+              href="/admin/employees"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-600 text-white shadow-sm"
             >
               <LayoutDashboard className="w-4 h-4" />
-              <span>Dashboard Analitik</span>
-            </a>
+              <span>Portal Manajemen HR</span>
+            </Link>
 
             <div className="pt-4 pb-1 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               Manajemen Personalia
             </div>
-            <a
-              href="#employees"
+            <Link
+              href="/admin/employees"
               className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <Users className="w-4 h-4" />
               <span>Master Karyawan</span>
-            </a>
-            <a
-              href="#departments"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              <Building2 className="w-4 h-4" />
-              <span>Struktur Organisasi</span>
-            </a>
+            </Link>
 
             <div className="pt-4 pb-1 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               Operasional & Waktu
             </div>
-            <a
-              href="#attendance"
+            <Link
+              href="/ess/attendance"
               className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <Clock className="w-4 h-4" />
-              <span>Presensi & Shift</span>
-            </a>
-            <a
-              href="#leave"
+              <span>Presensi & Radar GPS</span>
+            </Link>
+            <Link
+              href="/admin/leave"
               className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <CalendarCheck className="w-4 h-4" />
-              <span>Persetujuan Cuti</span>
-            </a>
+              <span>Persetujuan Cuti (HR)</span>
+            </Link>
 
             <div className="pt-4 pb-1 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               Finansial & Kepatuhan
             </div>
-            <a
-              href="#payroll"
+            <Link
+              href="/admin/payroll"
               className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <CreditCard className="w-4 h-4" />
               <span>Payroll & PPh 21 TER</span>
-            </a>
-            <a
-              href="#reports"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              <FileBarChart className="w-4 h-4" />
-              <span>Laporan & Rekap</span>
-            </a>
-            <a
-              href="#audit"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Audit Trail Log</span>
-            </a>
+            </Link>
           </nav>
         </div>
 
