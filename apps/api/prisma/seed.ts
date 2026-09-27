@@ -1,4 +1,5 @@
-import { PrismaClient, UserStatus, EmploymentType, EmploymentStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { UserStatus, EmploymentType, EmploymentStatus } from '../src/common/enums';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();

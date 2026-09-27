@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AttendanceStatus } from '@prisma/client';
+import { AttendanceStatus } from '../../../common/enums';
 import { IsDateString, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
 

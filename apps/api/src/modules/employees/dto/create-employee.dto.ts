@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EmploymentType } from '@prisma/client';
+import { EmploymentType } from '../../../common/enums';
 import {
   IsDateString,
   IsEmail,
