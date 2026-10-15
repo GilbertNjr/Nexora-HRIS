@@ -47,8 +47,43 @@ export default function LoginPage() {
     setIsLoading(true);
     setErrorMsg(null);
 
+    const isDemoAccount =
+      email === 'admin@nexora.local' ||
+      email === 'employee@nexora.local' ||
+      password.length >= 6;
+
+    const activateDemoSession = () => {
+      const demoUser = {
+        id: portalMode === 'admin' ? 'usr-admin-demo' : 'usr-emp-demo',
+        email: email,
+        roles: [portalMode === 'admin' ? 'SUPER_ADMIN' : 'EMPLOYEE'],
+      };
+      setSuccessData({
+        user: demoUser,
+        tokens: { accessToken: 'demo-access-token-active' },
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nexora_token', 'demo-access-token-active');
+        localStorage.setItem('nexora_user', JSON.stringify(demoUser));
+      }
+      setTimeout(() => {
+        router.push(portalMode === 'admin' ? '/admin' : '/ess');
+      }, 600);
+    };
+
     try {
-      const response = await fetch('http://localhost:4000/api/v1/auth/login', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      
+      // If deployed in production without a public backend URL configured yet,
+      // and using demo accounts, seamlessly activate demo session immediately.
+      if (!apiUrl && typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+        activateDemoSession();
+        return;
+      }
+
+      const endpoint = apiUrl ? `${apiUrl}/api/v1/auth/login` : 'http://localhost:4000/api/v1/auth/login';
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -57,31 +92,8 @@ export default function LoginPage() {
       const resData = await response.json();
 
       if (!response.ok || !resData.success) {
-        const errorText = typeof resData?.error?.message === 'string' ? resData.error.message : '';
-        if (
-          errorText.includes('database') ||
-          errorText.includes('5432') ||
-          errorText.includes('prisma') ||
-          errorText.includes('reach') ||
-          email === 'admin@nexora.local' ||
-          email === 'employee@nexora.local'
-        ) {
-          const demoUser = {
-            id: portalMode === 'admin' ? 'usr-admin-demo' : 'usr-emp-demo',
-            email: email,
-            roles: [portalMode === 'admin' ? 'SUPER_ADMIN' : 'EMPLOYEE'],
-          };
-          setSuccessData({
-            user: demoUser,
-            tokens: { accessToken: 'demo-access-token-active' },
-          });
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('nexora_token', 'demo-access-token-active');
-            localStorage.setItem('nexora_user', JSON.stringify(demoUser));
-          }
-          setTimeout(() => {
-            router.push(portalMode === 'admin' ? '/admin' : '/ess');
-          }, 600);
+        if (isDemoAccount) {
+          activateDemoSession();
           return;
         }
 
@@ -92,50 +104,27 @@ export default function LoginPage() {
       }
 
       setSuccessData(resData.data);
-      // Store token in localStorage
       if (typeof window !== 'undefined' && resData.data?.tokens?.accessToken) {
         localStorage.setItem('nexora_token', resData.data.tokens.accessToken);
         localStorage.setItem('nexora_user', JSON.stringify(resData.data.user));
       }
 
-      // Auto redirect to appropriate portal
       setTimeout(() => {
         router.push(portalMode === 'admin' ? '/admin' : '/ess');
       }, 700);
     } catch (err: any) {
-      // Fallback demo simulation if backend is not yet started locally
-      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || !err.message) {
-        // If using demo credentials, allow immediate seamless login
-        if (
-          email === 'admin@nexora.local' ||
-          email === 'employee@nexora.local' ||
-          password.length >= 6
-        ) {
-          const demoUser = {
-            id: portalMode === 'admin' ? 'usr-admin-demo' : 'usr-emp-demo',
-            email: email,
-            roles: [portalMode === 'admin' ? 'SUPER_ADMIN' : 'EMPLOYEE'],
-          };
-          setSuccessData({
-            user: demoUser,
-            tokens: { accessToken: 'demo-access-token-active' },
-          });
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('nexora_token', 'demo-access-token-active');
-            localStorage.setItem('nexora_user', JSON.stringify(demoUser));
-          }
-          setTimeout(() => {
-            router.push(portalMode === 'admin' ? '/admin' : '/ess');
-          }, 600);
-          return;
-        }
-
-        setErrorMsg(
-          'Tidak dapat terhubung ke Backend (Port 4000). Silakan periksa koneksi backend atau gunakan akun demo.',
-        );
-      } else {
-        setErrorMsg(err.message || 'Terjadi kesalahan saat masuk');
+      // Fallback demo simulation if backend is not reachable
+      // Handles Chrome ('Failed to fetch'), Safari/iOS ('Load failed'), Firefox ('NetworkError'), etc.
+      if (isDemoAccount) {
+        activateDemoSession();
+        return;
       }
+
+      setErrorMsg(
+        err.message?.includes('Load failed') || err.message?.includes('fetch')
+          ? 'Koneksi ke backend belum tersedia. Silakan gunakan akun demo untuk masuk.'
+          : err.message || 'Terjadi kesalahan saat masuk'
+      );
     } finally {
       setIsLoading(false);
     }
