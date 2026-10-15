@@ -64,6 +64,20 @@ export default function EmployeesPage() {
   // Mock initial dataset for demo / offline fallback
   const initialMockData: EmployeeItem[] = [
     {
+      id: 'NX-2021008',
+      employeeNumber: 'NX-2021008',
+      fullName: 'Rian Pratama, S.Kom',
+      firstName: 'Rian',
+      lastName: 'Pratama',
+      email: 'rian.pratama@nexora.co.id',
+      phone: '+62 812-9845-1120',
+      department: 'Technology & Product',
+      designation: 'Lead Backend Architect',
+      employmentType: 'PERMANENT',
+      employmentStatus: 'ACTIVE',
+      joinDate: '2021-01-14',
+    },
+    {
       id: 'emp-01',
       employeeNumber: 'NX-2024-0001',
       fullName: 'Ahmat Gebyar',
@@ -184,7 +198,7 @@ export default function EmployeesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-              <Link href="/" className="hover:text-blue-600">Beranda</Link>
+              <Link href="/admin" className="hover:text-blue-600">Beranda</Link>
               <span>/</span>
               <span>Personalia</span>
               <span>/</span>
@@ -399,15 +413,12 @@ export default function EmployeesPage() {
 
                       {/* Action */}
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEmployee(emp);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-300 text-xs transition-colors"
+                        <Link
+                          href={`/admin/employees/${emp.employeeNumber || emp.id}`}
+                          className="inline-block px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 text-xs font-semibold transition-all"
                         >
-                          Detail
-                        </button>
+                          Lihat Profil 360° &rarr;
+                        </Link>
                       </td>
                     </tr>
                   ))

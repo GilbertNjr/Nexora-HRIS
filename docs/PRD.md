@@ -1,943 +1,446 @@
-# DETAILED PRODUCT REQUIREMENT DOCUMENT (PRD)
+# PRODUCT REQUIREMENT DOCUMENT (PRD) — FINAL APPROVED BASELINE
 ## NEXORA — Human Resource Information System (HRIS)
-**Brand Tagline:** Human Resource Solutions | Connect • Innovate • Grow  
-**Roles:** Product Manager, Business Analyst, QA Analyst  
-**Version:** 2.0.0-Master-PRD  
-**Status:** Approved for Implementation Planning  
-**Target Horizon:** 1-3 Years Modular Architecture  
+**Tagline:** Human Resource Solutions | Connect • Innovate • Grow  
+**Dokumen Acuan Bisnis Utama:** `Capstone Project.pdf` (Kelompok 5) & `docs/requirements/`  
+**Peran:** Senior Software Architect, Product Manager, Business Analyst, QA Lead, Security Engineer  
+**Versi:** 2.1.0-Master-Approved-PRD  
+**Status:** Disetujui Penuh untuk Eksekusi Teknis (Baseline Disahkan)  
+**Target Horizon:** 1–3+ Tahun Arsitektur Modular Berkelanjutan  
 
 ---
 
 ## DAFTAR ISI
-1. [Kerangka Kerja & Panduan Prioritas](#1-kerangka-kerja--panduan-prioritas)
-2. [Spesifikasi Rinci 15 Core Modules](#2-spesifikasi-rinci-15-core-modules)
-   - [Modul 01: Authentication & Authorization](#modul-01-authentication--authorization)
-   - [Modul 02: Employee Management (Core HR)](#modul-02-employee-management-core-hr)
-   - [Modul 03: Attendance Management](#modul-03-attendance-management)
-   - [Modul 04: Leave, Permission, & Sick Leave](#modul-04-leave-permission--sick-leave)
-   - [Modul 05: Payroll Management](#modul-05-payroll-management)
-   - [Modul 06: Benefits & Reimbursement](#modul-06-benefits--reimbursement)
-   - [Modul 07: Performance Management](#modul-07-performance-management)
-   - [Modul 08: Career & Development](#modul-08-career--development)
-   - [Modul 09: Recruitment & Applicant Tracking System (ATS)](#modul-09-recruitment--applicant-tracking-system-ats)
-   - [Modul 10: HR Dashboard & Executive Analytics](#modul-10-hr-dashboard--executive-analytics)
-   - [Modul 11: Notification Engine](#modul-11-notification-engine)
-   - [Modul 12: Reports & Data Export](#modul-12-reports--data-export)
-   - [Modul 13: Documents & Policy Center](#modul-13-documents--policy-center)
-   - [Modul 14: Audit Log & Compliance Trail](#modul-14-audit-log--compliance-trail)
-   - [Modul 15: System Settings & Configurations](#modul-15-system-settings--configurations)
-3. [Daftar Requirement Decision Needed](#3-daftar-requirement-decision-needed)
-4. [Scope Breakdown](#4-scope-breakdown)
-   - [MVP Scope (P0)](#mvp-scope-p0)
-   - [Phase 2 Scope (P1)](#phase-2-scope-p1)
+1. [Kerangka Kerja, Prinsip Arsitektur, & Traceability](#1-kerangka-kerja-prinsip-arsitektur--traceability)
+   - [1.1 Definisi & Tujuan Sistem](#11-definisi--tujuan-sistem)
+   - [1.2 Karakteristik Dual-Panel System](#12-karakteristik-dual-panel-system)
+   - [1.3 Matriks Penyelarasan 17 Use Case Capstone ke Modul PRD](#13-matriks-penyelarasan-17-use-case-capstone-ke-modul-prd)
+2. [Spesifikasi Fungsional Rinci Modul HRIS](#2-spesifikasi-fungsional-rinci-modul-hris)
+   - [Modul 01: Authentication & Authorization (BR-AUTH-001)](#modul-01-authentication--authorization-br-auth-001)
+   - [Modul 02: Employee Master Data Management (BR-EMP-001, BR-ESS-EMP-001)](#modul-02-employee-master-data-management-br-emp-001-br-ess-emp-001)
+   - [Modul 03: Attendance & Time Tracking (BR-ATT-001, BR-ESS-ATT-001)](#modul-03-attendance--time-tracking-br-att-001-br-ess-att-001)
+   - [Modul 04: Leave, Permission, & Sick Leave (BR-ESS-LEV-001)](#modul-04-leave-permission--sick-leave-br-ess-lev-001)
+   - [Modul 05: Payroll Management (BR-PAY-001, BR-ESS-PAY-001)](#modul-05-payroll-management-br-pay-001-br-ess-pay-001)
+   - [Modul 06: Benefit & Asuransi (BR-BEN-001, BR-ESS-BEN-001)](#modul-06-benefit--asuransi-br-ben-001-br-ess-ben-001)
+   - [Modul 07: Penilaian Kinerja / KPI (BR-PRF-001, BR-ESS-PRF-001)](#modul-07-penilaian-kinerja--kpi-br-prf-001-br-ess-prf-001)
+   - [Modul 08: Pelatihan Karier & Kompetensi (BR-TRN-001, BR-ESS-TRN-001)](#modul-08-pelatihan-karier--kompetensi-br-trn-001-br-ess-trn-001)
+   - [Modul 09: Rekrutmen & Onboarding (BR-REC-001)](#modul-09-rekrutmen--onboarding-br-rec-001)
+   - [Modul 10: Laporan Analitik & Executive Dashboard (BR-REP-001)](#modul-10-laporan-analitik--executive-dashboard-br-rep-001)
+   - [Modul 11: Pengaturan Sistem (BR-SET-001)](#modul-11-pengaturan-sistem-br-set-001)
+   - [Modul 12: Notification Engine](#modul-12-notification-engine)
+   - [Modul 13: Audit Trail & Compliance Logging](#modul-13-audit-trail--compliance-logging)
+3. [Daftar Keputusan Bisnis yang Telah Disetujui (Approved Decisions)](#3-daftar-keputusan-bisnis-yang-telah-disetujui-approved-decisions)
+4. [Scope Breakdown & Rencana Implementasi Bertahap](#4-scope-breakdown--rencana-implementasi-bertahap)
+   - [MVP Scope (P0) — Fondasi Capstone](#mvp-scope-p0--fondasi-capstone)
+   - [Phase 2 Scope (P1) — Efisiensi Lanjutan](#phase-2-scope-p1--efisiensi-lanjutan)
    - [Future Scope (P2 / P3)](#future-scope-p2--p3)
    - [Out of Scope](#out-of-scope)
 
 ---
 
-## 1. KERANGKA KERJA & PANDUAN PRIORITAS
+## 1. KERANGKA KERJA, PRINSIP ARSITEKTUR, & TRACEABILITY
 
-Setiap kebutuhan fungsional diklasifikasikan menggunakan skema prioritas industri:
-- **[P0] Core Must-Have**: Wajib tersedia agar sistem dasar dapat berfungsi (MVP). Tanpa fitur ini, sistem HRIS tidak dapat dioperasikan secara legal, operasional, atau aman.
-- **[P1] Important**: Sangat penting untuk efisiensi operasional dan kepatuhan penuh, diimplementasikan segera setelah MVP stabil.
-- **[P2] Secondary**: Fitur bernilai tambah untuk otomatisasi tingkat lanjut dan kenyamanan pengguna.
-- **[P3] Future Feature**: Fitur strategis jangka panjang (AI/ML, integrasi eksternal tingkat lanjut).
+### 1.1 Definisi & Tujuan Sistem
+Sistem informasi berbasis digital yang dirancang untuk mengotomatisasi, mengintegrasikan, dan mengelola seluruh proses administrasi sumber daya manusia (SDM) di perusahaan secara terpusat (*centralized database center*). Seluruh data yang diinput oleh karyawan (seperti absensi dan permohonan cuti) langsung masuk ke basis data utama, yang kemudian diolah otomatis menjadi data siap pakai untuk penggajian (*payroll*) dan laporan manajemen bagi Admin HR.
 
-Setiap area yang memiliki ambiguitas kebijakan bisnis ditandai dengan **`[REQUIREMENT DECISION NEEDED]`** agar manajemen/stakeholder dapat memberikan keputusan final tanpa asumsi sepihak dari tim teknis.
+### 1.2 Karakteristik Dual-Panel System
+Menggunakan pendekatan **Dual-Panel System** yang memisahkan area kerja manajemen dan akses mandiri pegawai secara ketat:
+1. **Admin HR Panel (`/admin/*`)**: Dikhususkan bagi Admin HR untuk mengelola master data karyawan, rekrutmen hingga onboarding, validasi rekap absensi staf, kalkulasi penggajian, alokasi benefit, penilaian kinerja divisi, pelatihan karier, analitik eksekutif, dan pengaturan sistem.
+2. **Employee Self-Service (ESS) Panel (`/ess/*`)**: Dikhususkan bagi Karyawan untuk presensi harian digital, edit profil kontak dinamis, pengajuan cuti/izin/sakit, unduh slip gaji resmi, melihat hak benefit aktif, melihat evaluasi rapot kerja, dan mengambil tawaran pelatihan.
+
+### 1.3 Matriks Penyelarasan 17 Use Case Capstone ke Modul PRD
+Seluruh 17 use case yang tercantum pada Bab 5 `Capstone Project.pdf` dipetakan secara terukur ke modul-modul PRD ini:
+
+| No | Nama Use Case (PDF) | Aktor | ID Kebutuhan Bisnis | Modul PRD Terkait | Rute Frontend |
+|:---|:---|:---|:---|:---|:---|
+| 1 | **Login** | Admin HR & Karyawan | `BR-AUTH-001` | Modul 01: Auth | `/login` |
+| 2 | **Kelola data karyawan** | Admin HR | `BR-EMP-001` | Modul 02: Employee | `/admin/employees` |
+| 3 | **Kelola rekrutmen** | Admin HR | `BR-REC-001` | Modul 09: Recruitment | `/admin/recruitment` |
+| 4 | **Rekap absensi staf** | Admin HR | `BR-ATT-001` | Modul 03: Attendance | `/admin/attendance` |
+| 5 | **Proses payroll** | Admin HR | `BR-PAY-001` | Modul 05: Payroll | `/admin/payroll` |
+| 6 | **Kelola benefit** | Admin HR | `BR-BEN-001` | Modul 06: Benefits | `/admin/benefits` |
+| 7 | **Penilaian Kinerja** | Admin HR | `BR-PRF-001` | Modul 07: Performance | `/admin/performance` |
+| 8 | **Kelola pelatihan** | Admin HR | `BR-TRN-001` | Modul 08: Training | `/admin/training` |
+| 9 | **Lihat lap. analitik** | Admin HR | `BR-REP-001` | Modul 10: Reports | `/admin/reports` |
+| 10 | **Pengaturan sistem** | Admin HR | `BR-SET-001` | Modul 11: Settings | `/admin/settings` |
+| 11 | **Kelola profil mandiri** | Karyawan | `BR-ESS-EMP-001` | Modul 02: Employee | `/ess/profile` |
+| 12 | **Absensi digital** | Karyawan | `BR-ESS-ATT-001` | Modul 03: Attendance | `/ess/attendance` |
+| 13 | **Ajukan cuti dan izin** | Karyawan | `BR-ESS-LEV-001` | Modul 04: Leave | `/ess/leave` |
+| 14 | **Unduh slip gaji** | Karyawan | `BR-ESS-PAY-001` | Modul 05: Payroll | `/ess/payroll` |
+| 15 | **Lihat benefit** | Karyawan | `BR-ESS-BEN-001` | Modul 06: Benefits | `/ess/benefits` |
+| 16 | **Lihat evaluasi** | Karyawan | `BR-ESS-PRF-001` | Modul 07: Performance | `/ess/evaluations` |
+| 17 | **Lihat pelatihan** | Karyawan | `BR-ESS-TRN-001` | Modul 08: Training | `/ess/training` |
 
 ---
 
-## 2. SPESIFIKASI RINCI 15 CORE MODULES
+## 2. SPESIFIKASI FUNGSIONAL RINCI MODUL HRIS
 
 ---
 
-### MODUL 01: AUTHENTICATION & AUTHORIZATION
+### MODUL 01: AUTHENTICATION & AUTHORIZATION (BR-AUTH-001)
 
 #### 1. Objective
-Menyediakan gerbang akses aman, terpusat, dan dapat diaudit bagi seluruh pengguna dengan memisahkan wewenang administratif dan akses mandiri karyawan secara ketat.
+Menyediakan gerbang autentikasi terpusat dan aman yang memvalidasi kredensial pengguna dan mengarahkan pengguna secara otomatis ke panel hak akses yang sesuai (Dual-Panel Redirection).
 
-#### 2. Actor
-- Super Admin, HR Admin, HR Staff, Line Manager, Employee, Unauthenticated User.
+#### 2. Actor & Role Mapping
+- **Admin HR**: Masuk ke Admin Panel (`/admin`).
+- **Karyawan**: Masuk ke ESS Portal (`/ess`).
+- *Catatan Teknis:* Role di belakang layar dipetakan secara harmonis (`SUPER_ADMIN`, `HR_ADMIN`, `HR_STAFF`, `LINE_MANAGER` $\rightarrow$ Admin Panel; `EMPLOYEE` $\rightarrow$ ESS Portal).
 
-#### 3. Overview Functional Requirements
-- Login berbasis Email & Password dengan proteksi brute-force [P0].
-- Manajemen Sesi menggunakan Dual-Token (Short-lived Access Token + HTTP-Only Refresh Token) [P0].
-- Centralized RBAC Policy Engine & ABAC Scope Filter [P0].
-- Multi-Factor Authentication (TOTP) untuk pengguna dengan privilege finansial/admin [P1].
-- Password reset via secure email link [P0].
+#### 3. Functional Requirements
+- **Autentikasi Fleksibel [P0]:** Pengguna dapat login menggunakan `username` ATAU `email` dan kata sandi yang valid.
+- **Session Management [P0]:** Menggunakan Short-Lived Access Token (JWT, 15 menit) dan HTTP-Only Secure Refresh Token (7 hari).
+- **Proteksi Brute-Force [P0]:** Akun dikunci sementara selama 15 menit setelah 5 kali gagal memasukkan kata sandi berturut-turut.
+- **Role Redirection Otomatis [P0]:**
+  - Akun dengan wewenang Admin diarahkan ke `/admin`.
+  - Akun Karyawan diarahkan ke `/ess`.
+- **Ubah Password [P0]:** Fitur `ubahPassword()` mandiri dengan verifikasi password lama.
 
----
-
-#### FEATURE: Dual-Panel User Authentication & Session Security [P0]
-
-- **USER STORY**:
-  Sebagai pengguna (Admin atau Karyawan), saya ingin masuk ke panel yang sesuai dengan kredensial saya secara aman sehingga saya dapat mengakses fitur kerja sesuai hak wewenang saya.
-- **BUSINESS RULE**:
-  1. Password wajib memiliki panjang minimal 10 karakter, memuat minimal 1 huruf besar, 1 huruf kecil, 1 angka, dan 1 karakter khusus.
-  2. Akun akan terkunci sementara selama 15 menit setelah 5 kali berturut-turut gagal memasukkan password dari IP yang sama.
-  3. Access Token memiliki masa berlaku tepat 15 menit. Refresh Token memiliki masa berlaku 7 hari dan disimpan dalam HTTP-Only Secure Cookie.
-  4. Penggunaan ulang (*reuse*) Refresh Token yang sudah usang akan memicu pembatalan (*revocation*) seluruh sesi aktif pengguna terkait (*security anomaly detection*).
-- **ACCEPTANCE CRITERIA**:
-  - Pengguna dengan role `EMPLOYEE` yang berhasil login diarahkan ke portal ESS (`/portal`).
-  - Pengguna dengan role `SUPER_ADMIN` atau `HR_ADMIN` diarahkan ke Admin Console (`/admin`).
-  - Request API tanpa header `Authorization: Bearer <token>` atau dengan token kedaluwarsa mengembalikan HTTP 401 Unauthorized.
-- **EDGE CASE**:
-  - Pengguna mencoba login saat status akun di database adalah `SUSPENDED` atau `INACTIVE` -> Sistem menolak dengan pesan generik "Kredensial tidak valid atau akun dinonaktifkan".
-  - Pengguna login bersamaan dari dua perangkat berbeda -> `[REQUIREMENT DECISION NEEDED: Apakah single-session concurrent login diizinkan untuk Employee biasa, atau wajib membatalkan sesi lama?]`
-- **SECURITY REQUIREMENT**:
-  - Password disimpan menggunakan algoritma **Argon2id** (atau bcrypt cost 12).
-  - Tidak ada informasi sensitif (password hash, secret key) di payload JWT.
-- **NOTIFICATION**:
-  - Email notifikasi peringatan login dari perangkat/lokasi baru [P1].
-- **AUDIT REQUIREMENT**:
-  - Setiap percobaan login (berhasil maupun gagal) wajib dicatat pada `audit_logs` memuat: `timestamp`, `email`, `ip_address`, `user_agent`, `status`.
-- **TEST CASE**:
-  - `TC-AUTH-01`: Login dengan email dan password valid mengembalikan HTTP 200 dan token.
-  - `TC-AUTH-02`: Percobaan login gagal ke-5 memicu penguncian akun (HTTP 429 / 401 locked).
-  - `TC-AUTH-03`: Request API dengan token expired memicu refresh token flow secara transparan.
+#### 4. Acceptance Criteria & Test Cases
+- `TC-AUTH-01`: Login kredensial valid menghasilkan HTTP 200, JWT token, dan pengalihan ke dashboard yang tepat.
+- `TC-AUTH-02`: Kredensial tidak cocok menampilkan pesan error generik tanpa kebocoran data sensitif.
+- `TC-AUTH-03`: Percobaan akses rute `/admin` oleh pengguna role Karyawan menghasilkan HTTP 403 Forbidden.
 
 ---
 
-#### FEATURE: Role-Based & Attribute-Based Access Control (RBAC & ABAC) [P0]
-
-- **USER STORY**:
-  Sebagai Sistem, saya ingin membatasi akses setiap endpoint dan data berdasarkan peran dan departemen pengguna agar tidak terjadi kebocoran atau manipulasi data antar karyawan.
-- **BUSINESS RULE**:
-  1. Hak akses modul diverifikasi di level middleware/guard sebelum mencapai logika bisnis.
-  2. Aturan ABAC: Karyawan hanya boleh membaca/mengubah data miliknya sendiri. Manager hanya boleh melihat data bawahan langsung atau anggota departemennya.
-  3. Super Admin tidak boleh mengeksekusi payroll tanpa review HR Admin. `[REQUIREMENT DECISION NEEDED: Apakah Super Admin memiliki wewenang override mutlak terhadap semua data finansial, atau berlaku Four-Eyes Principle?]`
-- **ACCEPTANCE CRITERIA**:
-  - Employee yang mencoba memanggil `GET /api/v1/employees` (list seluruh karyawan) menerima HTTP 403 Forbidden.
-  - Line Manager yang mengakses `GET /api/v1/leaves/requests` hanya menerima daftar cuti dari karyawan dengan `manager_id == current_user.employee_id`.
-- **EDGE CASE**:
-  - Seorang manajer dipindahkan departemennya saat ada permohonan cuti bawahannya yang masih pending -> Sistem harus mengalihkan wewenang approval ke manajer baru secara otomatis.
-- **SECURITY REQUIREMENT**:
-  - Hak akses diperiksa secara berlapis: Route Guard (RBAC) + Service Layer Query Scoping (ABAC).
-- **NOTIFICATION**:
-  - Tidak ada notifikasi pengguna (Pencatatan pelanggaran ke log keamanan).
-- **AUDIT REQUIREMENT**:
-  - Percobaan akses ilegal (HTTP 403) dicatat sebagai insiden keamanan pada audit trail.
-- **TEST CASE**:
-  - `TC-RBAC-01`: Verifikasi role `EMPLOYEE` ditolak saat mengakses endpoint admin `/api/v1/payroll/periods`.
-  - `TC-ABAC-01`: Verifikasi Line Manager A tidak dapat melihat pengajuan cuti tim Line Manager B.
-
-#### Future Extensibility (Modul 01):
-- Integrasi Single Sign-On (SSO) berbasis SAML 2.0 / OAuth2 / Google Workspace / Azure AD [P2].
-- Dukungan Biometric Passkeys (WebAuthn / FIDO2) [P3].
-
----
-
-### MODUL 02: EMPLOYEE MANAGEMENT (CORE HR)
+### MODUL 02: EMPLOYEE MASTER DATA MANAGEMENT (BR-EMP-001, BR-ESS-EMP-001)
 
 #### 1. Objective
-Mengelola master data kepegawaian secara komprehensif, terstruktur, aman, dan menjadi fondasi utama seluruh modul lainnya.
+Mengelola siklus hidup data master kepegawaian perusahaan sebagai sumber kebenaran tunggal (*Single Source of Truth*) yang terintegrasi dengan struktur departemen.
 
 #### 2. Actor
-- HR Admin, HR Staff, Line Manager, Employee.
+- **Admin HR**: CRUD data master pegawai (`BR-EMP-001`).
+- **Karyawan**: Pembaruan profil mandiri data personal dinamis (`BR-ESS-EMP-001`).
 
-#### 3. Overview Functional Requirements
-- CRUD Data Induk Karyawan & Status Kepegawaian (PKWT/PKWTT/Probation/Intern) [P0].
-- Manajemen Departemen, Divisi, dan Struktur Jabatan [P0].
-- Visualisasi Bagan Organisasi (*Org Chart Tree*) [P1].
-- Portal Profil Mandiri Karyawan (ESS Profile) [P0].
-- Enkripsi Dokumen & Identitas Pribadi (KTP, NPWP, Rekening Bank) [P0].
+#### 3. Functional Requirements
+- **Kelola Data Karyawan (Admin HR) [P0]:**
+  - Menginput data master pegawai baru: `nip`, `nama`, `tgl_lahir`, `jk` (jenis kelamin), `alamat`, `status_kerja`, dan `id_dept` (relasi ke `Departemen`).
+  - Memperbarui data kepegawaian, status kerja (Tetap, Kontrak/PKWT, Magang, Percobaan), dan perpindahan departemen.
+  - Menonaktifkan pegawai (*soft deactivation*) untuk menjaga integritas data historis masa lalu.
+- **Kelola Profil Mandiri (Karyawan - ESS) [P0]:**
+  - Karyawan hanya memiliki hak untuk mengubah data personal yang bersifat **dinamis**, yaitu: **`alamat`** dan **`nomor HP`**.
+  - Data struktural (`nip`, `nama`, `tgl_lahir`, `status_kerja`, `departemen`) bersifat *read-only* bagi karyawan.
+- **Manajemen Departemen [P0]:**
+  - Admin HR mengelola data departemen: `id_dept`, `nama_dept`, `deskripsi` (`tambah()`, `ubah()`, `hapus()`). Relasi: 1 Departemen memiliki 0..* Karyawan.
 
----
-
-#### FEATURE: Master Data Karyawan & Enkripsi Data Sensitif [P0]
-
-- **USER STORY**:
-  Sebagai HR Admin, saya ingin mendaftarkan dan memperbarui data profil karyawan lengkap dengan nomor identitas dan rekening bank secara aman agar data kepegawaian terkelola dengan valid.
-- **BUSINESS RULE**:
-  1. Nomor Induk Karyawan (NIK / `employee_code`) wajib unik di seluruh sistem dan mengikuti format standar perusahaan.
-  2. Data sensitif (Nomor KTP, NPWP, Nomor Rekening Bank) wajib disimpan dalam kondisi terenkripsi (AES-256) di database dan hanya boleh dimasking saat ditampilkan di UI (`************1234`), kecuali bagi user yang memiliki permission `employee:view_sensitive`.
-  3. Tanggal akhir kontrak (`end_date`) wajib diisi jika status kepegawaian adalah `CONTRACT` (PKWT) atau `PROBATION`.
-  4. Penghapusan data karyawan menggunakan soft delete (`deleted_at`); hard delete dilarang demi integritas relasional data payroll dan audit.
-- **ACCEPTANCE CRITERIA**:
-  - Form pendaftaran karyawan baru berhasil menyimpan data dan secara otomatis membuat akun User (Modul 01).
-  - Nilai kolom `national_id_number` dan `bank_account_no` di PostgreSQL tersimpan dalam cipher binary/base64 yang tidak dapat dibaca mentah.
-  - Karyawan dapat melihat profilnya di ESS namun kolom jabatan, departemen, dan gaji terkunci (*read-only*).
-- **EDGE CASE**:
-  - Karyawan keluar (*resign/terminated*) -> Status berubah menjadi `TERMINATED`, akun login langsung dinonaktifkan secara otomatis, namun data historis tetap tersimpan.
-  - Perubahan nomor rekening saat periode payroll sedang berjalan -> Sistem menerapkan versi rekening baru untuk periode berikutnya atau `[REQUIREMENT DECISION NEEDED: Apakah ada tanggal cut-off perubahan rekening bank per bulan?]`
-- **SECURITY REQUIREMENT**:
-  - Dekripsi data sensitif hanya terjadi di memori aplikasi pada use-case berizin khusus.
-- **NOTIFICATION**:
-  - Notifikasi email selamat datang kepada karyawan baru berisi instruksi aktivasi akun.
-- **AUDIT REQUIREMENT**:
-  - Setiap perubahan data profil (terutama NIK, nama, status, rekening bank) wajib mencatat nilai lama (*old_values*) dan nilai baru (*new_values*) di `audit_logs`.
-- **TEST CASE**:
-  - `TC-EMP-01`: Registrasi karyawan dengan NIK duplikat mengembalikan HTTP 409 Conflict.
-  - `TC-EMP-02`: Verifikasi query database langsung pada tabel `employees` menampilkan ciphertext untuk field sensitif.
+#### 4. Acceptance Criteria & Test Cases
+- `TC-EMP-01`: Tambah pegawai baru dengan NIP unik dan departemen valid tersimpan di database.
+- `TC-EMP-02`: Karyawan berhasil memperbarui alamat dan no HP via endpoint `/api/v1/ess/profile`.
+- `TC-EMP-03`: Percobaan karyawan memodifikasi NIP atau Departemen via payload ditolak oleh validator API.
 
 ---
 
-#### FEATURE: Pembaruan Profil Mandiri Karyawan (ESS Profile Update) [P0]
-
-- **USER STORY**:
-  Sebagai Karyawan, saya ingin memperbarui nomor telepon domisili dan kontak darurat saya secara mandiri melalui ESS agar informasi kontak saya selalu mutakhir.
-- **BUSINESS RULE**:
-  1. Karyawan hanya diizinkan mengedit field: `phone_number`, `current_address`, `emergency_contact_name`, `emergency_contact_phone`, dan `emergency_contact_relation`.
-  2. Seluruh data struktural (Departemen, Posisi, Gaji, Manager, Bank) terkunci bagi karyawan.
-- **ACCEPTANCE CRITERIA**:
-  - Karyawan submit update data kontak -> data langsung terupdate di profilnya.
-  - Karyawan mencoba mengirim payload berisi perubahan `basic_salary` melalui manipulasi API -> API mengabaikan atau menolak request dengan HTTP 400.
-- **EDGE CASE**:
-  - Karyawan menginput nomor kontak darurat sama persis dengan nomor telepon pribadinya -> Sistem memunculkan validasi peringatan.
-- **SECURITY REQUIREMENT**:
-  - Validasi ketat menggunakan DTO whitelist (hanya properti yang diizinkan yang diproses).
-- **NOTIFICATION**:
-  - Notifikasi konfirmasi perubahan data dikirimkan ke email karyawan.
-- **AUDIT REQUIREMENT**:
-  - Perubahan kontak dicatat pada `audit_logs` dengan `action: "UPDATE_PROFILE_SELF"`.
-- **TEST CASE**:
-  - `TC-EMP-03`: Karyawan mengedit alamat domisili berhasil tersimpan dan tercatat di audit log.
-
-#### Future Extensibility (Modul 02):
-- Fitur *Digital Identity Card* (QR Code ID Karyawan di aplikasi mobile) [P2].
-- Integrasi e-Sign untuk kontrak kerja digital via PrivyID / Peruri [P2].
-
----
-
-### MODUL 03: ATTENDANCE MANAGEMENT
+### MODUL 03: ATTENDANCE & TIME TRACKING (BR-ATT-001, BR-ESS-ATT-001)
 
 #### 1. Objective
-Mencatat dan memverifikasi kehadiran kerja harian secara akurat, real-time, anti-kecurangan, serta otomatis mengkalkulasi keterlambatan dan lembur sebagai input payroll.
+Mencatat kehadiran kerja harian secara mandiri melalui web ESS dan menyediakan rekapitulasi data kehadiran yang siap divalidasi oleh HR sebagai dasar perhitungan penggajian.
 
 #### 2. Actor
-- Employee, Line Manager, HR Admin, HR Staff.
+- **Karyawan**: Melakukan check-in dan check-out mandiri (`BR-ESS-ATT-001`).
+- **Admin HR**: Memantau, memvalidasi, dan merekapitulasi jam masuk/pulang semua staf (`BR-ATT-001`).
 
-#### 3. Overview Functional Requirements
-- Clock-in dan Clock-out mandiri via ESS dengan validasi Geofencing (GPS) dan IP Address [P0].
-- Manajemen Jadwal & Shift Kerja (Fleksibel, Normal, Shift Roster) [P0].
-- Deteksi otomatis: Masuk Tepat Waktu, Terlambat (*Late In*), Pulang Awal (*Early Out*), Absen (*No Show*) [P0].
-- Pengajuan dan Approval Lembur (*Overtime Request*) [P1].
-- Koreksi Absensi Manual oleh HR dengan riwayat alasan [P1].
-- Impor data log presensi dari mesin Fingerprint (CSV / API) [P1].
+#### 3. Functional Requirements
+- **Absensi Digital Karyawan (ESS) [P0]:**
+  - Karyawan melakukan aksi Check-In saat masuk kerja dan Check-Out saat pulang kerja.
+  - Waktu kehadiran dicatat secara real-time berdasarkan jam server (*Server Authoritative Time*).
+  - Presensi bersifat fleksibel: Koordinat lokasi GPS dan swafoto bersifat opsional (*non-blocking*) sesuai keputusan `BDR-ATT-01`.
+  - Sistem mencegah duplikasi check-in pada tanggal kalender kerja yang sama.
+- **Rekap Absensi Staf (Admin HR) [P0]:**
+  - Admin HR memantau log kehadiran seluruh staf secara harian/bulanan.
+  - Sistem menampilkan jam masuk, jam pulang, dan status kehadiran: `PRESENT` (Tepat Waktu), `LATE` (Terlambat), `ABSENT` (Alpa), `ON_LEAVE` (Cuti/Izin).
+  - Admin HR dapat memvalidasi dan mengoreksi data presensi staf.
+- **Toleransi Keterlambatan (*Grace Period*) [P0]:**
+  - Diberikan batas toleransi keterlambatan **15 menit** dari jam masuk kerja resmi. Check-in setelah menit ke-15 dikategorikan `LATE`.
 
----
-
-#### FEATURE: Geofenced Mobile/Web Clock-In & Anti-Spoofing [P0]
-
-- **USER STORY**:
-  Sebagai Karyawan, saya ingin melakukan clock-in dari portal ESS dengan GPS lokasi saya sehingga jam kehadiran saya tercatat akurat dan diakui perusahaan.
-- **BUSINESS RULE**:
-  1. Clock-in hanya valid jika jarak koordinat pengguna berada dalam radius geofence kantor yang ditentukan (contoh: maksimal 100 meter dari titik koordinat kantor/cabang tempat karyawan ditugaskan).
-  2. Waktu kehadiran (*timestamp*) mutlak menggunakan jam server (*Server Authoritative Time*), bukan waktu jam di perangkat klien.
-  3. Toleransi keterlambatan (*grace period*) dihitung berdasarkan konfigurasi shift (misal: 15 menit). Karyawan yang clock-in setelah grace period otomatis berstatus `LATE` dengan durasi keterlambatan dihitung dalam satuan menit.
-  4. Dalam satu hari kalender kerja, karyawan hanya dapat melakukan 1 kali Clock-In dan 1 kali Clock-Out utama (kecuali ada skema shift khusus yang diatur).
-- **ACCEPTANCE CRITERIA**:
-  - Karyawan berada di dalam radius 50 meter kantor -> Clock-in berhasil, status: `PRESENT`.
-  - Karyawan berada di luar radius 100 meter -> Clock-in ditolak dengan pesan: "Anda berada di luar area kantor yang diizinkan (Jarak: X meter)".
-  - Tombol Clock-In di portal ESS berubah menjadi tombol Clock-Out setelah presensi masuk berhasil dicatat.
-- **EDGE CASE**:
-  - Sinyal GPS lemah atau perangkat mematikan izin lokasi -> Sistem menolak presensi dengan instruksi jelas untuk mengaktifkan izin GPS akurasi tinggi.
-  - Karyawan bertugas dinas luar kota -> Karyawan harus memilih opsi "Dinas Luar" yang mewajibkan unggah foto lokasi dan approval atasan `[REQUIREMENT DECISION NEEDED: Apakah presensi dinas luar memerlukan modul terpisah atau flag pada presensi reguler?]`
-- **SECURITY REQUIREMENT**:
-  - Deteksi indikasi Mock Location / Fake GPS pada browser/perangkat jika memungkinkan.
-  - Idempotency key pada request clock-in untuk mencegah double record akibat klik berulang.
-- **NOTIFICATION**:
-  - Push notification/In-app toast berhasil clock-in.
-  - Notifikasi ke Line Manager jika karyawan terlambat > 30 menit [P2].
-- **AUDIT REQUIREMENT**:
-  - Mencatat koordinat latitude, longitude, IP address, device user-agent, dan waktu server pada setiap baris presensi.
-- **TEST CASE**:
-  - `TC-ATT-01`: Clock-in pada koordinat valid menghasilkan record status `PRESENT`.
-  - `TC-ATT-02`: Clock-in pada jarak 500 meter dari kantor ditolak dengan HTTP 422 `OUT_OF_GEOFENCE`.
-  - `TC-ATT-03`: Clock-in kedua kali di tanggal yang sama ditolak (HTTP 409 / constraint violation).
+#### 4. Acceptance Criteria & Test Cases
+- `TC-ATT-01`: Karyawan klik tombol Check-In $\rightarrow$ status hari ini tercatat `PRESENT` / `LATE` dengan waktu server akurat.
+- `TC-ATT-02`: Karyawan klik tombol Check-Out $\rightarrow$ jam pulang tercatat pada baris presensi hari tersebut.
+- `TC-ATT-03`: Admin HR dapat memfilter rekap absensi per departemen dan per rentang periode tanggal.
 
 ---
 
-#### FEATURE: Pengajuan & Perhitungan Lembur (Overtime) [P1]
-
-- **USER STORY**:
-  Sebagai Karyawan, saya ingin mengajukan lembur setelah jam kerja normal beserta rincian tugas yang dikerjakan agar jam lembur saya diverifikasi dan dibayarkan pada payroll.
-- **BUSINESS RULE**:
-  1. Pengajuan lembur wajib diajukan minimal pada hari H sebelum jam lembur dimulai atau maksimal H+1 sesuai kebijakan HR.
-  2. Durasi lembur aktual dihitung dari selisih waktu clock-out dengan jam akhir shift, dengan batas maksimal sesuai lembur yang telah disetujui (*capped by approval*).
-  3. Formula kompensasi lembur mengikuti regulasi Depnaker (Jam pertama: 1.5x upah sejam, jam berikutnya: 2x upah sejam) `[REQUIREMENT DECISION NEEDED: Apakah perusahaan menerapkan formula lembur Depnaker murni atau skema flat allowance?]`
-  4. Pengajuan lembur wajib disetujui minimal oleh Line Manager (Level 1).
-- **ACCEPTANCE CRITERIA**:
-  - Pengajuan lembur yang di-approve manajer otomatis masuk ke rekap akumulasi jam lembur bulanan karyawan.
-- **EDGE CASE**:
-  - Karyawan mengajukan lembur 3 jam, tetapi clock-out hanya 1 jam setelah shift -> Sistem hanya mengakui durasi aktual (1 jam).
-- **SECURITY REQUIREMENT**:
-  - Verifikasi hak akses approval lembur (hanya manajer terkait yang dapat menyetujui).
-- **NOTIFICATION**:
-  - Real-time notification ke Manager saat pengajuan lembur disubmit.
-  - Notifikasi ke karyawan saat pengajuan lembur disetujui/ditolak.
-- **AUDIT REQUIREMENT**:
-  - Log audit mencatat ID approver, waktu persetujuan, dan catatan approval.
-- **TEST CASE**:
-  - `TC-ATT-04`: Karyawan submit lembur 2 jam -> Manager approve -> Record lembur berstatus `APPROVED`.
-
-#### Future Extensibility (Modul 03):
-- Face Recognition selfie check dengan liveness detection [P2].
-- Integrasi otomatis webhook ke IoT Smart Turnstile / Door Access Controller [P3].
-
----
-
-### MODUL 04: LEAVE, PERMISSION, & SICK LEAVE
+### MODUL 04: LEAVE, PERMISSION, & SICK LEAVE (BR-ESS-LEV-001)
 
 #### 1. Objective
-Mengotomatisasi siklus pengajuan, alokasi kuota, verifikasi dokumen pendukung, dan alur persetujuan cuti/izin/sakit secara transparan tanpa mengganggu operasional tim.
+Mengotomatisasi siklus pengajuan izin, sakit, dan cuti tahunan secara digital dengan alur persetujuan terpusat langsung oleh Admin HR.
 
 #### 2. Actor
-- Employee, Line Manager, HR Admin.
+- **Karyawan**: Mengisi formulir permohonan digital (`BR-ESS-LEV-001`).
+- **Admin HR**: Menyetujui atau menolak permohonan cuti/izin (`ubahStatus`).
 
-#### 3. Overview Functional Requirements
-- Manajemen Master Jenis Cuti (Cuti Tahunan, Melahirkan, Menikah, Duka, Sakit, Unpaid Leave) [P0].
-- Perhitungan Saldo Kuota Cuti Otomatis (Alokasi tahunan, akumulasi bulanan/accrual) [P0].
-- Formulir Pengajuan Cuti Mandiri dengan unggah berkas (Surat Dokter untuk izin sakit) [P0].
-- Multi-tier Approval Workflow (Employee -> Line Manager -> HR Admin) [P0].
-- Kalender Cuti Bersama Tim (*Team Leave Calendar*) [P1].
-- Pembatalan Cuti (*Leave Cancellation*) sebelum tanggal pelaksanaan [P1].
+#### 3. Functional Requirements
+- **Pengajuan Cuti & Izin Mandiri (ESS) [P0]:**
+  - Karyawan memilih kategori: **Libur (Cuti Tahunan)**, **Sakit**, atau **Dispensasi/Izin**.
+  - Mengisi `tanggal_mulai`, `tanggal_selesai`, dan `keterangan`.
+  - Validasi: `tanggal_selesai` $\ge$ `tanggal_mulai`.
+- **Kebijakan Saldo Cuti & Izin [P0]:**
+  - Kuota cuti tahunan ditetapkan baku **12 hari per tahun** per karyawan (`BDR-LEV-01`).
+  - Pengajuan jenis **Sakit** dan **Dispensasi** **tidak memotong** kuota cuti tahunan.
+  - Pengajuan jenis cuti tahunan memotong saldo kuota saat permohonan disetujui.
+- **Alur Persetujuan Terpusat (Admin HR) [P0]:**
+  - Sesuai keputusan resmi, persetujuan cuti ditangani langsung oleh Admin HR di Admin Panel via fungsi `ubahStatus()` (`APPROVED` / `REJECTED`).
+  - Permohonan yang disetujui otomatis menyinkronkan status kalender presensi karyawan menjadi `ON_LEAVE` sehingga tidak dihitung alpa.
 
----
-
-#### FEATURE: Pengajuan Cuti & Pemotongan Saldo Otomatis [P0]
-
-- **USER STORY**:
-  Sebagai Karyawan, saya ingin mengajukan cuti tahunan melalui portal ESS dengan melihat sisa kuota yang tersedia sehingga rencana libur saya terdata resmi.
-- **BUSINESS RULE**:
-  1. Pengajuan cuti tahunan tidak boleh melebihi sisa saldo cuti aktif (`remaining_days >= requested_days`).
-  2. Pengajuan cuti sakit melebihi 1 hari kerja wajib melampirkan berkas surat keterangan dokter (format PDF/JPG/PNG maksimal 2MB).
-  3. Hari libur nasional dan hari libur akhir pekan tidak dihitung sebagai pengurang saldo cuti.
-  4. Saat pengajuan diajukan (*PENDING*), saldo cuti masuk ke status terpotong sementara (`pending_days`). Jika di-*REJECT*, saldo dikembalikan ke kuota aktif. Jika di-*APPROVED*, saldo resmi dipotong dari `allocated_days`.
-  5. Pengajuan cuti tidak boleh bertabrakan (*overlap*) dengan tanggal pengajuan cuti lain yang sudah ada.
-- **ACCEPTANCE CRITERIA**:
-  - Karyawan dengan saldo 10 hari mengajukan 3 hari cuti -> Saldo tersisa menjadi 7 hari (dengan 3 hari pending).
-  - Sistem menolak pengajuan jika tanggal awal lebih besar dari tanggal akhir atau tanggal di masa lampau `[REQUIREMENT DECISION NEEDED: Apakah backdated leave diizinkan khusus untuk izin sakit darurat?]`
-- **EDGE CASE**:
-  - Dua karyawan dalam satu tim yang memegang peran operasional tunggal mengajukan cuti di tanggal yang sama -> Sistem memunculkan *warning alert* kepada Line Manager mengenai benturan jadwal tim.
-- **SECURITY REQUIREMENT**:
-  - Validasi MIME type dan magic bytes pada berkas surat dokter untuk mencegah upload skrip berbahaya.
-- **NOTIFICATION**:
-  - Notifikasi real-time & email terkirim ke Line Manager saat pengajuan dibuat.
-  - Notifikasi ke karyawan saat status permohonan berubah (Approved/Rejected).
-- **AUDIT REQUIREMENT**:
-  - Log audit mencatat pengurangan saldo cuti, mutasi status, dan alasan approver.
-- **TEST CASE**:
-  - `TC-LEV-01`: Pengajuan cuti 15 hari dengan sisa saldo 12 hari menghasilkan error HTTP 422 `INSUFFICIENT_LEAVE_BALANCE`.
-  - `TC-LEV-02`: Pengajuan cuti yang disetujui memotong sisa saldo secara akurat pada database.
+#### 4. Acceptance Criteria & Test Cases
+- `TC-LEV-01`: Karyawan submit cuti tahunan 3 hari dengan saldo 12 $\rightarrow$ status permohonan `PENDING`.
+- `TC-LEV-02`: Admin HR klik approve $\rightarrow$ status cuti menjadi `APPROVED`, saldo cuti berkurang menjadi 9 hari.
+- `TC-LEV-03`: Pengajuan cuti yang melebihi sisa saldo ditolak sistem dengan pesan saldo tidak mencukupi.
 
 ---
 
-#### FEATURE: Multi-Level Approval Workflow [P0]
-
-- **USER STORY**:
-  Sebagai Line Manager dan HR Admin, saya ingin meninjau pengajuan cuti bawahan saya dan memberikan persetujuan atau penolakan dengan catatan agar operasional tetap terkontrol.
-- **BUSINESS RULE**:
-  1. Approval Tahap 1: Line Manager (Atasan langsung pemohon).
-  2. Approval Tahap 2: HR Admin (Verifikasi kepatuhan kebijakan perusahaan) `[REQUIREMENT DECISION NEEDED: Apakah semua cuti wajib 2-level approval (Manager + HR), atau cuti reguler cukup 1-level Manager saja?]`
-  3. Penolakan (*Rejection*) pada tahap mana pun wajib menyertakan alasan teks minimal 10 karakter.
-- **ACCEPTANCE CRITERIA**:
-  - Setelah Manager menyetujui, status berpindah ke `WAITING_HR_APPROVAL` (jika skema 2-level).
-  - Jika ditolak, status berubah menjadi `REJECTED`, saldo pending dikembalikan utuh ke saldo aktif karyawan seketika itu juga dalam 1 database transaction.
-- **EDGE CASE**:
-  - Line Manager tidak merespons pengajuan cuti dalam kurun waktu 3 hari kerja -> Sistem mengirim reminder otomatis atau eskalasi ke atasan manajer `[REQUIREMENT DECISION NEEDED: Apakah auto-escalation diaktifkan?]`
-- **SECURITY REQUIREMENT**:
-  - Validasi otorisasi bahwa yang memanggil endpoint approve adalah benar atasan langsung dari pemohon.
-- **NOTIFICATION**:
-  - Notifikasi WebSocket instan ke antarmuka pemohon saat disetujui.
-- **AUDIT REQUIREMENT**:
-  - Tabel `leave_approvals` mencatat approver ID, status, komentar, dan timestamp.
-- **TEST CASE**:
-  - `TC-LEV-03`: Percobaan approval oleh user yang bukan atasan langsung menghasilkan HTTP 403 Forbidden.
-
-#### Future Extensibility (Modul 04):
-- Integrasi sinkronisasi jadwal cuti ke Google Calendar / Microsoft Outlook API [P2].
-- Mekanisme Cuti Bersama yang memotong kuota tahunan secara massal (*bulk deduction*) [P1].
-
----
-
-### MODUL 05: PAYROLL MANAGEMENT
+### MODUL 05: PAYROLL MANAGEMENT (BR-PAY-001, BR-ESS-PAY-001)
 
 #### 1. Objective
-Memproses perhitungan upah, tunjangan, lembur, potongan pajak PPh 21 (TER), BPJS, dan potongan kehadiran secara presisi, tepat waktu, aman, serta menghasilkan slip gaji resmi.
+Menghitung gaji bersih karyawan secara otomatis berdasarkan rekapitulasi absensi bulanan dan menerbitkan dokumen slip gaji resmi yang dapat diunduh oleh karyawan.
 
 #### 2. Actor
-- HR Admin (Payroll Specialist), HR Director, Employee.
+- **Admin HR**: Menjalankan kalkulasi payroll bulanan (`BR-PAY-001`).
+- **Karyawan**: Melihat rincian pendapatan dan mengunduh slip gaji resmi (`BR-ESS-PAY-001`).
 
-#### 3. Overview Functional Requirements
-- Manajemen Komponen Gaji: Gaji Pokok, Tunjangan Tetap, Tunjangan Tidak Tetap, Potongan [P0].
-- Mesin Kalkulasi PPh 21 skema TER (Tarif Efektif Rata-rata PP 58/2023) [P0].
-- Mesin Kalkulasi Iuran BPJS Ketenagakerjaan (JKK, JKM, JHT, JP) & BPJS Kesehatan [P0].
-- Integrasi Pemotongan Otomatis dari Modul Kehadiran (Potongan telat/absen) & Cuti Unpaid [P0].
-- Siklus Periode Penggajian: *Draft -> Calculate -> Verify -> Lock -> Publish* [P0].
-- Generate Slip Gaji Digital terenkripsi & Ekspor File Batch Transfer Bank (BCA, Mandiri, dll) [P0].
+#### 3. Functional Requirements
+- **Formula Penggajian Baku (Sesuai Keputusan BDR-PAY-01 & BDR-PAY-02) [P0]:**
+  $$\text{Total Gaji} = \text{Gaji Pokok} + \text{Tunjangan} - \text{Potongan}$$
+  - **Gaji Pokok:** Berdasarkan master data gaji karyawan.
+  - **Tunjangan:** Tunjangan tetap bulanan yang terkonfigurasi.
+  - **Potongan Absensi (Alpa):**
+    $$\text{Potongan Alpa} = \left(\frac{\text{Gaji Pokok}}{21}\right) \times \text{Jumlah Hari Alpa}$$
+  - **Potongan Lain:** Iuran BPJS dan potongan resmi perusahaan.
+- **Relasi Payroll ke Slip Gaji [P0]:**
+  - Tepat $1$ catatan `Payroll` menghasilkan $1$ berkas `SlipGaji`.
+  - Berkas slip gaji mencatat: `id_slip`, `id_payroll`, `periode`, `tgl_cetak`, dan berkas dokumen `file_slip` (PDF resmi).
+- **Akses Slip Gaji Mandiri (ESS) [P0]:**
+  - Karyawan hanya dapat melihat rincian gaji dan mengunduh berkas slip gaji miliknya sendiri.
+  - Akses slip gaji lintas akun diblokir secara mutlak pada level data API.
 
----
-
-#### FEATURE: Batch Payroll Calculation & Tax/BPJS Formula Engine [P0]
-
-- **USER STORY**:
-  Sebagai Payroll Specialist, saya ingin menjalankan kalkulasi penggajian bulanan untuk seluruh karyawan secara otomatis berdasarkan data master gaji dan rekap kehadiran agar proses payroll selesai cepat dan akurat.
-- **BUSINESS RULE**:
-  1. Formula Take Home Pay (THP):  
-     `THP = (Gaji Pokok + Tunjangan Tetap + Tunjangan Variabel + Upah Lembur) - (PPh 21 + BPJS Ketenagakerjaan Karyawan + BPJS Kesehatan Karyawan + Potongan Kehadiran + Pinjaman/Potongan Lain)`.
-  2. Perhitungan PPh 21 wajib mengikuti kategori TER (Kategori A, B, atau C berdasarkan status PTKP) untuk bulan Januari-November, dan perhitungan tarif Pasal 17 pada masa pajak Desember / masa akhir kerja.
-  3. BPJS Ketenagakerjaan:
-     - JHT: 3.7% pemberi kerja, 2.0% karyawan.
-     - JP: 2.0% pemberi kerja, 1.0% karyawan (dengan plafon upah maksimal yang ditentukan pemerintah).
-     - JKK (sesuai tingkat risiko) & JKM (0.3% pemberi kerja).
-  4. BPJS Kesehatan: 4.0% pemberi kerja, 1.0% karyawan (dengan batas upah maksimal yang berlaku).
-  5. Proses kalkulasi payroll massal wajib dijalankan secara asinkron (*Background Job*) untuk menghindari timeout HTTP.
-- **ACCEPTANCE CRITERIA**:
-  - Eksekusi tombol "Calculate Payroll" memicu background queue worker dan menampilkan progress bar status pemrosesan.
-  - Hasil perhitungan menghasilkan rincian detail pada tabel `payroll_items` untuk setiap karyawan.
-  - Jumlah total THP tidak boleh bernilai negatif (jika potongan > penghasilan, sistem memunculkan flag review manual).
-- **EDGE CASE**:
-  - Karyawan baru yang bergabung di tengah bulan (*prorate*) -> Sistem menghitung upah prorata berdasarkan jumlah hari kerja aktif dibagi total hari kerja sebulan `[REQUIREMENT DECISION NEEDED: Apakah prorata menggunakan formula hari kerja kalender atau standar 21/25 hari kerja?]`
-- **SECURITY REQUIREMENT**:
-  - Kolom nominal gaji di database wajib terenkripsi AES-256-GCM.
-  - Akses endpoint kalkulasi payroll dibatasi hanya untuk role khusus Payroll Master.
-- **NOTIFICATION**:
-  - Notifikasi sistem ke Payroll Specialist saat background calculation selesai 100%.
-- **AUDIT REQUIREMENT**:
-  - Log audit mencatat: ID user pengeksekusi, parameter periode, jumlah karyawan terproses, dan total pengeluaran payroll.
-- **TEST CASE**:
-  - `TC-PAY-01`: Verifikasi formula PPh 21 TER Kategori A Penghasilan Rp 8.000.000 menghasilkan potongan pajak sesuai tabel regulasi resmi.
-  - `TC-PAY-02`: Verifikasi potongan BPJS mematuhi batas upah tertinggi (*wage ceiling*).
+#### 4. Acceptance Criteria & Test Cases
+- `TC-PAY-01`: Admin HR klik "Proses Payroll" untuk periode tertentu $\rightarrow$ sistem mengkalkulasi potongan alpa dan menghasilkan rekap gaji seluruh staf.
+- `TC-PAY-02`: Karyawan dengan 2 hari alpa menerima potongan gaji tepat `(Gaji Pokok / 21) * 2`.
+- `TC-PAY-03`: Karyawan login ke ESS membuka menu slip gaji $\rightarrow$ rincian pendapatan tampil dan berkas PDF slip resmi berhasil diunduh.
 
 ---
 
-#### FEATURE: Payroll Period Locking & Payslip Publishing [P0]
-
-- **USER STORY**:
-  Sebagai HR Director, saya ingin mengunci periode penggajian yang telah diverifikasi sehingga data gaji tidak dapat diubah lagi dan menerbitkan slip gaji ke portal ESS karyawan.
-- **BUSINESS RULE**:
-  1. Periode payroll yang sudah diberi status `LOCKED` bersifat *immutable* (tidak dapat dimodifikasi oleh siapa pun tanpa prosedur *Unlock* resmi dengan otorisasi Super Admin).
-  2. Sekali payroll di-lock, modul Presensi dan Cuti dilarang memutasi data kehadiran pada rentang tanggal periode tersebut.
-  3. Slip gaji hanya dapat diakses oleh pemilik akun (`employee_id == current_user.employee_id`) melalui portal ESS.
-  4. Unduhan file PDF slip gaji diproteksi password (kombinasi tanggal lahir karyawan atau PIN keamanan).
-- **ACCEPTANCE CRITERIA**:
-  - Slip gaji muncul di menu "My Payslips" ESS seketika setelah status payroll diubah ke `PUBLISHED`.
-  - Upaya mengubah data slip gaji pada periode locked melalui API menghasilkan HTTP 400 `PAYROLL_PERIOD_LOCKED`.
-- **EDGE CASE**:
-  - Terjadi koreksi gaji darurat setelah payroll di-lock -> `[REQUIREMENT DECISION NEEDED: Apakah koreksi dilakukan via mekanisme Unlock Periode atau dibebankan pada Adjustment di periode bulan berikutnya?]`
-- **SECURITY REQUIREMENT**:
-  - Endpoint download slip gaji menggunakan *signed URL* jangka pendek (maksimal 5 menit).
-- **NOTIFICATION**:
-  - Broadcast notifikasi real-time dan email ke seluruh karyawan: "Slip Gaji Periode [Bulan-Tahun] telah tersedia di ESS".
-- **AUDIT REQUIREMENT**:
-  - Aksi `LOCK_PAYROLL` dan `PUBLISH_PAYROLL` wajib dicatat di audit log dengan identitas eksekutor dan ringkasan nilai finansial.
-- **TEST CASE**:
-  - `TC-PAY-03`: Karyawan A mencoba mengakses endpoint slip gaji Karyawan B -> Menghasilkan HTTP 403 Forbidden.
-  - `TC-PAY-04`: Update record gaji pada status locked menghasilkan error penolakan.
-
-#### Future Extensibility (Modul 05):
-- Integrasi langsung API Direct Disbursement Bank (Host-to-Host BCA/Mandiri API) [P3].
-- Simulator kenaikan gaji berkala dan budgeting tahunan [P2].
-
----
-
-### MODUL 06: BENEFITS & REIMBURSEMENT
+### MODUL 06: BENEFIT & ASURANSI (BR-BEN-001, BR-ESS-BEN-001)
 
 #### 1. Objective
-Mengelola tunjangan fleksibel, klaim penggantian biaya (reimbursement medis, perjalanan, kacamata) karyawan secara transparan dengan batas pagu yang terkontrol.
+Mengonfigurasi alokasi jaminan sosial (BPJS), asuransi kesehatan, dan bonus perusahaan per karyawan, serta menyediakan transparansi sisa plafon kesehatan pada portal mandiri pegawai.
 
 #### 2. Actor
-- Employee, Line Manager, HR Admin, Finance/Payroll Staff.
+- **Admin HR**: Konfigurasi alokasi benefit per karyawan dan periode (`BR-BEN-001`).
+- **Karyawan**: Memeriksa jenis asuransi aktif dan sisa plafon kesehatan (`BR-ESS-BEN-001`).
 
-#### 3. Overview Functional Requirements
-- Alokasi Pagu Manfaat Karyawan per Kategori per Tahun [P1].
-- Pengajuan Klaim Mandiri via ESS dengan unggah bukti kuitansi/faktur [P1].
-- Alur Verifikasi Struk oleh HR dan Persetujuan Finansial [P1].
-- Integrasi Pencairan Klaim ke dalam Periode Penggajian (Payroll) [P1].
+#### 3. Functional Requirements
+- **Kelola Benefit (Admin HR) [P0]:**
+  - Menyimpan data benefit: `id_benefit`, `id_karyawan`, `jenis_benefit` (Asuransi Kesehatan, BPJS Ketenagakerjaan, BPJS Kesehatan, Bonus Perusahaan), `nilai : decimal`, dan `periode : string`.
+  - Admin HR dapat menambah, mengubah, atau memperbarui nominal alokasi benefit per periode.
+- **Lihat Benefit Mandiri (ESS) [P0]:**
+  - Karyawan dapat mengecek daftar asuransi aktif miliknya dan melihat nilai sisa plafon kesehatan pada periode berjalan.
 
----
-
-#### FEATURE: Pengajuan & Pencairan Klaim Reimbursement [P1]
-
-- **USER STORY**:
-  Sebagai Karyawan, saya ingin mengajukan klaim penggantian biaya kacamata/medis dengan melampirkan foto kuitansi agar dana saya diganti pada pembayaran payroll berikutnya.
-- **BUSINESS RULE**:
-  1. Total nominal klaim yang diajukan tidak boleh melebihi sisa pagu manfaat tahunan karyawan untuk kategori tersebut.
-  2. Kuitansi/faktur klaim yang diunggah tidak boleh bertanggal lebih dari 30 hari kalender sejak tanggal kwitansi (*claim expiration window*).
-  3. Klaim yang telah disetujui HR dan Finance dapat dibayarkan melalui: (a) Transfer langsung via Finance, atau (b) Ditambahkan ke komponen penggajian bulan berjalan.
-- **ACCEPTANCE CRITERIA**:
-  - Karyawan mengisi nominal klaim Rp 500.000, melampirkan foto struk, dan submit -> Status: `SUBMITTED`.
-  - Sisa pagu manfaat langsung berkurang sementara (*reserved balance*).
-- **EDGE CASE**:
-  - Foto struk buram atau tidak terbaca -> Approver dapat menolak klaim dengan status `REJECTED` disertai catatan: "Bukti kuitansi tidak terbaca, mohon unggah ulang". Sisa pagu otomatis dikembalikan utuh.
-- **SECURITY REQUIREMENT**:
-  - File kuitansi disimpan pada private storage dan hanya dapat dilihat oleh pemohon, HR Admin, dan Finance.
-- **NOTIFICATION**:
-  - Notifikasi ke HR Admin saat ada klaim baru.
-  - Notifikasi ke Karyawan saat klaim disetujui untuk dicairkan.
-- **AUDIT REQUIREMENT**:
-  - Pencatatan nilai klaim yang disetujui, nama approver, dan tanggal approval.
-- **TEST CASE**:
-  - `TC-BEN-01`: Klaim dengan nominal melebihi sisa pagu ditolak dengan HTTP 422 `BENEFIT_LIMIT_EXCEEDED`.
-
-#### Future Extensibility (Modul 06):
-- Integrasi OCR otomatis untuk ekstraksi tanggal dan total nominal dari foto struk [P2].
+#### 4. Acceptance Criteria & Test Cases
+- `TC-BEN-01`: Admin HR mengalokasikan benefit asuransi kesehatan senilai Rp 10.000.000 untuk seorang karyawan.
+- `TC-BEN-02`: Karyawan yang bersangkutan membuka menu Benefit di ESS $\rightarrow$ informasi jenis asuransi dan sisa plafon Rp 10.000.000 tampil akurat.
 
 ---
 
-### MODUL 07: PERFORMANCE MANAGEMENT
+### MODUL 07: PENILAIAN KINERJA / KPI (BR-PRF-001, BR-ESS-PRF-001)
 
 #### 1. Objective
-Menyelaraskan sasaran kerja individu dengan strategi perusahaan melalui siklus evaluasi KPI/OKRs yang objektif, terukur, dan terdokumentasi.
+Mendokumentasikan hasil evaluasi kerja berkala (KPI) tiap divisi secara objektif dan menyajikan rapot kerja transparan bagi karyawan.
 
 #### 2. Actor
-- HR Admin, Line Manager, Employee, Executive.
+- **Admin HR**: Menginput hasil evaluasi kerja berkala divisi (`BR-PRF-001`).
+- **Karyawan**: Mengakses penilaian rapot kerja dari manajemen (`BR-ESS-PRF-001`).
 
-#### 3. Overview Functional Requirements
-- Pembuatan Siklus Penilaian Kinerja (Tahunan / Semesteran / Triwulanan) [P2].
-- Penyusunan Key Performance Indicators (KPI) & Key Results dengan bobot persentase [P2].
-- Pengisian Evaluasi Mandiri (*Self-Assessment*) oleh Karyawan [P2].
-- Penilaian Kinerja oleh Atasan Langsung (*Manager Review*) disertai umpan balik [P2].
-- Kalibrasi Nilai oleh HR Admin dan Komite Evaluasi [P2].
+#### 3. Functional Requirements
+- **Input Penilaian Kinerja (Admin HR) [P0]:**
+  - Mencatat data penilaian: `id_penilaian`, `id_karyawan`, `periode : string`, `nilai : decimal`, dan `catatan : string`.
+  - Standar rentang nilai KPI menggunakan skala **0 s/d 100 (desimal)** sesuai keputusan `BDR-PRF-01`.
+  - Admin HR mengisi skor angka dan catatan evaluasi kualitatif per karyawan per periode evaluasi.
+- **Lihat Evaluasi Mandiri (ESS) [P0]:**
+  - Karyawan dapat mengakses rapot kerja miliknya yang memuat skor KPI, predikat, dan catatan evaluasi dari manajemen.
+  - Data evaluasi bersifat *read-only* bagi karyawan.
 
----
-
-#### FEATURE: Siklus Evaluasi Kinerja (KPI Appraisal Cycle) [P2]
-
-- **USER STORY**:
-  Sebagai Karyawan dan Line Manager, kami ingin mengisi form evaluasi capaian kerja akhir tahun secara online agar nilai kinerja dapat dihitung secara adil.
-- **BUSINESS RULE**:
-  1. Total bobot seluruh item KPI seorang karyawan wajib tepat 100%.
-  2. Karyawan wajib menyelesaikan self-assessment terlebih dahulu sebelum form evaluasi terbuka untuk dinilai oleh Line Manager.
-  3. Skor akhir dihitung berdasarkan formula: `(Skor Capaian x Bobot)`.
-  4. Nilai kinerja yang telah difinalisasi diklasifikasikan ke dalam matriks grading (e.g. A = Outstanding, B = Exceeds Expectation, C = Meets Expectation, D = Needs Improvement, E = Unsatisfactory).
-- **ACCEPTANCE CRITERIA**:
-  - Manager dapat memberikan rating skor 1-5 untuk setiap sasaran kerja dan mengisi kolom *Strength* & *Area of Improvement*.
-  - Status evaluasi: `DRAFT -> SELF_SUBMITTED -> MANAGER_EVALUATED -> HR_CALIBRATED -> FINALIZED`.
-- **EDGE CASE**:
-  - Karyawan tidak mengisi self-assessment hingga batas tenggat waktu (*deadline*) -> Sistem dapat melakukan auto-lock atau auto-forward ke Manager `[REQUIREMENT DECISION NEEDED: Kebijakan penanganan keterlambatan pengisian KPI]`.
-- **SECURITY REQUIREMENT**:
-  - Karyawan tidak dapat melihat nilai evaluasi atasan sebelum proses kalibrasi HR dinyatakan selesai dan dirilis secara resmi.
-- **NOTIFICATION**:
-  - Email reminder otomatis H-7 dan H-1 menjelang penutupan siklus evaluasi.
-- **AUDIT REQUIREMENT**:
-  - Log audit mencatat setiap perubahan nilai rating selama sesi kalibrasi HR.
-- **TEST CASE**:
-  - `TC-PERF-01`: Submit KPI dengan akumulasi bobot 90% menghasilkan validasi error `TOTAL_WEIGHT_MUST_BE_100`.
-
-#### Future Extensibility (Modul 07):
-- Skema evaluasi Review 360 Derajat (Peer Review & Subordinate Review) [P3].
-- AI-assisted performance feedback generation [P3].
+#### 4. Acceptance Criteria & Test Cases
+- `TC-PRF-01`: Admin HR input nilai KPI 88.50 dan catatan evaluasi karyawan untuk periode 2026-Q3 $\rightarrow$ data tersimpan.
+- `TC-PRF-02`: Karyawan login ke ESS membuka menu Evaluasi $\rightarrow$ nilai 88.50 dan catatan manajemen tampil pada layar.
 
 ---
 
-### MODUL 08: CAREER & DEVELOPMENT
+### MODUL 08: PELATIHAN KARIER & KOMPETENSI (BR-TRN-001, BR-ESS-TRN-001)
 
 #### 1. Objective
-Mengelola riwayat perjalanan karir karyawan, pemetaan kompetensi (*skills matrix*), program pelatihan internal/eksternal, serta rencana suksesi.
+Mengelola katalog program peningkatan kompetensi kerja, mengatur jadwal dan kuota peserta, serta memfasilitasi pendaftaran mandiri oleh karyawan maupun penugasan diklat wajib.
 
 #### 2. Actor
-- HR Admin, Line Manager, Employee.
+- **Admin HR**: Menyusun program, jadwal, dan kapasitas peserta pelatihan (`BR-TRN-001`).
+- **Karyawan**: Mengambil tawaran kelas kompetensi atau melihat jadwal diklat wajib (`BR-ESS-TRN-001`).
 
-#### 3. Overview Functional Requirements
-- Pencatatan Riwayat Karir Karyawan (Promosi, Demosi, Mutasi Departemen, Penyesuaian Grade) [P2].
-- Katalog Program Pelatihan (*Training Directory*) & Jadwal Sesi [P2].
-- Pendaftaran Pelatihan oleh Karyawan atau Penugasan oleh Manajer [P2].
-- Pelacakan Sertifikasi Karyawan & Notifikasi Kedaluwarsa Sertifikat [P2].
+#### 3. Functional Requirements
+- **Kelola Pelatihan (Admin HR) [P0]:**
+  - Mengelola data pelatihan: `id_pelatihan`, `nama_pelatihan`, `tanggal : date`, `lokasi : string`, dan batas kuota `peserta : int`.
+  - Admin HR dapat menambah program pelatihan baru, memperbarui jadwal/lokasi, atau menghapus program yang dibatalkan.
+- **Pendaftaran & Jadwal Pelatihan (ESS) [P0]:**
+  - Karyawan dapat melihat daftar program pelatihan yang aktif beserta jadwal dan lokasi.
+  - Karyawan dapat mengambil tawaran kelas kompetensi dengan mendaftar mandiri (*self-enroll*) selama kuota peserta belum penuh (`BDR-TRN-01`).
+  - Sistem menolak pendaftaran mandiri jika kuota `peserta` telah tercapai.
+  - Menampilkan status jadwal diklat wajib yang ditugaskan oleh Admin HR.
 
----
-
-#### FEATURE: Pencatatan Mutasi & Promosi Karyawan [P2]
-
-- **USER STORY**:
-  Sebagai HR Admin, saya ingin menerbitkan Surat Keputusan (SK) mutasi/promosi karyawan sehingga departemen, jabatan, dan struktur atasan langsung karyawan terbarui secara resmi.
-- **BUSINESS RULE**:
-  1. Perubahan departemen atau atasan langsung berlaku efektif per tanggal yang ditentukan dalam SK (`effective_date`).
-  2. Sistem menyimpan seluruh histori jabatan lama tanpa menimpa data sebelumnya (*Historical Snapshot*).
-  3. Otomatisasi wewenang: Hak akses approval cuti/lembur bawahan lama otomatis berpindah ke atasan baru per tanggal efektif.
-- **ACCEPTANCE CRITERIA**:
-  - Form mutasi mengupdate field `department_id`, `designation_id`, atau `manager_id` di tabel `employees` saat tanggal efektif tiba.
-  - Riwayat karir dapat dilihat di tab "Career History" pada profil karyawan.
-- **EDGE CASE**:
-  - Karyawan dimutasi ke departemen baru saat masih memiliki pengajuan cuti yang pending di atasan lama -> `[REQUIREMENT DECISION NEEDED: Apakah approval dialihkan ke atasan baru atau diselesaikan oleh atasan lama?]`
-- **SECURITY REQUIREMENT**:
-  - Mutasi hanya dapat dieksekusi oleh HR Admin dengan permission `employee:career_mutate`.
-- **NOTIFICATION**:
-  - Notifikasi ucapan selamat ke karyawan dan pengumuman mutasi ke departemen terkait.
-- **AUDIT REQUIREMENT**:
-  - Rekam data jabatan lama, jabatan baru, nomor SK, dan eksekutor mutasi.
-- **TEST CASE**:
-  - `TC-CAR-01`: Mutasi karyawan berhasil mengubah hierarki atasan dan tercatat di histori karir.
-
-#### Future Extensibility (Modul 08):
-- Nine-Box Grid Talent Mapping untuk identifikasi *High-Potential Leaders* [P3].
+#### 4. Acceptance Criteria & Test Cases
+- `TC-TRN-01`: Admin HR membuat jadwal pelatihan "Advanced TypeScript" dengan kuota 20 peserta pada tanggal tertentu.
+- `TC-TRN-02`: Karyawan klik tombol daftar kelas kompetensi di ESS $\rightarrow$ pendaftaran berhasil dan sisa kuota berkurang.
+- `TC-TRN-03`: Pendaftaran ditolak jika kuota peserta telah bernilai 0 (penuh).
 
 ---
 
-### MODUL 09: RECRUITMENT & APPLICANT TRACKING SYSTEM (ATS)
+### MODUL 09: REKRUTMEN & ONBOARDING (BR-REC-001)
 
 #### 1. Objective
-Mengelola siklus pengadaan tenaga kerja mulai dari pembukaan lowongan, penyaringan resume, penjadwalan wawancara, penawaran kerja (*offering*), hingga onboarding otomatis ke master data karyawan.
+Mengelola pembukaan lowongan pekerjaan dan tahapan seleksi calon tenaga kerja baru hingga tahap onboarding ke dalam data master pegawai.
 
 #### 2. Actor
-- HR Recruiter, Hiring Manager, Candidate (Job Seeker).
+- **Admin HR**: Mengatur proses seleksi pelamar baru hingga tahap onboarding (`BR-REC-001`).
 
-#### 3. Overview Functional Requirements
-- Manajemen Lowongan Kerja Internal & Eksternal (*Job Requisition & Posting*) [P2].
-- Pipeline Pelamar ATS (Applied -> Screened -> Interview -> Technical Test -> Offering -> Hired) [P2].
-- Penjadwalan Wawancara & Integrasi Kalender [P2].
-- Konversi Otomatis Kandidat Diterima (*Hired*) menjadi Data Master Karyawan (Modul 02) [P1].
+#### 3. Functional Requirements
+- **Manajemen Lowongan Pekerjaan [P0]:**
+  - Mengelola entitas rekrutmen: `id_rekrutmen`, `posisi : string`, `tgl_buka : date`, `tgl_tutup : date`, `status : string`.
+  - Admin HR membuka lowongan pekerjaan dengan rentang tanggal dan status aktif.
+- **Tahapan Seleksi & Onboarding [P0]:**
+  - Memperbarui status tahapan seleksi kandidat (Pendaftaran, Seleksi Berkas, Wawancara, Onboarding).
+  - Kandidat yang menyelesaikan tahap onboarding siap dikonversi menjadi data master pegawai baru pada Modul 02 (`Karyawan`).
 
----
-
-#### FEATURE: Kandidat Onboarding to Core Employee Conversion [P1]
-
-- **USER STORY**:
-  Sebagai HR Recruiter, saya ingin mengonversi data pelamar yang telah berstatus *Hired* menjadi master data karyawan baru hanya dengan 1 klik agar tidak perlu input ulang manual.
-- **BUSINESS RULE**:
-  1. Hanya kandidat dengan status `OFFERING_ACCEPTED` yang dapat dikonversi menjadi karyawan.
-  2. Data dasar pelamar (Nama, Email, Nomor Telepon, Resume) otomatis dipetakan ke profil calon karyawan baru di Modul 02.
-  3. HR Recruiter wajib melengkapi NIK, Tanggal Bergabung (*Join Date*), Departemen, Jabatan, dan Gaji Pokok sebelum konversi dinyatakan sukses.
-- **ACCEPTANCE CRITERIA**:
-  - Eksekusi tombol "Convert to Employee" membuat record baru di tabel `employees` dan akun di tabel `users`.
-  - Status kandidat di modul ATS berubah menjadi `ONBOARDED`.
-- **EDGE CASE**:
-  - Email kandidat ternyata sudah terdaftar sebelumnya di sistem (misal mantan karyawan) -> Sistem memunculkan dialog konfirmasi untuk mengaktifkan kembali akun lama atau menggunakan email baru.
-- **SECURITY REQUIREMENT**:
-  - Data penawaran gaji (*offering letter*) terisolasi dan hanya dapat diakses oleh tim rekrutmen dan hiring manager terkait.
-- **NOTIFICATION**:
-  - Email otomatis berisi surat penawaran kerja dan link formulir kelengkapan berkas onboarding.
-- **AUDIT REQUIREMENT**:
-  - Log audit mencatat konversi kandidat ke ID karyawan baru.
-- **TEST CASE**:
-  - `TC-REC-01`: Konversi kandidat berstatus Hired sukses membuat record karyawan baru di database.
-
-#### Future Extensibility (Modul 09):
-- AI Resume Parsing untuk pencocokan otomatis kualifikasi pelamar dengan kriteria lowongan [P3].
-- Integrasi ke LinkedIn Jobs & JobStreet API [P3].
+#### 4. Acceptance Criteria & Test Cases
+- `TC-REC-01`: Admin HR membuat posisi rekrutmen baru "Senior Frontend Engineer" dengan tanggal buka dan tutup valid.
+- `TC-REC-02`: Status rekrutmen dapat diubah menjadi `ONBOARDING` atau `CLOSED`.
 
 ---
 
-### MODUL 10: HR DASHBOARD & EXECUTIVE ANALYTICS
+### MODUL 10: LAPORAN ANALITIK & EXECUTIVE DASHBOARD (BR-REP-001)
 
 #### 1. Objective
-Menyajikan visualisasi data strategis SDM secara real-time dan interaktif bagi jajaran manajemen untuk pengambilan keputusan berbasis data (*Data-Driven HR*).
+Menyajikan grafik visual statistik ketenagakerjaan secara real-time dan memfasilitasi pengunduhan berkas laporan bulanan resmi bagi manajemen HR.
 
 #### 2. Actor
-- Executive (C-Level), HR Director, HR Admin.
+- **Admin HR**: Memantau grafik analitik dan mengunduh berkas laporan bulanan (`BR-REP-001`).
 
-#### 3. Overview Functional Requirements
-- Metrik Utama SDM: Total Headcount, Rasio Gender, Distribusi Usia, Rasio Karyawan Tetap vs Kontrak [P1].
-- Analitik Kehadiran Harian: Persentase Kehadiran, Keterlambatan, dan Ketidakhadiran [P1].
-- Metrik Retensi Tenaga Kerja: Angka Perputaran Karyawan (*Turnover Rate*) & Masa Kerja Rata-rata [P2].
-- Widget Peringatan Dini (*Early Warning Widget*): Kontrak PKWT akan habis dalam 30/60 hari, Karyawan Probation selesai [P1].
-- Grafik Tren Biaya Penggajian (*Labor Cost Trends*) Bulanan [P1].
+#### 3. Functional Requirements
+- **Grafik Statistik SDM [P0]:**
+  - Menampilkan ringkasan visual metrik SDM: Total Karyawan Aktif, Rasio Kehadiran Bulanan, Persentase Keterlambatan, dan Rekapitulasi Status Cuti.
+- **Unduh Laporan Bulanan Resmi [P0]:**
+  - Admin HR dapat men-generate dan mengunduh berkas laporan bulanan (`generate()`, `unduh()`).
+  - Entitas `LaporanAnalitik` mencatat: `id_laporan`, `jenis`, `periode`, `tanggal_generate`, dan tautan `file_laporan` (PDF / spreadsheet resmi).
 
----
-
-#### FEATURE: Executive KPI Dashboard & Contract Expiration Alerts [P1]
-
-- **USER STORY**:
-  Sebagai HR Director, saya ingin melihat dashboard ringkasan headcount, tren kehadiran, dan daftar kontrak yang akan berakhir bulan ini agar saya dapat merencanakan perpanjangan atau rekrutmen tepat waktu.
-- **BUSINESS RULE**:
-  1. Seluruh query analitik agregasi berat wajib di-cache menggunakan Redis dengan masa kadaluarsa (TTL) maksimal 15-30 menit atau di-invalidasi saat ada mutasi data karyawan baru.
-  2. Data nominal finansial pada grafik payroll hanya dapat dilihat oleh user dengan role yang memiliki permission `payroll:view_analytics`.
-- **ACCEPTANCE CRITERIA**:
-  - Dashboard menampilkan widget kartu: Total Karyawan Aktif, Hadir Hari Ini, Karyawan Cuti Hari Ini, dan Kontrak Berakhir < 30 Hari.
-  - Mengklik widget "Kontrak Berakhir < 30 Hari" membuka tabel daftar nama karyawan terkait secara terfilter.
-- **EDGE CASE**:
-  - Tidak ada data presensi (misal hari libur nasional) -> Dashboard menampilkan status "Hari Libur Resmi" tanpa error division by zero pada persentase.
-- **SECURITY REQUIREMENT**:
-  - Proteksi agregasi data agar tidak membocorkan data individu karyawan jika jumlah sampel terlalu kecil.
-- **NOTIFICATION**:
-  - Notifikasi email mingguan ringkasan HR Metric ke HR Director [P2].
-- **AUDIT REQUIREMENT**:
-  - Tidak ada pencatatan audit untuk query dashboard read-only (hanya request log server biasa).
-- **TEST CASE**:
-  - `TC-DASH-01`: Dashboard berhasil menampilkan angka headcount yang sinkron dengan total record karyawan aktif di database.
-
-#### Future Extensibility (Modul 10):
-- Analitik Prediktif: Prediksi potensi turnover karyawan (*Flight Risk Prediction*) menggunakan machine learning [P3].
+#### 4. Acceptance Criteria & Test Cases
+- `TC-REP-01`: Dashboard analitik merender grafik statistik kehadiran secara akurat berdasarkan data tabel absensi.
+- `TC-REP-02`: Admin HR klik unduh laporan bulanan $\rightarrow$ berkas laporan resmi berhasil diunduh ke perangkat.
 
 ---
 
-### MODUL 11: NOTIFICATION ENGINE
+### MODUL 11: PENGATURAN SISTEM (BR-SET-001)
 
 #### 1. Objective
-Menyediakan infrastruktur komunikasi asinkron yang andal untuk mendistribusikan notifikasi multi-channel (In-App, WebSocket, Email) kepada pengguna tepat waktu.
+Mengelola parameter konfigurasi dasar aplikasi dan pembagian hak akses pengguna agar operasional HRIS berjalan sesuai kebijakan perusahaan.
 
 #### 2. Actor
-- System Worker, Seluruh Pengguna Sistem.
+- **Admin HR**: Mengatur konfigurasi dasar aplikasi dan pembagian hak user (`BR-SET-001`).
 
-#### 3. Overview Functional Requirements
-- In-App Notification Center dengan penanda badge unread [P0].
-- Push Notification Real-Time via WebSockets (Socket.io) [P1].
-- Worker Pengiriman Email Transaksional berbasis Antrian (BullMQ + Redis) [P0].
-- Pengaturan Preferensi Notifikasi per Pengguna [P2].
-- Mekanisme Fallback Polling otomatis jika koneksi WebSocket terputus [P0].
+#### 3. Functional Requirements
+- **Manajemen Konfigurasi Aplikasi [P0]:**
+  - Menyimpan parameter: `id_setting`, `nama_setting`, `nilai`, dan `deskripsi`.
+  - Admin HR dapat memodifikasi nilai setting (`ubahSetting()`) seperti nama perusahaan, jam masuk kerja resmi, toleransi keterlambatan, dll.
+  - Admin HR dapat mereset konfigurasi ke nilai default bawaan sistem (`reset()`).
+- **Pembagian Hak User [P0]:**
+  - Mengatur pembagian penugasan hak akses pengguna antara Admin HR dan Karyawan.
 
----
-
-#### FEATURE: Asynchronous Multi-Channel Notification Dispatcher [P0]
-
-- **USER STORY**:
-  Sebagai Pengguna, saya ingin menerima notifikasi instan saat ada tugas persetujuan atau pengumuman penting baik melalui lonceng aplikasi maupun email agar saya dapat bertindak cepat.
-- **BUSINESS RULE**:
-  1. Notifikasi dipicu oleh Domain Event internal (misal: `leave.submitted`, `payroll.published`).
-  2. Kegagalan pada transport pengiriman email (SMTP down) tidak boleh membatalkan transaksi utama database dan wajib dicoba ulang secara otomatis (*retry backoff*) hingga 3 kali oleh BullMQ worker.
-  3. Database PostgreSQL adalah sumber kebenaran (*Single Source of Truth*). Setiap notifikasi wajib memiliki record tersimpan di tabel `notifications`.
-- **ACCEPTANCE CRITERIA**:
-  - Saat cuti diajukan, lonceng notifikasi di antarmuka Line Manager bertambah +1 secara instan tanpa perlu refresh halaman (via WebSocket).
-  - Mengklik notifikasi menandai status notifikasi menjadi `is_read = true` dan mengarahkan pengguna ke halaman detail yang relevan via payload link.
-- **EDGE CASE**:
-  - Pengguna membuka aplikasi di browser yang memblokir WebSocket -> Klien otomatis beralih ke HTTP polling interval 30 detik (*graceful degradation*).
-- **SECURITY REQUIREMENT**:
-  - Payload notifikasi tidak boleh memuat kredensial atau token otentikasi.
-- **NOTIFICATION**:
-  - Menghasilkan delivery In-App, WebSocket, dan Email.
-- **AUDIT REQUIREMENT**:
-  - Pencatatan log kegagalan pengiriman email pada file log worker.
-- **TEST CASE**:
-  - `TC-NOTIF-01`: Event `leave.approved` sukses memicu pembuatan record notifikasi dan push message ke channel user pemohon.
-
-#### Future Extensibility (Modul 11):
-- Integrasi WhatsApp Business API untuk notifikasi slip gaji dan approval darurat [P2].
-- Integrasi bot notifikasi ke Slack / Microsoft Teams [P2].
+#### 4. Acceptance Criteria & Test Cases
+- `TC-SET-01`: Admin HR mengubah toleransi keterlambatan dari 15 menit menjadi 20 menit $\rightarrow$ perubahan tersimpan dan berlaku aktif.
+- `TC-SET-02`: Admin HR klik tombol reset $\rightarrow$ parameter sistem kembali ke nilai bawaan pabrik (*default values*).
 
 ---
 
-### MODUL 12: REPORTS & DATA EXPORT
+### MODUL 12: NOTIFICATION ENGINE
 
 #### 1. Objective
-Memfasilitasi ekstraksi dan rekapitulasi data operasional SDM dalam berbagai format standar (Excel, CSV, PDF) untuk kebutuhan audit, kepatuhan, dan pelaporan manajemen.
+Mendistribusikan notifikasi in-app dan peringatan sistem secara otomatis untuk setiap aksi persetujuan dan perubahan status.
 
 #### 2. Actor
-- HR Admin, Payroll Specialist, Executive, Auditor.
+- Seluruh Pengguna Sistem.
 
-#### 3. Overview Functional Requirements
-- Laporan Rekapitulasi Presensi & Lembur Bulanan [P0].
-- Laporan Rekapitulasi Cuti & Saldo Tahunan per Departemen [P0].
-- Laporan Penggajian & Rekap Pajak PPh 21 Tahunan (Format 1721-A1) [P0].
-- Generator Ekspor Dokumen Format Excel (`.xlsx`), CSV, dan PDF [P0].
-- Pemrosesan Laporan Besar di Background dengan Notifikasi Unduhan [P1].
+#### 3. Functional Requirements
+- **In-App Notification Center [P0]:** Menampilkan badge notifikasi pada antarmuka saat ada pengajuan cuti baru, penerbitan slip gaji baru, atau perubahan jadwal pelatihan.
+- **Pemberitahuan Status [P0]:** Karyawan menerima notifikasi instan saat permohonan cuti disetujui atau ditolak oleh Admin HR.
 
 ---
 
-#### FEATURE: Background Report Generation & Export [P0]
-
-- **USER STORY**:
-  Sebagai HR Admin, saya ingin mengunduh laporan rekap absensi bulanan untuk seluruh 1.000 karyawan ke dalam file Excel tanpa membuat server hang/freeze.
-- **BUSINESS RULE**:
-  1. Ekspor data dengan jumlah baris > 1.000 baris dialihkan secara otomatis ke background job worker untuk di-generate secara asinkron.
-  2. File hasil generate disimpan di temporary storage terenkripsi dengan masa berlaku unduh maksimal 24 jam.
-  3. Format laporan keuangan wajib mematuhi standar pembukuan dan perpajakan resmi.
-- **ACCEPTANCE CRITERIA**:
-  - Pengguna memilih filter rentang tanggal -> klik "Export Excel" -> Muncul pemberitahuan: "Laporan sedang diproses, Anda akan diberi notifikasi saat file siap diunduh".
-  - Notifikasi masuk berisi tombol download file `.xlsx` yang valid.
-- **EDGE CASE**:
-  - Pengguna mengekspor rentang data kosong (0 record) -> Sistem menampilkan notifikasi: "Tidak ada data pada kriteria filter yang dipilih" tanpa membuat file kosong.
-- **SECURITY REQUIREMENT**:
-  - URL unduhan laporan diamankan dengan signed token bertenggat waktu; user lain tidak dapat menebak URL unduhan.
-- **NOTIFICATION**:
-  - In-app notification saat file laporan siap diunduh.
-- **AUDIT REQUIREMENT**:
-  - Setiap aktivitas ekspor data karyawan wajib dicatat di `audit_logs` (mencegah *mass data exfiltration* tanpa izin).
-- **TEST CASE**:
-  - `TC-REP-01`: Ekspor data 500 karyawan menghasilkan file Excel dengan formula dan header kolom yang tepat.
-
-#### Future Extensibility (Modul 12):
-- Custom Report Builder (User dapat memilih kolom dan filter sendiri via antarmuka drag-and-drop) [P3].
-
----
-
-### MODUL 13: DOCUMENTS & POLICY CENTER
+### MODUL 13: AUDIT TRAIL & COMPLIANCE LOGGING
 
 #### 1. Objective
-Menyediakan repositori terpusat dan teratur untuk seluruh dokumen kebijakan perusahaan, SOP, formulir resmi, serta memastikan kepatuhan karyawan terhadap peraturan kerja.
+Mencatat seluruh mutasi data sensitif secara permanen (*append-only*) untuk menjamin transparansi, integritas data, dan kemudahan audit forensik.
 
 #### 2. Actor
-- HR Admin, Seluruh Karyawan.
+- Sistem Otomatis, Compliance Auditor, Admin HR.
 
-#### 3. Overview Functional Requirements
-- Repositori Digital Kebijakan Perusahaan, Buku Pedoman (*Employee Handbook*), dan SOP [P1].
-- Penomoran Versi Dokumen (*Document Versioning*) [P1].
-- Pelacakan Tanda Terima & Konfirmasi Baca Digital (*Digital Policy Acknowledgment*) [P1].
-- Manajemen Dokumen Pribadi Karyawan (Kontrak Kerja, Ijazah, Sertifikat) [P0].
-
----
-
-#### FEATURE: Policy Publishing & Employee Acknowledgment Tracking [P1]
-
-- **USER STORY**:
-  Sebagai HR Admin, saya ingin menerbitkan Peraturan Perusahaan terbaru dan mewajibkan seluruh karyawan membaca serta menyetujuinya secara digital agar perusahaan memiliki bukti kepatuhan hukum.
-- **BUSINESS RULE**:
-  1. Dokumen kebijakan baru dapat ditandai sebagai `MANDATORY_ACKNOWLEDGMENT`.
-  2. Karyawan yang login ke portal ESS akan menerima modal peringatan untuk membaca dokumen dan mengklik tombol "Saya Telah Membaca dan Menyetujui".
-  3. Sistem mencatat timestamp, user ID, dan IP address saat konfirmasi diklik sebagai bukti digital sah.
-- **ACCEPTANCE CRITERIA**:
-  - HR Admin dapat memantau dashboard persentase kepatuhan (contoh: 85% karyawan telah menyetujui SOP baru).
-- **EDGE CASE**:
-  - Karyawan menolak menyetujui kebijakan baru -> Sistem mencatat penolakan dan memberi notifikasi ke HR Admin untuk tindak lanjut personal `[REQUIREMENT DECISION NEEDED: Apakah akses portal diblokir jika kebijakan wajib belum disetujui?]`
-- **SECURITY REQUIREMENT**:
-  - File dokumen kebijakan tersimpan aman dan hanya dapat diakses dalam mode *read-only* (mencegah manipulasi isi file).
-- **NOTIFICATION**:
-  - Notifikasi broadcast pengumuman dokumen kebijakan baru ke seluruh karyawan.
-- **AUDIT REQUIREMENT**:
-  - Catatan acknowledgment bersifat permanen dan tidak dapat dihapus.
-- **TEST CASE**:
-  - `TC-DOC-01`: Karyawan klik setuju pada dokumen SOP -> Tabel acknowledgment mencatat record baru dengan waktu akurat.
-
-#### Future Extensibility (Modul 08/13):
-- Integrasi sertifikat digital berotentikasi e-Meterai resmi Peruri [P2].
+#### 3. Functional Requirements
+- **Append-Only Audit Logs [P0]:**
+  - Setiap mutasi pada master karyawan, pemrosesan payroll, persetujuan cuti, dan konfigurasi sistem wajib mencatat entri pada tabel `audit_logs`.
+  - Mencatat: `user_id`, `action`, `module`, `record_id`, `ip_address`, `old_data` (JSON snapshot), `new_data` (JSON snapshot), dan `created_at`.
+  - Data log dilarang memiliki operasi DELETE atau UPDATE di level aplikasi.
 
 ---
 
-### MODUL 14: AUDIT LOG & COMPLIANCE TRAIL
+## 3. DAFTAR KEPUTUSAN BISNIS YANG TELAH DISETUJUI (APPROVED DECISIONS)
 
-#### 1. Objective
-Menyediakan catatan rekaman seluruh aktivitas penting sistem yang permanen, tahan manipulasi (*tamper-proof*), dan tidak dapat dibantah (*non-repudiation*) untuk investigasi forensik dan audit kepatuhan.
+Berikut adalah ringkasan resmi keputusan bisnis yang telah disahkan oleh pemilik proyek untuk menutup seluruh ambiguitas operasional:
 
-#### 2. Actor
-- Super Admin, Compliance Auditor, Sistem Keamanan.
-
-#### 3. Overview Functional Requirements
-- Pencatatan otomatis setiap aksi mutasi data penting (CREATE, UPDATE, DELETE) [P0].
-- Pencatatan akses baca data sensitif (VIEW_SENSITIVE, EXPORT_DATA) [P0].
-- Audit Log Viewer dengan filter waktu, pengguna, modul, dan tipe aksi [P0].
-- Sifat data Append-Only (Tabel tanpa izin UPDATE dan DELETE di level basis data) [P0].
-
----
-
-#### FEATURE: Tamper-Proof Audit Trail Logging [P0]
-
-- **USER STORY**:
-  Sebagai Auditor dan Super Admin, saya ingin memeriksa riwayat perubahan gaji seorang karyawan secara detail (siapa yang mengubah, kapan, dari nilai berapa menjadi berapa) untuk memastikan tidak ada kecurangan internal.
-- **BUSINESS RULE**:
-  1. Setiap perubahan data pada entitas sensitif (`Employee`, `PayrollRecord`, `LeaveBalance`, `UserRole`) wajib mencatat *delta change* (kolom `old_values` dan `new_values` dalam format JSONB).
-  2. Data log audit tidak boleh dapat diubah atau dihapus oleh siapa pun, termasuk Super Admin (Dilarang ada endpoint atau antarmuka delete log).
-  3. Aksi audit logging dieksekusi secara transaksional bersamaan dengan operasi bisnis utama.
-- **ACCEPTANCE CRITERIA**:
-  - Saat HR Staff mengubah nomor rekening karyawan, tabel `audit_logs` langsung mencatat: User ID pelaksana, Action: `UPDATE`, Entity: `Employee`, Old: `{ bank_account_no: "xxx" }`, New: `{ bank_account_no: "yyy" }`, IP Address, dan Timestamp.
-  - Halaman Audit Log Viewer di Admin Panel dapat menampilkan perbandingan visual *side-by-side diff* antara nilai lama dan nilai baru.
-- **EDGE CASE**:
-  - Aksi dilakukan oleh sistem otomatis (Cron Job / Worker) -> Kolom `user_id` diisi `SYSTEM` atau `NULL` dengan keterangan nama job pada kolom metadata.
-- **SECURITY REQUIREMENT**:
-  - Konfigurasi permission database PostgreSQL: User aplikasi dilarang memiliki wewenang `DROP TABLE`, `TRUNCATE`, atau `DELETE` pada tabel `audit_logs`.
-- **NOTIFICATION**:
-  - Peringatan instan ke Security Officer jika terdeteksi aksi audit berkategori risiko tinggi (misal: pemberian role Super Admin baru) [P1].
-- **AUDIT REQUIREMENT**:
-  - Merupakan core engine dari seluruh sistem audit.
-- **TEST CASE**:
-  - `TC-AUD-01`: Percobaan query SQL `DELETE FROM audit_logs` memicu error permission denied dari PostgreSQL.
-  - `TC-AUD-02`: Aksi perubahan gaji mencatat snapshot JSON nilai sebelum dan sesudah mutasi.
-
-#### Future Extensibility (Modul 14):
-- Pengiriman log secara streaming ke SIEM eksternal (Splunk / Datadog / Elasticsearch) [P2].
-- Hashing berantai ala Cryptographic Audit Ledger (Merkle Tree / Blockchain-like verification) [P3].
+| ID Keputusan | Modul | Aturan Bisnis yang Disetujui | Tanggal Disahkan |
+|:---|:---|:---|:---|
+| **`BDR-PAY-01`** | Payroll | **Formula Potongan Alpa:** `(Gaji Pokok / 21) * Hari Alpa`. Toleransi keterlambatan 15 menit. Formula Total Gaji: `Gaji Pokok + Tunjangan - Potongan`. | 13 Okt 2026 |
+| **`BDR-PAY-02`** | Payroll | **Sifat Tunjangan:** Tunjangan bersifat tunjangan tetap bulanan (*fixed monthly allowance*). | 13 Okt 2026 |
+| **`BDR-LEV-01`** | Cuti & Izin | **Kuota Cuti:** Ditetapkan 12 hari per tahun. Izin Sakit tidak memotong kuota tahunan. Persetujuan cuti/izin diproses langsung oleh Admin HR di panel Admin (`ubahStatus`). | 13 Okt 2026 |
+| **`BDR-ATT-01`** | Absensi | **Presensi Fleksibel:** Tombol Check-In / Check-Out di ESS web mencatat waktu real-time server. Verifikasi GPS dan swafoto bersifat opsional (*non-blocking*). | 13 Okt 2026 |
+| **`BDR-PRF-01`** | Evaluasi KPI | **Skala Nilai KPI:** Menggunakan rentang skala 0 s/d 100 (desimal). | 13 Okt 2026 |
+| **`BDR-TRN-01`** | Pelatihan | **Mekanisme Pendaftaran:** Karyawan dapat mendaftar mandiri (*self-enroll*) di ESS hingga kuota `peserta` penuh, serta Admin HR dapat menugaskan diklat wajib. | 13 Okt 2026 |
+| **`BDR-BEN-01`** | Benefit | **Plafon Manfaat:** Alokasi asuransi, BPJS, dan plafon kesehatan dikonfigurasi per periode oleh Admin HR, dan karyawan dapat memantau sisa plafon di ESS. | 13 Okt 2026 |
 
 ---
 
-### MODUL 15: SYSTEM SETTINGS & CONFIGURATIONS
+## 4. SCOPE BREAKDOWN & RENCANA IMPLEMENTASI BERTAHAP
 
-#### 1. Objective
-Mengelola parameter operasional global, kalender hari libur, struktur toleransi jam kerja, dan konstanta regulasi agar sistem fleksibel beradaptasi tanpa perlu mengubah kode sumber (*Zero-Code Configuration*).
-
-#### 2. Actor
-- Super Admin, HR Admin.
-
-#### 3. Overview Functional Requirements
-- Manajemen Hari Kerja & Sinkronisasi Kalender Libur Nasional [P0].
-- Konfigurasi Batas Toleransi Jam Kerja & Geofence Radius Default [P0].
-- Konfigurasi Konstanta Regulasi Finansial (Batas Maksimal Upah BPJS, Persentase Pajak) [P0].
-- Konfigurasi Akun Email SMTP & Parameter Webhook [P0].
-
----
-
-#### FEATURE: Dynamic Company Calendar & Work Schedule Configuration [P0]
-
-- **USER STORY**:
-  Sebagai HR Admin, saya ingin mengatur kalender kerja dan memasukkan daftar hari libur nasional tahun berjalan sehingga sistem tidak menghitung absen/pemotongan cuti pada hari libur tersebut.
-- **BUSINESS RULE**:
-  1. Hari yang ditandai sebagai Hari Libur Nasional otomatis mengecualikan pemotongan kuota cuti tahunan jika ada pengajuan cuti yang melintasi tanggal tersebut.
-  2. Perubahan jadwal kerja atau hari libur tidak berlaku surut (*no retroactive recalculation*) pada data kehadiran yang telah berstatus final/terkunci.
-- **ACCEPTANCE CRITERIA**:
-  - HR Admin dapat menambah hari libur nasional baru -> Kalender absensi dan cuti langsung memperbarui status tanggal tersebut menjadi `PUBLIC_HOLIDAY`.
-- **EDGE CASE**:
-  - Pemerintah mengumumkan cuti bersama mendadak -> HR Admin dapat menambahkan tanggal libur baru dan sistem secara otomatis menyesuaikan kalkulasi kehadiran pada tanggal terkait.
-- **SECURITY REQUIREMENT**:
-  - Perubahan konfigurasi sistem hanya dapat dilakukan oleh role `SUPER_ADMIN` dan `HR_ADMIN`.
-- **NOTIFICATION**:
-  - Tidak ada notifikasi pengguna (hanya konfirmasi UI).
-- **AUDIT REQUIREMENT**:
-  - Setiap perubahan parameter konfigurasi tercatat di `audit_logs`.
-- **TEST CASE**:
-  - `TC-SET-01`: Penambahan hari libur nasional membatalkan perhitungan status `ABSENT` otomatis bagi karyawan di tanggal tersebut.
-
-#### Future Extensibility (Modul 15):
-- Otomatisasi sinkronisasi Hari Libur Nasional via integrasi Open API Pemerintah / Google Calendar [P2].
+### MVP SCOPE (P0) — FONDASI LENGKAP CAPSTONE
+Mencakup seluruh 17 use case yang tercantum dalam dokumen blueprint `Capstone Project.pdf`:
+1. **Modul 01 (Auth):** Login Dual-Panel (`/admin` dan `/ess`), session security, ubah password mandiri.
+2. **Modul 02 (Employee):** Master data pegawai lengkap departemen, edit profil mandiri alamat & no HP.
+3. **Modul 03 (Attendance):** Presensi digital check-in/out harian ESS, monitoring & rekap absensi staf Admin HR.
+4. **Modul 04 (Leave):** Permohonan cuti/sakit/dispensasi ESS, approval terpusat Admin HR, saldo cuti 12 hari.
+5. **Modul 05 (Payroll):** Perhitungan payroll otomatis dengan potongan alpa `(Gaji Pokok / 21) * Hari Alpa`, slip gaji PDF resmi.
+6. **Modul 06 (Benefits):** Konfigurasi alokasi BPJS & asuransi Admin HR, cek sisa plafon kesehatan ESS.
+7. **Modul 07 (Performance):** Input skor evaluasi KPI (skala 0–100) Admin HR, tampilan rapot kerja ESS.
+8. **Modul 08 (Training):** Kelola jadwal diklat Admin HR, katalog dan pendaftaran mandiri pelatihan ESS.
+9. **Modul 09 (Recruitment):** Lowongan kerja dan alur seleksi pelamar hingga onboarding Admin HR.
+10. **Modul 10 (Reports):** Grafik visual statistik SDM dan ekspor laporan bulanan Admin HR.
+11. **Modul 11 (Settings):** Konfigurasi dasar aplikasi dan pembagian hak user Admin HR.
+12. **Modul 12 (Notifications):** In-app notification center untuk approval dan slip gaji.
+13. **Modul 13 (Audit Logs):** Pencatatan riwayat mutasi data sensitif terpusat.
 
 ---
 
-## 3. DAFTAR REQUIREMENT DECISION NEEDED
-
-Berikut adalah rangkuman poin ambiguitas bisnis yang membutuhkan keputusan final dari pihak manajemen perusahaan sebelum tahap implementasi teknis modul terkait dimulai:
-
-| ID Keputusan | Modul Terkait | Deskripsi Isu Bisnis yang Perlu Keputusan |
-| :---: | :---: | :--- |
-| **`[REQ-DEC-01]`** | Modul 01 (Auth) | Apakah sistem mengizinkan satu akun Karyawan (ESS) melakukan login secara bersamaan dari multiple device (ponsel + laptop), atau wajib membatalkan sesi lama (*Single Active Session*)? |
-| **`[REQ-DEC-02]`** | Modul 01 (Auth) | Apakah Super Admin memiliki wewenang untuk melihat dan mengubah langsung data gaji karyawan, atau harus mematuhi *Four-Eyes Principle* (hanya HR Admin & Payroll Master yang berhak)? |
-| **`[REQ-DEC-03]`** | Modul 02 (Employee) | Apakah ada batas tanggal cut-off bulanan untuk penerimaan perubahan nomor rekening bank karyawan sebelum penggajian diproses? |
-| **`[REQ-DEC-04]`** | Modul 03 (Attendance)| Apakah presensi dinas luar kota/remote memerlukan alur permohonan dinas mandiri terlebih dahulu, atau cukup clock-in reguler dengan flag "Luar Kantor" dan foto bukti? |
-| **`[REQ-DEC-05]`** | Modul 03 (Attendance)| Apakah formula lembur yang digunakan wajib 100% patuh pada formula Depnaker (pengali 1.5x dan 2x) atau perusahaan menggunakan skema uang saku lembur flat? |
-| **`[REQ-DEC-06]`** | Modul 04 (Leave) | Apakah pengajuan izin sakit dan cuti darurat diizinkan diajukan di masa lampau (*backdated request*), dan berapa batas maksimal hari keterlambatan pengajuannya? |
-| **`[REQ-DEC-07]`** | Modul 04 (Leave) | Apakah seluruh jenis cuti memerlukan persetujuan 2 tingkat (Line Manager lalu HR Admin), atau cuti tahunan cukup disetujui Line Manager saja? |
-| **`[REQ-DEC-08]`** | Modul 05 (Payroll) | Untuk perhitungan gaji prorata karyawan yang masuk/keluar di tengah bulan, apakah formula pembagi menggunakan jumlah hari kalender kerja riil atau standar konstan 21/25 hari kerja? |
-| **`[REQ-DEC-09]`** | Modul 05 (Payroll) | Jika ditemukan kekeliruan perhitungan gaji setelah status periode `LOCKED`, apakah prosedur perbaikan dilakukan dengan membuka lock (*Unlock Period*) atau melalui mekanisme koreksi penyesuaian (*Adjustment*) di bulan berikutnya? |
-| **`[REQ-DEC-10]`** | Modul 07 (Performance)| Jika karyawan terlambat mengisi evaluasi mandiri (*self-assessment*) melewati batas deadline, apakah sistem otomatis mengunci form atau otomatis meneruskannya ke manajer penilai? |
-| **`[REQ-DEC-11]`** | Modul 13 (Documents) | Apakah akses portal ESS karyawan akan diblokir sementara jika terdapat dokumen Peraturan Perusahaan wajib (*Mandatory Policy*) yang belum dikonfirmasi baca oleh karyawan? |
+### PHASE 2 SCOPE (P1) — EFISIENSI & OTOMASI LANJUTAN
+- Multi-Factor Authentication (TOTP).
+- Background report queue worker untuk laporan dataset besar (> 1.000 baris).
+- Ekspor file transfer bank (BCA AutoPay / Mandiri MCM format).
+- Kalender cuti bersama tim (*Team Leave Calendar*).
 
 ---
 
-## 4. SCOPE BREAKDOWN
-
-Untuk menjamin keberhasilan delivery secara modular dan aman, ruang lingkup implementasi dibagi secara terukur ke dalam 4 tahapan:
-
-### MVP SCOPE (P0) - FONDASI OPERASIONAL WAJIB
-Fokus pada kelayakan operasional legal dasar, pencatatan karyawan, kehadiran, cuti, penggajian, dan keamanan:
-- **Modul 01**: Otentikasi Email/Password, JWT Session Management, RBAC & ABAC dasar.
-- **Modul 02**: Master Data Karyawan, Struktur Departemen & Jabatan, Enkripsi AES-256 data PII/Bank, Profil ESS Karyawan.
-- **Modul 03**: Clock-in & Clock-out berbasis Geofencing GPS & validasi IP, Manajemen Shift Standar, Deteksi Keterlambatan.
-- **Modul 04**: Master Jenis Cuti, Alokasi Kuota Cuti Tahunan, Form Pengajuan Cuti Mandiri, Approval Line Manager, Pengurangan Saldo Otomatis.
-- **Modul 05**: Master Komponen Gaji, Mesin Kalkulasi PPh 21 skema TER, Kalkulator BPJS TK & Kesehatan, Integrasi Potongan Absen, Status Periode (Draft/Calculate/Lock/Publish), Generate Slip Gaji PDF, Ekspor CSV Transfer Bank.
-- **Modul 11**: Pusat Notifikasi In-App & Worker Email Transaksional (BullMQ).
-- **Modul 12**: Laporan Rekap Presensi & Payroll Bulanan (Format Excel & PDF).
-- **Modul 14**: Append-Only Audit Trail untuk mutasi data sensitif.
-- **Modul 15**: Konfigurasi Hari Kerja, Jam Kantor, Radius Geofence, dan Hari Libur Nasional.
-
----
-
-### PHASE 2 SCOPE (P1) - EFISIENSI & PENGEMBANGAN LANJUTAN
-Fokus pada otomasi persetujuan tingkat lanjut, analitik eksekutif, dan manajemen dokumen:
-- **Modul 01**: Multi-Factor Authentication (TOTP Authenticator) untuk role Admin/Payroll.
-- **Modul 03**: Pengajuan & Rekonsiliasi Lembur (*Overtime*), Koreksi Absensi Manual oleh HR, Impor Log Mesin Fingerprint.
-- **Modul 04**: Multi-tier Approval (Manager + HR), Kalender Cuti Bersama Tim, Pembatalan Cuti yang Disetujui.
-- **Modul 06**: Manajemen Pagu Manfaat, Pengajuan Klaim Reimbursement Medis & Struk, Verifikasi & Pencairan via Payroll.
-- **Modul 09**: Konversi Otomatis Pelamar Diterima (*Hired*) langsung menjadi data karyawan baru.
-- **Modul 10**: HR Executive Dashboard (Metrik Headcount, Rasio Kehadiran, Alert Habis Kontrak PKWT < 30 Hari, Tren Payroll).
-- **Modul 11**: Real-Time Push Notification via WebSocket (Socket.io) dengan Redis Pub/Sub adapter.
-- **Modul 12**: Background Report Generator untuk dataset besar (> 1.000 baris).
-- **Modul 13**: Repositori Kebijakan Perusahaan, Versi Dokumen, dan Pelacakan Konfirmasi Baca Digital (*Policy Acknowledgment*).
-
----
-
-### FUTURE SCOPE (P2 / P3) - STRATEGIS & OTOMASI TINGKAT TINGGI
-*(Dokumentasi dan kesiapan arsitektur rinci tersimpan di [`docs/FUTURE_EXPANSIONS.md`](file:///d:/Sistem%20HRIS/docs/FUTURE_EXPANSIONS.md))*:
-1. **Mobile Application (Native / Cross-Platform)**: Aplikasi mobile mandiri (Flutter / React Native) untuk portal Employee Self-Service (ESS).
-2. **Fingerprint Machine Integration**: Integrasi dan sinkronisasi log mesin absensi fisik kantor (ZKTeco, Solution, dll) ke tabel presensi.
-3. **Face Recognition Attendance with Liveness Detection**: Presensi selfie kamera dengan verifikasi biometrik wajah anti-spoofing.
-4. **WhatsApp Business Notification Gateway**: Pengiriman slip gaji, notifikasi approval, dan pengumuman instan via WhatsApp resmi.
-5. **AI HR Analytics & Predictive Workforce Intelligence**: Deteksi dini risiko turnover karyawan (*Flight Risk Prediction*) dan model prediktif SDM.
-6. **Employee Virtual Assistant / HR Chatbot**: Asisten virtual RAG cerdas untuk konsultasi kebijakan perusahaan dan sisa cuti 24/7.
-7. **Biometric Attendance Engine**: Mesin verifikasi kehadiran biometrik gabungan (Fingerprint + Face Recognition + Geofencing).
-8. **Advanced Payroll Engine**: Multi-Currency, Pinjaman Karyawan & Kasbon (*Salary Loan / Advance*), Cafeteria Flexible Benefits, dan integrasi API Host-to-Host (H2H) Bank.
-- **Fitur Pendukung Lainnya**: Single Sign-On (SSO SAML / Google Workspace / Azure AD) [P2], WebAuthn Biometrics [P3], Streaming log forensik ke external SIEM [P2].
+### FUTURE SCOPE (P2 / P3)
+- Aplikasi Mobile Mandiri (React Native / Flutter) untuk ESS.
+- Integrasi mesin fisik absensi sidik jari (Fingerprint Machine ZKTeco via sync agent).
+- Face Recognition Attendance dengan deteksi keaslian wajah (*Liveness Detection*).
+- Gateway notifikasi WhatsApp Business API resmi.
 
 ---
 
 ### OUT OF SCOPE
-Hal-hal berikut secara eksplisit **TIDAK TERMASUK** dalam batasan proyek HRIS ini:
-1. **Sistem Akuntansi Umum / ERP Finansial Lengkap**: Sistem HRIS ini hanya menghitung dan mengekspor jurnal beban payroll/gaji, namun tidak mengelola Buku Besar Umum (*General Ledger*), Hutang/Piutang Usaha (*AP/AR*), atau perpajakan badan (PPh Badan/PPN).
-2. **Pengadaan Hardware Fisik**: Pengadaan fisik mesin fingerprint, turnstile gate, tablet absensi, atau kartu RFID fisik berada di luar cakupan software ini.
-3. **Penyedia Layanan Pembayaran Pihak Ketiga (Payment Gateway Settlement)**: HRIS menghasilkan instruksi transfer file batch perbankan standar (BCA AutoPay, Mandiri MCM, dll), namun otorisasi token bank dan eksekusi debet rekening perusahaan tetap dilakukan melalui portal resmi perbankan terkait.
-4. **Layanan Hukum & Konsultasi Ketenagakerjaan**: Perangkat lunak menyediakan formula dan fleksibilitas pengaturan sesuai regulasi UU Ketenagakerjaan, namun bukan pengganti nasihat konsultan hukum ketenagakerjaan.
+- Sistem Akuntansi Finansial / General Ledger ERP lengkap (Hanya memproses beban payroll SDM).
+- Pengadaan perangkat keras fisik mesin fingerprint / turnstile gate.
+- Payment Gateway Settlement pencairan dana langsung tanpa otorisasi portal bank.
+
+---
+*Dokumen PRD ini telah disahkan dan diselaraskan secara penuh dengan Capstone Project.pdf serta keputusan bisnis pemilik proyek.*

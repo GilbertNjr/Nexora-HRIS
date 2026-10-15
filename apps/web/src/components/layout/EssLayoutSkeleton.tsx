@@ -15,7 +15,7 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-0">
       {/* Top Header */}
       <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
-        <Link href="/">
+        <Link href="/ess">
           <NexoraLogo />
         </Link>
 

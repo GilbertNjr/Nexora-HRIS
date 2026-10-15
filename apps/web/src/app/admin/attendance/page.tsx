@@ -1,0 +1,1313 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
+import {
+  Clock,
+  Calendar,
+  Users,
+  Search,
+  Filter,
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  RotateCw,
+  Building2,
+  ChevronDown,
+  SlidersHorizontal,
+  FileEdit,
+  ExternalLink,
+  MapPin,
+  Laptop,
+  Building,
+  Check,
+  X,
+  Send,
+  MoreVertical,
+  CheckSquare,
+  Square,
+  Sparkles,
+  PieChart,
+  Eye,
+  FileText,
+  CalendarCheck,
+  ShieldCheck,
+} from 'lucide-react';
+
+interface AttendanceRecord {
+  id: string;
+  name: string;
+  nik: string;
+  division: string;
+  initials: string;
+  avatarBg: string;
+  shiftName: string;
+  shiftHours: string;
+  shiftNote: string;
+  checkInTime: string;
+  checkInSourceIcon: 'globe' | 'building' | 'cog' | 'pin';
+  checkInNote: string;
+  checkInType: 'early' | 'late' | 'remote' | 'gate' | 'dinas';
+  checkOutTime: string;
+  status: 'TEPAT_WAKTU' | 'TERLAMBAT' | 'WFH' | 'DINAS_LUAR' | 'BELUM_PRESENSI';
+}
+
+interface OvertimeItem {
+  id: string;
+  name: string;
+  department: string;
+  hours: string;
+  timeRange: string;
+  reason: string;
+  dateBadge: string;
+}
+
+export default function AdminAttendancePage() {
+  // Filter & Toolbar States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDept, setSelectedDept] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [selectedShift, setSelectedShift] = useState<'all' | 'shift1' | 'shift2' | 'flexible'>('all');
+  const [selectedDate, setSelectedDate] = useState('24 Mar 2025 (Hari Ini)');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Modals State
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [isManualCorrectionModalOpen, setIsManualCorrectionModalOpen] = useState(false);
+  const [isNudgeModalOpen, setIsNudgeModalOpen] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Table selection
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Overtime Pending Requests State
+  const [overtimeList, setOvertimeList] = useState<OvertimeItem[]>([
+    {
+      id: 'ot-1',
+      name: 'Bambang Sutedjo',
+      department: 'Warehouse Logistik',
+      hours: '3.5 Jam',
+      timeRange: '17:00 - 20:30',
+      reason: 'Bongkar muat kontainer logistik bahan baku kloter akhir kuartal...',
+      dateBadge: 'Hari Ini',
+    },
+    {
+      id: 'ot-2',
+      name: 'Farhan Al-Ghifari',
+      department: 'IT Infrastructure',
+      hours: '2.0 Jam',
+      timeRange: '19:00 - 21:00',
+      reason: 'Maintenance server database bulanan dan update patch security cluster...',
+      dateBadge: 'Hari Ini',
+    },
+  ]);
+
+  // Attendance Records State
+  const [records, setRecords] = useState<AttendanceRecord[]>([
+    {
+      id: 'att-1',
+      name: 'Raden Bagus Prakoso, S.Kom',
+      nik: 'NX-201844',
+      division: 'Divisi Rekayasa Cloud',
+      initials: 'RP',
+      avatarBg: 'from-blue-600 to-indigo-600',
+      shiftName: 'Reguler HQ (08:00 - 17:00)',
+      shiftHours: '08:00 - 17:00',
+      shiftNote: 'Toleransi 15 Menit',
+      checkInTime: '07:51:20',
+      checkInSourceIcon: 'globe',
+      checkInNote: '+9 menit lbh cepat',
+      checkInType: 'early',
+      checkOutTime: '17:08:15',
+      status: 'TEPAT_WAKTU',
+    },
+    {
+      id: 'att-2',
+      name: 'Siti Nurhaliza, M.M.',
+      nik: 'NX-201992',
+      division: 'People & Talent Dev',
+      initials: 'SN',
+      avatarBg: 'from-purple-600 to-pink-600',
+      shiftName: 'Reguler HQ (08:00 - 17:00)',
+      shiftHours: '08:00 - 17:00',
+      shiftNote: 'Toleransi 15 Menit',
+      checkInTime: '08:24:11',
+      checkInSourceIcon: 'building',
+      checkInNote: 'Terlambat 24 Menit',
+      checkInType: 'late',
+      checkOutTime: '—',
+      status: 'TERLAMBAT',
+    },
+    {
+      id: 'att-3',
+      name: 'Dimas Arya Pamungkas',
+      nik: 'NX-202105',
+      division: 'DevOps & Security',
+      initials: 'DA',
+      avatarBg: 'from-emerald-600 to-teal-600',
+      shiftName: 'Fleksibel Remote (WFH)',
+      shiftHours: 'Fleksibel',
+      shiftNote: 'Jadwal Rotasi Mingguan',
+      checkInTime: '08:02:40',
+      checkInSourceIcon: 'globe',
+      checkInNote: 'Selfie Validated',
+      checkInType: 'remote',
+      checkOutTime: '—',
+      status: 'WFH',
+    },
+    {
+      id: 'att-4',
+      name: 'Hendro Wibowo, S.T.',
+      nik: 'NX-201633',
+      division: 'Operasional Pabrik Cikarang',
+      initials: 'HW',
+      avatarBg: 'from-amber-600 to-orange-600',
+      shiftName: 'Shift 1 Pagi (07:00 - 15:30)',
+      shiftHours: '07:00 - 15:30',
+      shiftNote: 'Standar Pabrik',
+      checkInTime: '06:48:10',
+      checkInSourceIcon: 'cog',
+      checkInNote: 'Gate Masuk Barat',
+      checkInType: 'gate',
+      checkOutTime: '—',
+      status: 'TEPAT_WAKTU',
+    },
+    {
+      id: 'att-5',
+      name: 'Anindya Kusuma, S.E.',
+      nik: 'NX-202289',
+      division: 'Business Development & Sales',
+      initials: 'AK',
+      avatarBg: 'from-rose-600 to-red-600',
+      shiftName: 'Dinas Luar (Surabaya)',
+      shiftHours: 'Full Day',
+      shiftNote: 'Surat Tugas #ST-442',
+      checkInTime: '08:10:02',
+      checkInSourceIcon: 'pin',
+      checkInNote: 'Check-In Client Site',
+      checkInType: 'dinas',
+      checkOutTime: '—',
+      status: 'DINAS_LUAR',
+    },
+  ]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      showToast('Sinkronisasi Biometrik & Geofencing berhasil diperbarui!');
+    }, 900);
+  };
+
+  const handleApproveOvertime = (id: string, name: string) => {
+    setOvertimeList((prev) => prev.filter((item) => item.id !== id));
+    showToast(`Lembur ${name} berhasil disetujui & dicatat ke perhitungan payroll!`);
+  };
+
+  const handleRejectOvertime = (id: string, name: string) => {
+    setOvertimeList((prev) => prev.filter((item) => item.id !== id));
+    showToast(`Pengajuan lembur ${name} ditolak.`);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === records.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(records.map((r) => r.id));
+    }
+  };
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  // Filtered dataset
+  const filteredRecords = records.filter((r) => {
+    const matchesSearch =
+      r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.nik.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.division.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesShift =
+      selectedShift === 'all' ||
+      (selectedShift === 'shift1' && r.shiftName.includes('08:00')) ||
+      (selectedShift === 'shift2' && r.shiftName.includes('Shift Siang')) ||
+      (selectedShift === 'flexible' && r.shiftName.includes('Fleksibel'));
+
+    return matchesSearch && matchesShift;
+  });
+
+  return (
+    <AdminLayoutSkeleton
+      onQuickAction={() => setIsManualCorrectionModalOpen(true)}
+    >
+      {/* Toast Feedback */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+          <span className="text-xs font-semibold">{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="p-1 text-slate-400 hover:text-white ml-2 rounded-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-5 max-w-[1440px] mx-auto pb-12">
+        {/* =========================================================================
+            1. HEADER & BREADCRUMBS WITH REAL-TIME SYNC BADGE
+        ========================================================================= */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
+          <div>
+            <div className="flex items-center gap-2.5 text-xs text-slate-500 mb-1">
+              <span className="font-semibold text-slate-700 uppercase tracking-wider text-[11px]">
+                UTAMA
+              </span>
+              <span>&gt;</span>
+              <span className="font-bold text-blue-700 uppercase tracking-wider text-[11px]">
+                PRESENSI & WAKTU
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                REAL-TIME SYNC
+              </span>
+            </div>
+
+            <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
+              Presensi & Waktu Kerja
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
+              Monitoring kehadiran harian, sinkronisasi log biometrik, validasi geofencing mobile, dispensasi keterlambatan, dan rekapitulasi lembur karyawan terpusat.
+            </p>
+          </div>
+
+          {/* Top Actions: Shift & Jam Kerja, Koreksi Manual, Unduh Rekap */}
+          <div className="flex items-center gap-2.5 flex-wrap flex-shrink-0 relative">
+            <button
+              onClick={() => setIsShiftModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+              <span>Shift & Jam Kerja</span>
+            </button>
+
+            <button
+              onClick={() => setIsManualCorrectionModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all"
+            >
+              <FileEdit className="w-3.5 h-3.5 text-slate-500" />
+              <span>Koreksi Manual</span>
+            </button>
+
+            {/* Export Link & Center */}
+            <div className="relative">
+              <Link
+                href="/admin/attendance/export"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all transform active:scale-95"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh Rekap</span>
+                <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
+              </Link>
+
+              {isExportDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    onClick={() => {
+                      setIsExportDropdownOpen(false);
+                      showToast('Mengunduh Laporan Presensi Excel (.xlsx)...');
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-600" />
+                    Format Excel (.xlsx)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsExportDropdownOpen(false);
+                      showToast('Mengunduh Laporan Presensi PDF Eksekutif...');
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-rose-600" />
+                    Format PDF Resmi
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsExportDropdownOpen(false);
+                      showToast('Mengunduh Data Mentah CSV Biometrik...');
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    Raw Biometric (.csv)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            2. TOP 5 KPI SUMMARY CARDS (Matching Stitch Screen Exactly)
+        ========================================================================= */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          {/* Card 1: TOTAL WAJIB MASUK */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  TOTAL WAJIB MASUK
+                </span>
+                <Users className="w-4 h-4 text-slate-300" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold text-slate-900">1,248</span>
+                <span className="text-xs text-slate-500 font-medium">personil</span>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium mt-3 whitespace-nowrap">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                Semua unit kerja
+              </span>
+              <span className="font-semibold text-slate-700">100% Target</span>
+            </div>
+          </div>
+
+          {/* Card 2: HADIR TEPAT WAKTU */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  HADIR TEPAT WAKTU
+                </span>
+                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  📈 94.7%
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold text-slate-900">1,182</span>
+                <span className="text-xs text-slate-500 font-medium">staf</span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2.5 overflow-hidden">
+                <div className="bg-blue-600 h-full rounded-full w-[94.7%]" />
+              </div>
+            </div>
+            <div className="pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold mt-3">
+              +1.2% dr kemarin
+            </div>
+          </div>
+
+          {/* Card 3: TERLAMBAT & IZIN AWAL */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  TERLAMBAT & IZIN AWAL
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                  Rata-rata 14 mnt
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold text-slate-900">28</span>
+                <span className="text-xs text-slate-500 font-medium">kasus</span>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] mt-3">
+              <span className="text-slate-500 font-medium">
+                • 19 dlm batas toleransi
+              </span>
+              <button
+                onClick={() => showToast('Menampilkan rincian toleransi 15 menit...')}
+                className="text-blue-600 hover:underline font-semibold"
+              >
+                Rincian →
+              </button>
+            </div>
+          </div>
+
+          {/* Card 4: IZIN, CUTI & SAKIT */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  IZIN, CUTI & SAKIT
+                </span>
+                <CalendarCheck className="w-4 h-4 text-slate-300" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold text-slate-900">26</span>
+                <span className="text-xs text-slate-500 font-medium">terverifikasi</span>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] mt-3">
+              <span className="text-slate-500 font-medium truncate">
+                14 Cuti • 8 Sakit • 4 Dinas
+              </span>
+              <Link
+                href="/admin/leave"
+                className="text-blue-600 hover:underline font-semibold flex-shrink-0"
+              >
+                Lihat SK
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 5: BELUM PRESENSI (Alert Card) */}
+          <div className="bg-white rounded-3xl p-5 border border-rose-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between bg-gradient-to-br from-white to-rose-50/40">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold tracking-wider text-rose-600 uppercase">
+                  BELUM PRESENSI
+                </span>
+                <AlertTriangle className="w-4 h-4 text-rose-500" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold text-rose-700">12</span>
+                <span className="text-xs text-rose-500 font-medium">tanpa kabar</span>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-rose-100 flex items-center justify-between gap-1.5 mt-3">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                ⚠ Perlu Konfirmasi
+              </span>
+              <button
+                onClick={() => setIsNudgeModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold shadow-sm transition-all transform active:scale-95"
+              >
+                Nudge Staf
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            3. FILTER & TOOLBAR SECTION (Search, Date, Dept, Status, Shift Tabs)
+        ========================================================================= */}
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/70 shadow-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            {/* Search Input */}
+            <div className="md:col-span-5 relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari Nama Pegawai atau NIK..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+              />
+            </div>
+
+            {/* Date Selector Dropdown */}
+            <div className="md:col-span-3 relative">
+              <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <select
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full pl-10 pr-8 py-2.5 text-xs rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold text-slate-700 appearance-none cursor-pointer"
+              >
+                <option value="24 Mar 2025 (Hari Ini)">24 Mar 2025 (Hari Ini)</option>
+                <option value="23 Mar 2025">23 Mar 2025 (Kemarin)</option>
+                <option value="22 Mar 2025">22 Mar 2025 (Sabtu)</option>
+                <option value="21 Mar 2025">21 Mar 2025 (Jumat)</option>
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Department Dropdown */}
+            <div className="md:col-span-2 relative">
+              <select
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-700 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Semua Departemen</option>
+                <option value="TECH">Teknologi & Produk</option>
+                <option value="OPS">Operasional & Logistik</option>
+                <option value="SALES">Pemasaran & Penjualan</option>
+                <option value="HR">Keuangan & HR</option>
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Status Dropdown */}
+            <div className="md:col-span-2 relative">
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-700 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Semua Status</option>
+                <option value="TEPAT_WAKTU">Tepat Waktu</option>
+                <option value="TERLAMBAT">Terlambat</option>
+                <option value="WFH">WFH (Remote)</option>
+                <option value="DINAS_LUAR">Dinas Luar</option>
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Sub-bar: Shift Pills + Sync Status */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+              <span className="text-xs font-semibold text-slate-500 mr-1 flex-shrink-0">
+                Shift:
+              </span>
+              <button
+                onClick={() => setSelectedShift('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedShift === 'all'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Semua Shift
+              </button>
+              <button
+                onClick={() => setSelectedShift('shift1')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedShift === 'shift1'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Shift 1 (08:00 - 17:00)
+              </button>
+              <button
+                onClick={() => setSelectedShift('shift2')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedShift === 'shift2'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Shift Siang (13:00 - 21:00)
+              </button>
+              <button
+                onClick={() => setSelectedShift('flexible')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedShift === 'flexible'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Fleksibel HQ
+              </button>
+            </div>
+
+            {/* Sync Status & Refresh Button */}
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                <span>Sinkron Biometrik Otomatis</span>
+              </div>
+              <button
+                onClick={handleRefresh}
+                className="flex items-center gap-1.5 font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                <RotateCw
+                  className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+                />
+                <span>Refresh Data</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            4. LOWER 2-COLUMN SECTION: (Table Log on Left, Widgets on Right)
+        ========================================================================= */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* -----------------------------------------------------------------------
+              LEFT COLUMN: Log Presensi Harian Real-Time (8 cols)
+          ----------------------------------------------------------------------- */}
+          <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200/70 shadow-sm overflow-hidden flex flex-col justify-between">
+            <div>
+              {/* Table Header Row */}
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <CalendarCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-slate-900">
+                        Log Presensi Harian Real-Time
+                      </h2>
+                      <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                        1,248 Baris
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-slate-400">
+                  <button
+                    onClick={() => showToast('Mengatur konfigurasi kolom tampilan')}
+                    className="p-1.5 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                    title="Pengaturan Kolom"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => showToast('Mengurutkan data presensi')}
+                    className="p-1.5 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                    title="Sorting"
+                  >
+                    <Filter className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 bg-slate-50/50 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                      <th className="py-3 px-4 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedIds.length === records.length &&
+                            records.length > 0
+                          }
+                          onChange={toggleSelectAll}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </th>
+                      <th className="py-3 px-4">Karyawan & Divisi</th>
+                      <th className="py-3 px-4">Jadwal Shift</th>
+                      <th className="py-3 px-4">Check-In</th>
+                      <th className="py-3 px-4">Check-Out</th>
+                      <th className="py-3 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRecords.map((item) => {
+                      const isSelected = selectedIds.includes(item.id);
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`hover:bg-slate-50/70 transition-colors ${
+                            isSelected ? 'bg-blue-50/30' : ''
+                          }`}
+                        >
+                          {/* Checkbox */}
+                          <td className="py-3.5 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectRow(item.id)}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </td>
+
+                          {/* Karyawan & Divisi */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.avatarBg} text-white font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-sm`}
+                              >
+                                {item.initials}
+                              </div>
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/admin/employees/${item.nik}`}
+                                  className="font-bold text-slate-900 hover:text-blue-600 transition-colors truncate block"
+                                >
+                                  {item.name}
+                                </Link>
+                                <p className="text-[11px] text-slate-500 font-medium truncate">
+                                  <span className="font-mono text-slate-400">
+                                    {item.nik}
+                                  </span>{' '}
+                                  • {item.division}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Jadwal Shift */}
+                          <td className="py-3.5 px-4">
+                            <p className="font-semibold text-slate-800">
+                              {item.shiftName}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {item.shiftNote}
+                            </p>
+                          </td>
+
+                          {/* Check-In */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
+                              <span>{item.checkInTime}</span>
+                              {item.checkInSourceIcon === 'globe' && (
+                                <span title="Web Portal">
+                                  <Laptop className="w-3.5 h-3.5 text-blue-500" />
+                                </span>
+                              )}
+                              {item.checkInSourceIcon === 'building' && (
+                                <span title="Kantor Pusat">
+                                  <Building className="w-3.5 h-3.5 text-amber-500" />
+                                </span>
+                              )}
+                              {item.checkInSourceIcon === 'cog' && (
+                                <span title="Pabrik Cikarang">
+                                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                                </span>
+                              )}
+                              {item.checkInSourceIcon === 'pin' && (
+                                <span title="Lokasi Client">
+                                  <MapPin className="w-3.5 h-3.5 text-purple-500" />
+                                </span>
+                              )}
+                            </div>
+                            <p
+                              className={`text-[10px] font-semibold mt-0.5 ${
+                                item.checkInType === 'early'
+                                  ? 'text-emerald-600'
+                                  : item.checkInType === 'late'
+                                  ? 'text-rose-600 font-bold'
+                                  : item.checkInType === 'remote'
+                                  ? 'text-blue-600'
+                                  : 'text-slate-500'
+                              }`}
+                            >
+                              {item.checkInNote}
+                            </p>
+                          </td>
+
+                          {/* Check-Out */}
+                          <td className="py-3.5 px-4 font-mono text-slate-700">
+                            {item.checkOutTime}
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="py-3.5 px-4">
+                            {item.status === 'TEPAT_WAKTU' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Tepat Waktu
+                              </span>
+                            )}
+                            {item.status === 'TERLAMBAT' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                Terlambat
+                              </span>
+                            )}
+                            {item.status === 'WFH' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                WFH Terverifikasi
+                              </span>
+                            )}
+                            {item.status === 'DINAS_LUAR' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                Dinas Luar
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Table Pagination Footer */}
+            <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span>Menampilkan</span>
+                <select className="px-2 py-1 rounded-lg border border-slate-200 bg-white font-semibold text-slate-700 text-xs">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+                <span>dari <strong className="text-slate-800">1,248</strong> total data presensi</span>
+              </div>
+
+              {/* Pagination controls */}
+              <div className="flex items-center gap-1 font-semibold">
+                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400">
+                  |&lt;
+                </button>
+                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400">
+                  &lt;
+                </button>
+                <button className="px-3 py-1 rounded-lg bg-blue-600 text-white">
+                  1
+                </button>
+                <button className="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
+                  2
+                </button>
+                <button className="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
+                  3
+                </button>
+                <span className="px-1 text-slate-400">...</span>
+                <button className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
+                  125
+                </button>
+                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
+                  &gt;
+                </button>
+                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
+                  &gt;|
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* -----------------------------------------------------------------------
+              RIGHT COLUMN: Verifikasi Lembur & Metode Check-In (4 cols)
+          ----------------------------------------------------------------------- */}
+          <div className="lg:col-span-4 space-y-5">
+            {/* Card 1: Verifikasi Lembur */}
+            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Verifikasi Lembur
+                    </h3>
+                  </div>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  {overtimeList.length} Permohonan
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Surat Perintah Lembur (SPL) yang diajukan oleh supervisor divisi menunggu otorisasi HRD.
+              </p>
+
+              <div className="space-y-3.5">
+                {overtimeList.map((ot) => (
+                  <div
+                    key={ot.id}
+                    className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/60 space-y-2.5 hover:border-blue-200 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-900 truncate">
+                          {ot.name}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          {ot.department} • <strong className="text-blue-700">{ot.hours}</strong> ({ot.timeRange})
+                        </p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 flex-shrink-0">
+                        {ot.dateBadge}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 italic bg-white p-2.5 rounded-xl border border-slate-200/50">
+                      "{ot.reason}"
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        onClick={() => handleRejectOvertime(ot.id, ot.name)}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-colors"
+                      >
+                        Tolak
+                      </button>
+                      <button
+                        onClick={() => handleApproveOvertime(ot.id, ot.name)}
+                        className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all transform active:scale-95"
+                      >
+                        Setujui Segera
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {overtimeList.length === 0 && (
+                  <div className="text-center py-6 text-slate-400 text-xs space-y-1">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                    <p className="font-semibold text-slate-700">
+                      Semua Lembur Sudah Disetujui
+                    </p>
+                    <p className="text-[11px]">Tidak ada permohonan tertunda.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 text-center">
+                <Link
+                  href="/admin/payroll"
+                  className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
+                >
+                  <span>Buka Semua Riwayat Lembur</span>
+                  <span>&rarr;</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Card 2: Metode Check-In (Donut Chart & Distribution) */}
+            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <PieChart className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Metode Check-In
+                  </h3>
+                </div>
+                <button
+                  onClick={handleRefresh}
+                  className="p-1 text-slate-400 hover:text-slate-700 rounded"
+                  title="Refresh Breakdown"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Circular Visual & Center Counter */}
+              <div className="flex flex-col items-center py-2">
+                <div className="relative w-36 h-36 flex items-center justify-center">
+                  {/* SVG Donut Visual */}
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke="#E2E8F0"
+                      strokeWidth="12"
+                    />
+                    {/* Biometrik Kantor (62.8%) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke="#1D4ED8"
+                      strokeWidth="12"
+                      strokeDasharray="251.2"
+                      strokeDashoffset="93.4"
+                      className="transition-all duration-1000 ease-out"
+                    />
+                    {/* Mobile GPS (26.9%) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke="#0EA5E9"
+                      strokeWidth="12"
+                      strokeDasharray="251.2"
+                      strokeDashoffset="183.6"
+                      strokeDashoffset-start="93.4"
+                    />
+                  </svg>
+                  <div className="absolute flex flex-col items-center text-center">
+                    <span className="text-2xl font-bold text-slate-900">1,182</span>
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                      Total Hadir
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Legend Breakdown */}
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-700 flex-shrink-0" />
+                    <span className="font-semibold text-slate-700 truncate">
+                      Biometrik Kantor (Finger & Face)
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-slate-900">
+                    742 (62.8%)
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500 flex-shrink-0" />
+                    <span className="font-semibold text-slate-700 truncate">
+                      Mobile App (GPS & Geofencing)
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-slate-900">
+                    318 (26.9%)
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400 flex-shrink-0" />
+                    <span className="font-semibold text-slate-700 truncate">
+                      Web Portal SSO / Remote WFH
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-slate-900">
+                    122 (10.3%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          MODAL 1: SHIFT & JAM KERJA CONFIGURATION
+      ========================================================================= */}
+      {isShiftModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setIsShiftModalOpen(false)}
+              className="absolute top-6 right-6 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                <SlidersHorizontal className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Pengaturan Shift & Kebijakan Jam Kerja
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Toleransi keterlambatan dan rentang waktu tap-in/tap-out.
+                </p>
+              </div>
+            </div>
+
+            <div className="py-5 space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Shift Reguler Kantor Pusat (HQ)
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    defaultValue="08:00 WIB"
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 font-mono"
+                  />
+                  <input
+                    type="text"
+                    defaultValue="17:00 WIB"
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Batas Toleransi Keterlambatan Resmi
+                </label>
+                <select className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-semibold text-slate-700">
+                  <option value="15">15 Menit (Standar Kebijakan Perusahaan)</option>
+                  <option value="30">30 Menit (Kondisi Khusus / Cuaca Ekstrem)</option>
+                  <option value="0">0 Menit (Strict Tanpa Dispensasi)</option>
+                </select>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 text-[11px] text-blue-800 leading-relaxed">
+                💡 <strong>Catatan Kepatuhan:</strong> Perubahan kebijakan shift akan berlaku mulai besok pukul 00:00 WIB dan otomatis disinkronkan ke seluruh mesin biometric dan mobile geofence.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5">
+              <button
+                onClick={() => setIsShiftModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  setIsShiftModalOpen(false);
+                  showToast('Kebijakan shift berhasil diperbarui & disinkronkan!');
+                }}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 shadow-sm"
+              >
+                Simpan Konfigurasi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 2: KOREKSI MANUAL PRESENSI
+      ========================================================================= */}
+      {isManualCorrectionModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setIsManualCorrectionModalOpen(false)}
+              className="absolute top-6 right-6 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                <FileEdit className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Input Koreksi Manual Presensi
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Dispensasi lupa tap-in atau anomali jaringan mesin biometric.
+                </p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setIsManualCorrectionModalOpen(false);
+                showToast('Koreksi presensi berhasil dicatat & masuk ke Audit Trail!');
+              }}
+              className="py-5 space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Pilih Pegawai
+                </label>
+                <select className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-medium text-slate-800">
+                  <option value="NX-201992">Siti Nurhaliza, M.M. (NX-201992)</option>
+                  <option value="NX-2021008">Rian Pratama, S.Kom (NX-2021008)</option>
+                  <option value="NX-201844">Raden Bagus Prakoso (NX-201844)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">
+                    Jam Check-In Disesuaikan
+                  </label>
+                  <input
+                    type="time"
+                    defaultValue="08:00"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">
+                    Jam Check-Out Disesuaikan
+                  </label>
+                  <input
+                    type="time"
+                    defaultValue="17:00"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">
+                  Alasan Koreksi / Nomor Memo
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Contoh: Mesin fingerprint lobby barat mati lampu pkl 08:00..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsManualCorrectionModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 shadow-sm"
+                >
+                  Simpan Koreksi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 3: NUDGE STAF (BROADCAST REMINDER PRESENSI)
+      ========================================================================= */}
+      {isNudgeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setIsNudgeModalOpen(false)}
+              className="absolute top-6 right-6 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                <Send className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Kirim Nudge / Pengingat Presensi
+                </h3>
+                <p className="text-xs text-rose-600 font-semibold">
+                  12 Pegawai Belum Presensi Hari Ini
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 my-4 leading-relaxed">
+              Sistem akan mengirimkan push notification aplikasi mobile Nexora ESS dan pesan WhatsApp reminder otomatis kepada 12 pegawai yang belum melakukan tap-in hingga pukul 09:00 WIB.
+            </p>
+
+            <div className="flex justify-end gap-2.5">
+              <button
+                onClick={() => setIsNudgeModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  setIsNudgeModalOpen(false);
+                  showToast('Notifikasi Nudge terkirim ke 12 pegawai via WhatsApp & ESS!');
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Kirim Nudge Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AdminLayoutSkeleton>
+  );
+}
