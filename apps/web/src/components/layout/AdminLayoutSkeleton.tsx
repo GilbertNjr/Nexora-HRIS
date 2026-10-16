@@ -310,12 +310,16 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
             {/* Vertical Separator */}
             <div className="hidden sm:block h-6 w-px bg-slate-200" />
 
-            {/* User Profile Pill */}
-            <div className="flex items-center gap-2.5 pl-1 cursor-pointer group">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 to-rose-400 p-0.5 shadow-sm">
+            {/* User Profile Pill linking to /admin/profile */}
+            <Link
+              href="/admin/profile"
+              className="flex items-center gap-2.5 pl-1 cursor-pointer group hover:opacity-90 transition-opacity"
+              title="Buka Pengaturan Akun & Profil Pengguna"
+            >
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 to-rose-400 p-0.5 shadow-sm flex-shrink-0">
                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-xs font-bold text-slate-700 overflow-hidden">
                   <img
-                    src="/avatars/dewi-lestari.jpg"
+                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=120"
                     alt="Dewi Lestari"
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -325,15 +329,15 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
                 </div>
               </div>
               <div className="hidden xl:flex flex-col text-left">
-                <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight">
+                <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight whitespace-nowrap">
                   Dewi Lestari, S.Psi
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium leading-tight">
+                <span className="text-[10px] text-slate-400 font-medium leading-tight whitespace-nowrap">
                   HR Operations Manager
                 </span>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors hidden sm:block" />
-            </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors hidden sm:block flex-shrink-0" />
+            </Link>
           </div>
         </header>
 
