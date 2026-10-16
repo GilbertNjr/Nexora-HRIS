@@ -282,7 +282,7 @@ export default function SecurityAndPasswordsPage() {
 
           {/* Tab 3: Preferensi & Notifikasi */}
           <Link
-            href="/admin/profile?tab=preferences"
+            href="/admin/profile/preferences"
             className="flex-1 min-w-[180px] inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 transition-all whitespace-nowrap"
           >
             <Bell className="w-4 h-4 text-slate-500" />

@@ -299,18 +299,13 @@ export default function UserProfilePage() {
             <span>Keamanan &amp; Kata Sandi</span>
           </Link>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('preferences')}
-            className={`flex-1 min-w-[170px] inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'preferences'
-                ? 'bg-white text-blue-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-            }`}
+          <Link
+            href="/admin/profile/preferences"
+            className="flex-1 min-w-[180px] inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 transition-all whitespace-nowrap"
           >
             <Bell className="w-4 h-4 text-amber-500" />
-            <span>Preferensi & Notifikasi</span>
-          </button>
+            <span>Preferensi &amp; Notifikasi</span>
+          </Link>
 
           <button
             type="button"
