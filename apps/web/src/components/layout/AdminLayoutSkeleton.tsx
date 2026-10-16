@@ -228,8 +228,8 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
         {/* Sidebar Bottom: Help Card */}
         {!isSidebarCollapsed && (
           <div className="p-3 border-t border-slate-100 flex-shrink-0">
-            <a
-              href="mailto:support@nexora.local"
+            <Link
+              href="/admin/help"
               className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100/90 border border-slate-200/70 flex items-center justify-between transition-colors group"
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -241,12 +241,12 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
                     Bantuan HRIS
                   </p>
                   <p className="text-[10px] text-slate-500 truncate">
-                    Dokumentasi & Kontak
+                    Dokumentasi &amp; Kontak
                   </p>
                 </div>
               </div>
               <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-1" />
-            </a>
+            </Link>
           </div>
         )}
       </aside>
