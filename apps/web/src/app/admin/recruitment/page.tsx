@@ -51,9 +51,113 @@ import {
   Code2,
   Smartphone,
   ExternalLink,
+  TrendingUp,
+  LayoutList,
+  LayoutGrid,
+  FileCheck,
 } from 'lucide-react';
 
 // Types
+export interface TableVacancy {
+  id: string;
+  title: string;
+  type: string;
+  location: string;
+  departmentBadge: string;
+  deptColor: string;
+  openDate: string;
+  deadlineDate: string;
+  applicantCount: number;
+  status: 'Aktif' | 'Tutup';
+}
+
+const initialTableVacancies: TableVacancy[] = [
+  {
+    id: 'vac-1',
+    title: 'Frontend Engineer',
+    type: 'Full-Time',
+    location: 'Kantor Pusat Jakarta',
+    departmentBadge: 'IT & Engineering',
+    deptColor: 'bg-blue-100 text-blue-800',
+    openDate: '10 Okt 2024',
+    deadlineDate: '31 Okt 2024',
+    applicantCount: 12,
+    status: 'Aktif',
+  },
+  {
+    id: 'vac-2',
+    title: 'HR Specialist',
+    type: 'Full-Time',
+    location: 'People Operations',
+    departmentBadge: 'HRD',
+    deptColor: 'bg-indigo-100 text-indigo-800',
+    openDate: '14 Okt 2024',
+    deadlineDate: '04 Nov 2024',
+    applicantCount: 8,
+    status: 'Aktif',
+  },
+  {
+    id: 'vac-3',
+    title: 'Staff Akuntansi',
+    type: 'Full-Time',
+    location: 'Tax & Accounting',
+    departmentBadge: 'Finance',
+    deptColor: 'bg-sky-100 text-sky-800',
+    openDate: '18 Okt 2024',
+    deadlineDate: '08 Nov 2024',
+    applicantCount: 5,
+    status: 'Aktif',
+  },
+  {
+    id: 'vac-4',
+    title: 'Staf Operasional',
+    type: 'Kontrak',
+    location: 'Logistik & Fasilitas',
+    departmentBadge: 'Ops',
+    deptColor: 'bg-slate-100 text-slate-800',
+    openDate: '20 Okt 2024',
+    deadlineDate: '10 Nov 2024',
+    applicantCount: 3,
+    status: 'Aktif',
+  },
+];
+
+const initialRecentApplicants = [
+  {
+    id: 'rec-1',
+    initials: 'RA',
+    avatarBg: 'bg-blue-600 text-white',
+    name: 'Rian Aditya',
+    role: 'Frontend Engineer',
+    timeAgo: '2 jam yang lalu',
+    statusBadge: 'Review Berkas',
+    badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200/80',
+    dotColor: 'bg-blue-600',
+  },
+  {
+    id: 'rec-2',
+    initials: 'NP',
+    avatarBg: 'bg-slate-900 text-white',
+    name: 'Nadya Putri',
+    role: 'HR Specialist',
+    timeAgo: '5 jam yang lalu',
+    statusBadge: 'Wawancara',
+    badgeColor: 'bg-indigo-50 text-indigo-700 border border-indigo-200/80',
+    dotColor: 'bg-indigo-600',
+  },
+  {
+    id: 'rec-3',
+    initials: 'BK',
+    avatarBg: 'bg-sky-500 text-white',
+    name: 'Bagus Kurniawan',
+    role: 'Staff Akuntansi',
+    timeAgo: 'Kemarin, 16:20',
+    statusBadge: 'Review Berkas',
+    badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200/80',
+    dotColor: 'bg-blue-600',
+  },
+];
+
 interface JobPosting {
   id: string;
   code: string;
@@ -121,7 +225,10 @@ interface TalentPoolCandidate {
 
 export default function AdminRecruitmentPage() {
   // Navigation & Tabs
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'onboarding' | 'talent_pool'>('pipeline');
+  const [activeTab, setActiveTab] = useState<'jobs' | 'pipeline' | 'onboarding' | 'talent_pool'>('jobs');
+  const [jobViewMode, setJobViewMode] = useState<'table' | 'cards'>('table');
+  const [tableSearchQuery, setTableSearchQuery] = useState('');
+  const [tableVacancies, setTableVacancies] = useState<TableVacancy[]>(initialTableVacancies);
   const [selectedPipelineStage, setSelectedPipelineStage] = useState<string | null>(null);
 
   // Filters for Pipeline
@@ -143,6 +250,18 @@ export default function AdminRecruitmentPage() {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  // Filtered Table Vacancies matching Image 1
+  const filteredTableVacancies = useMemo(() => {
+    return tableVacancies.filter((v) => {
+      const q = tableSearchQuery.toLowerCase();
+      return (
+        v.title.toLowerCase().includes(q) ||
+        v.departmentBadge.toLowerCase().includes(q) ||
+        v.location.toLowerCase().includes(q)
+      );
+    });
+  }, [tableVacancies, tableSearchQuery]);
 
   // 1. Initial Job Postings Data
   const [jobPostings, setJobPostings] = useState<JobPosting[]>([
@@ -648,158 +767,132 @@ export default function AdminRecruitmentPage() {
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-xs text-slate-500 font-medium">
           <Link href="/admin" className="hover:text-blue-600 transition-colors">
-            Utama
+            Sistem HR
           </Link>
           <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-slate-600">Operasional</span>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-slate-900 font-semibold">Rekrutmen & Onboarding</span>
+          <span className="text-slate-600">Portal Utama</span>
+          <span className="text-slate-300">|</span>
+          <span className="text-slate-500 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <span>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+          </span>
         </nav>
 
-        {/* Page Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2">
-          <div className="space-y-1">
+        {/* Page Header matching Image 1 */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
+              <Briefcase className="w-3.5 h-3.5" />
+              <span>MODUL REKRUTMEN</span>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-              Rekrutmen & Onboarding Karyawan
+              Kelola Rekrutmen
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
-              Kelola alur akuisisi talenta, seleksi kandidat, penawaran kerja (Offering), serta
-              checklist onboarding karyawan baru secara terpadu.
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Daftar lowongan kerja aktif dan status lamaran pelamar.
             </p>
           </div>
 
-          {/* Action Buttons Top Right: Stacked Vertically as per design mockup */}
-          <div className="flex flex-col items-stretch sm:items-end gap-2 flex-shrink-0">
-            {/* Download Report Button */}
+          {/* Action Buttons Top Right matching Image 1 */}
+          <div className="flex items-center gap-3 flex-shrink-0">
             <button
               type="button"
               onClick={handleExportXLSX}
-              className="inline-flex items-center justify-center sm:justify-start gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all active:scale-98"
             >
               <Download className="w-3.5 h-3.5 text-slate-500" />
-              <span>Unduh Laporan (.xlsx)</span>
+              <span>Unduh Rekap</span>
             </button>
 
-            {/* Manage Onboarding Template */}
-            <button
-              type="button"
-              onClick={() => setIsOnboardingTemplateModalOpen(true)}
-              className="inline-flex items-center justify-center sm:justify-start gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-              <span>Kelola Template Onboarding</span>
-            </button>
-
-            {/* Primary Action: Open New Job */}
             <Link
               href="/admin/recruitment/new"
-              className="inline-flex items-center justify-center sm:justify-start gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95"
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white shadow-sm shadow-blue-500/20 transition-all"
             >
-              <Plus className="w-4 h-4" />
-              <span>Buka Lowongan Baru</span>
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>+ Buka Lowongan Baru</span>
             </Link>
           </div>
         </div>
 
-        {/* 4 Top KPI / Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {/* Card 1: TOTAL LOWONGAN AKTIF */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                TOTAL LOWONGAN AKTIF
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Briefcase className="w-4 h-4" />
+        {/* 3 Metric Cards matching Image 1 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1: Lowongan Dibuka */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500">Lowongan Dibuka</p>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-extrabold text-slate-900 tracking-tight">4</span>
+                <span className="text-xs font-semibold text-slate-600">Posisi</span>
+              </div>
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Semua berstatus aktif</span>
               </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">18</span>
-              <span className="text-sm font-semibold text-slate-700">Posisi</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">12 Full-time (PKWTT) • 6 Kontrak (PKWT)</p>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                <ArrowUpRight className="w-3 h-3" />
-                +3 minggu ini
-              </span>
-              <span className="text-[11px] text-slate-400">posisi baru disetujui</span>
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+              <Briefcase className="w-6 h-6 stroke-[1.75]" />
             </div>
           </div>
 
-          {/* Card 2: PELAMAR MASUK (BULAN INI) */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                PELAMAR MASUK (BULAN INI)
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <UserPlus className="w-4 h-4" />
+          {/* Card 2: Total Berkas Masuk */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500">Total Berkas Masuk</p>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-extrabold text-slate-900 tracking-tight">28</span>
+                <span className="text-xs font-semibold text-slate-600">Kandidat</span>
+              </div>
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-blue-600">
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>+6 pelamar hari ini</span>
               </div>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">482</span>
-              <span className="text-sm font-semibold text-slate-700">Pelamar</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Screening rate lolos: 24.5%</p>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-              <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: '24.5%' }}></div>
-              </div>
-              <span className="text-[11px] text-slate-500 font-medium">118 berkas lolos</span>
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-6 h-6 stroke-[1.75]" />
             </div>
           </div>
 
-          {/* Card 3: DALAM PROSES ONBOARDING */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                DALAM PROSES ONBOARDING
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <UserCheck className="w-4 h-4" />
+          {/* Card 3: Menunggu Tindakan */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-500">Menunggu Tindakan</p>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-3xl font-extrabold text-slate-900 tracking-tight">11</span>
+                <span className="text-xs font-semibold text-slate-600">Berkas</span>
               </div>
+              <p className="mt-2 text-[11px] font-medium text-slate-400">
+                Perlu screening awal HR
+              </p>
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">14</span>
-              <span className="text-sm font-semibold text-slate-700">Karyawan</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">8 Batch April 2025 • 6 Lengkap Checklist</p>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                3 Hari Menuju Masuk
-              </span>
-              <span className="text-[11px] text-slate-400">jadwal orientasi batch</span>
-            </div>
-          </div>
-
-          {/* Card 4: RATA-RATA TIME TO HIRE */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                RATA-RATA TIME TO HIRE
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Timer className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">22</span>
-              <span className="text-sm font-semibold text-slate-700">Hari Kerja</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Batas KPI Efisiensi: &lt; 28 Hari</p>
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                <Check className="w-3 h-3 text-blue-600" />
-                Optimal
-              </span>
-              <span className="text-[11px] text-slate-400">-6 hari vs kuartal lalu</span>
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+              <FileCheck className="w-6 h-6 stroke-[1.75]" />
             </div>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="border-b border-slate-200 flex items-center gap-6 overflow-x-auto no-scrollbar">
+        {/* Tab Navigation matching Image 1 */}
+        <div className="border-b border-slate-200 flex items-center gap-6 overflow-x-auto no-scrollbar pt-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('jobs')}
+            className={`flex items-center gap-2 pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === 'jobs'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span>Lowongan Aktif</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                activeTab === 'jobs'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              4
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('pipeline')}
@@ -810,7 +903,7 @@ export default function AdminRecruitmentPage() {
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>Pipeline Rekrutmen (ATS)</span>
+            <span>Pipeline ATS (Kartu)</span>
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                 activeTab === 'pipeline'
@@ -857,6 +950,470 @@ export default function AdminRecruitmentPage() {
             <span>Bank Talenta & Arsip</span>
           </button>
         </div>
+
+        {/* Tab 0 Content: Lowongan Aktif (Image 1 Table View with Image 2 Cards Toggle Option) */}
+        {activeTab === 'jobs' && (
+          <div className="space-y-6">
+            {/* Control Bar: View Switcher (Tabel Image 1 vs Kartu Image 2) & Search */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              {/* View Mode Toggle Button */}
+              <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80 self-start">
+                <button
+                  type="button"
+                  onClick={() => setJobViewMode('table')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    jobViewMode === 'table'
+                      ? 'bg-white text-blue-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  <span>Tampilan Tabel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setJobViewMode('cards')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    jobViewMode === 'cards'
+                      ? 'bg-white text-blue-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Tampilan Kartu (Image 2)</span>
+                </button>
+              </div>
+
+              {/* Search Bar matching Image 1 */}
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={tableSearchQuery}
+                  onChange={(e) => setTableSearchQuery(e.target.value)}
+                  placeholder="Cari posisi pekerjaan..."
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
+                />
+              </div>
+            </div>
+
+            {/* If View Mode is 'table', Render Image 1 Table & Recent Applicants */}
+            {jobViewMode === 'table' ? (
+              <div className="space-y-8">
+                {/* Master Table Lowongan Aktif matching Image 1 */}
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="py-4 px-6">Posisi Lowongan</th>
+                          <th className="py-4 px-6">Departemen</th>
+                          <th className="py-4 px-6">Tanggal Buka</th>
+                          <th className="py-4 px-6">Batas Lamaran</th>
+                          <th className="py-4 px-6 text-center">Jumlah Pelamar</th>
+                          <th className="py-4 px-6 text-center">Status</th>
+                          <th className="py-4 px-6 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {filteredTableVacancies.map((vac) => (
+                          <tr key={vac.id} className="hover:bg-slate-50/70 transition-colors group">
+                            {/* Posisi Lowongan */}
+                            <td className="py-4 px-6">
+                              <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                                {vac.title}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {vac.type} • {vac.location}
+                              </p>
+                            </td>
+
+                            {/* Departemen Badge */}
+                            <td className="py-4 px-6">
+                              <span
+                                className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-semibold ${vac.deptColor}`}
+                              >
+                                {vac.departmentBadge}
+                              </span>
+                            </td>
+
+                            {/* Tanggal Buka */}
+                            <td className="py-4 px-6 text-slate-600">
+                              {vac.openDate}
+                            </td>
+
+                            {/* Batas Lamaran */}
+                            <td className="py-4 px-6 text-slate-600">
+                              {vac.deadlineDate}
+                            </td>
+
+                            {/* Jumlah Pelamar */}
+                            <td className="py-4 px-6 text-center">
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200/60">
+                                {vac.applicantCount}
+                              </span>
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-4 px-6 text-center">
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span>{vac.status}</span>
+                              </span>
+                            </td>
+
+                            {/* Aksi: Detail | Tutup */}
+                            <td className="py-4 px-6 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center justify-end gap-2 text-xs font-semibold">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const matchJob = jobPostings.find((j) => j.title.includes(vac.title.split(' ')[0])) || jobPostings[0];
+                                    setSelectedJobForReview(matchJob);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 transition-colors hover:underline"
+                                >
+                                  Detail
+                                </button>
+                                <span className="text-slate-300 font-light select-none">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTableVacancies((prev) =>
+                                      prev.map((item) =>
+                                        item.id === vac.id
+                                          ? { ...item, status: item.status === 'Aktif' ? 'Tutup' : 'Aktif' }
+                                          : item
+                                      )
+                                    );
+                                    showToast(`Status lowongan "${vac.title}" berhasil diperbarui!`);
+                                  }}
+                                  className="text-rose-600 hover:text-rose-800 transition-colors hover:underline"
+                                >
+                                  Tutup
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination Footer matching Image 1 */}
+                  <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+                    <p>Menampilkan <strong>{filteredTableVacancies.length}</strong> lowongan pekerjaan aktif</p>
+                    <div className="flex items-center gap-1">
+                      <span className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs shadow-xs">
+                        1
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Pelamar Terbaru Masuk matching Image 1 */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                          Pelamar Terbaru Masuk
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Update kandidat yang baru saja mengirimkan berkas lamaran.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('pipeline')}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+                    >
+                      <span>Lihat Semua Pelamar (28)</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 3 Horizontal Candidate Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {initialRecentApplicants.map((applicant) => (
+                      <div
+                        key={applicant.id}
+                        onClick={() => setActiveTab('pipeline')}
+                        className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs hover:border-blue-300 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${applicant.avatarBg}`}
+                          >
+                            {applicant.initials}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900 leading-tight">
+                              {applicant.name}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {applicant.role}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400 flex items-center gap-1 font-medium">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            <span>{applicant.timeAgo}</span>
+                          </span>
+
+                          <span className={`px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1 ${applicant.badgeColor}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${applicant.dotColor}`} />
+                            <span>{applicant.statusBadge}</span>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* If View Mode is 'cards', Render the Image 2 Card View */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left Main Column: Job Cards (Image 2 - 8 cols on desktop) */}
+                <div className="lg:col-span-8 space-y-4">
+                  {/* Search & Filter Controls matching Image 2 */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Cari nama lowongan atau ID..."
+                        className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-2xs"
+                      />
+                    </div>
+
+                    <div className="relative min-w-[170px]">
+                      <select
+                        value={selectedDepartment}
+                        onChange={(e) => setSelectedDepartment(e.target.value)}
+                        className="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer shadow-2xs"
+                      >
+                        <option value="Semua Departemen">Semua Departemen</option>
+                        <option value="Divisi Teknologi">Divisi Teknologi</option>
+                        <option value="Divisi Keuangan & Pajak">Divisi Keuangan & Pajak</option>
+                        <option value="Divisi SDM & Operasional">Divisi SDM & Operasional</option>
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+
+                    <div className="relative min-w-[140px]">
+                      <select
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value)}
+                        className="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer shadow-2xs"
+                      >
+                        <option value="Aktif">Status: Aktif</option>
+                        <option value="Semua">Semua Status</option>
+                        <option value="Draft">Status: Draft</option>
+                        <option value="Ditutup">Status: Ditutup</option>
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* 4 Job Listings Cards matching Image 2 */}
+                  <div className="space-y-3.5">
+                    {filteredJobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs hover:border-blue-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      >
+                        <div className="flex items-start gap-3.5 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            {job.iconType === 'terminal' && <Terminal className="w-5 h-5" />}
+                            {job.iconType === 'code' && <Code2 className="w-5 h-5" />}
+                            {job.iconType === 'finance' && <FileSpreadsheet className="w-5 h-5" />}
+                            {job.iconType === 'people' && <Users className="w-5 h-5" />}
+                            {job.iconType === 'mobile' && <Smartphone className="w-5 h-5" />}
+                          </div>
+
+                          <div className="space-y-1.5 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                                {job.title}
+                              </h3>
+                              <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/70 px-2 py-0.5 rounded-full">
+                                {job.priority}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-slate-500 font-medium flex flex-wrap items-center gap-2">
+                              <span>{job.department}</span>
+                              <span className="text-slate-300">•</span>
+                              <span>Karyawan Tetap ({job.contractType})</span>
+                              <span className="text-slate-300">•</span>
+                              <span>Target Penutupan: {job.targetDate}</span>
+                            </p>
+
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 pt-1 font-semibold">
+                              <span>{job.totalApplicants} Total Pelamar</span>
+                              <span className="text-slate-300">•</span>
+                              <span>{job.passedScreening} Lolos Screening</span>
+                              <span className="text-slate-300">•</span>
+                              <span>{job.userInterview} Tahap Interview User</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 flex-shrink-0 self-end sm:self-center">
+                          <div className="flex items-center -space-x-2 overflow-hidden">
+                            {job.applicantsSample.map((cand, idx) => (
+                              <div
+                                key={idx}
+                                title={cand.name}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-2xs ${cand.bg}`}
+                              >
+                                {cand.initials}
+                              </div>
+                            ))}
+                            <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold border-2 border-white">
+                              +{job.totalApplicants - job.applicantsSample.length}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedJobForReview(job)}
+                            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-all active:scale-95"
+                          >
+                            Tinjau Pelamar
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedJobForReview(job)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Column: Onboarding Batch April Card (4 cols on desktop) */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                          <CalendarCheck className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                            Onboarding Batch April
+                          </h3>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/80 px-2.5 py-1 rounded-lg">
+                        1 Apr 2025
+                      </span>
+                    </div>
+
+                    <div className="divide-y divide-slate-100">
+                      <div className="py-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
+                              FM
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 leading-tight">
+                                Farhan Maulana
+                              </p>
+                              <p className="text-[11px] text-slate-500">Frontend Dev • IT</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-blue-600">80%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: '80%' }}></div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Laptop & Email: Siap | Verifikasi BPJS: Pending
+                        </p>
+                      </div>
+
+                      <div className="py-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                              SR
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 leading-tight">
+                                Siti Rahmania, S.E.
+                              </p>
+                              <p className="text-[11px] text-slate-500">Tax Officer • Finance</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-blue-600">60%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: '60%' }}></div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Data Mandiri: Selesai | Orientasi HR: Belum
+                        </p>
+                      </div>
+
+                      <div className="py-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-bold">
+                              BA
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 leading-tight">
+                                Bima Arya Prasetyo
+                              </p>
+                              <p className="text-[11px] text-slate-500">Mobile Eng • Tech</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-blue-600">100%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-emerald-600 h-1.5 rounded-full" style={{ width: '100%' }}></div>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                          <span>Semua modul siap</span>
+                          <span className="text-emerald-600 font-semibold">Siap Hari Pertama</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('onboarding')}
+                        className="w-full py-2.5 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 text-blue-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <span>Lihat Semua 14 Onboarding</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
 
         {/* Tab 1 Content: Pipeline Rekrutmen (ATS) */}
         {activeTab === 'pipeline' && (
