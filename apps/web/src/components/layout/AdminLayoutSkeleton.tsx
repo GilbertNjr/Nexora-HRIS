@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NexoraLogo } from '../common/NexoraLogo';
@@ -37,6 +37,31 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('Nexora HRIS');
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('nexora_company_settings');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.logoUrl) setCompanyLogo(parsed.logoUrl);
+        if (parsed.commercialName) setCompanyName(parsed.commercialName);
+      }
+    } catch {
+      // ignore
+    }
+
+    fetch('/api/v1/company')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.success && json?.data) {
+          if (json.data.logoUrl) setCompanyLogo(json.data.logoUrl);
+          if (json.data.commercialName) setCompanyName(json.data.commercialName);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Dynamic Indonesian date formatted as "Senin, 24 Maret 2025"
   const formattedDate = new Intl.DateTimeFormat('id-ID', {
@@ -154,22 +179,36 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
               <button
                 type="button"
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base shadow-sm hover:scale-105 hover:ring-2 hover:ring-blue-400 transition-all cursor-pointer"
+                className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shadow-sm hover:scale-105 hover:ring-2 hover:ring-blue-400 transition-all cursor-pointer"
                 title="Buka Sidebar Penuh"
               >
-                N
+                {companyLogo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={companyLogo} alt={companyName} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base">
+                    N
+                  </div>
+                )}
               </button>
             ) : (
               /* Expanded view: Logo + Brand + Close Button */
               <>
                 <Link href="/admin" className="flex items-center gap-2.5 overflow-hidden min-w-0">
                   {/* Logo Ribbon Icon */}
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base shadow-sm flex-shrink-0">
-                    N
+                  <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shadow-sm flex-shrink-0">
+                    {companyLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={companyLogo} alt={companyName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base">
+                        N
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className="font-bold text-[15px] tracking-tight text-[#0F172A] leading-tight truncate">
-                      Nexora HRIS
+                      {companyName || 'Nexora HRIS'}
                     </span>
                     <span className="text-[10px] font-medium text-slate-400 tracking-wider truncate">
                       Enterprise Portal
