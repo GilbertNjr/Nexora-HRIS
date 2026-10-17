@@ -51,6 +51,7 @@ out/
 *.dump
 !prisma/migrations/**/*.sql
 !apps/*/prisma/migrations/**/*.sql
+!supabase/migrations/**/*.sql
 
 # Local uploads (KTP, selfie presensi, surat dokter, slip gaji lokal)
 /uploads/

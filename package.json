@@ -10,6 +10,10 @@
     "dev": "npm run dev --workspaces --if-present",
     "dev:api": "npm run start:dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
+    "db:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "db:deploy": "npx --workspace=apps/api prisma migrate deploy",
+    "db:seed": "npm run prisma:seed --workspace=apps/api",
+    "db:studio": "npm run prisma:studio --workspace=apps/api",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
