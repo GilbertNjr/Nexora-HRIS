@@ -140,6 +140,7 @@ model Company {
   legalName   String       @map("legal_name") @db.VarChar(200)
   taxId       String?      @map("tax_id") @db.VarChar(50)
   address     String?      @db.Text
+  logoUrl     String?      @map("logo_url") @db.Text
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

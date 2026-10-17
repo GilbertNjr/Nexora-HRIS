@@ -24,10 +24,14 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
+      const persistentLogo = localStorage.getItem('nexora_persistent_company_logo');
       const cached = localStorage.getItem('nexora_company_settings');
+      if (persistentLogo) {
+        setCompanyLogo(persistentLogo);
+      }
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed.logoUrl) setCompanyLogo(parsed.logoUrl);
+        if (!persistentLogo && parsed.logoUrl) setCompanyLogo(parsed.logoUrl);
         if (parsed.commercialName) setCompanyName(parsed.commercialName);
       }
     } catch {
@@ -38,11 +42,33 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
       .then((res) => res.json())
       .then((json) => {
         if (json?.success && json?.data) {
-          if (json.data.logoUrl) setCompanyLogo(json.data.logoUrl);
+          if (json.data.logoUrl) {
+            setCompanyLogo(json.data.logoUrl);
+            localStorage.setItem('nexora_persistent_company_logo', json.data.logoUrl);
+          }
           if (json.data.commercialName) setCompanyName(json.data.commercialName);
         }
       })
       .catch(() => {});
+
+    // Listen to real-time BroadcastChannel
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('nexora_live_sync');
+      channel.onmessage = (event) => {
+        const msg = event.data;
+        if (msg?.type === 'LOGO_UPDATED') {
+          setCompanyLogo(msg.logoUrl || '');
+          if (msg.companyName) setCompanyName(msg.companyName);
+        }
+      };
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      if (channel) channel.close();
+    };
   }, []);
 
   return (

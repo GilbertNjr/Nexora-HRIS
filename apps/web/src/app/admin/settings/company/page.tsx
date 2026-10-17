@@ -217,6 +217,10 @@ export default function CompanySettingsPage() {
         compressedSize: res.compressedSize,
         savingsPercent: res.savingsPercent,
       });
+
+      // Persist immediately to dedicated local logo cache
+      localStorage.setItem('nexora_persistent_company_logo', res.dataUrl);
+
       showToast(
         `Gambar berhasil dikompres ke JPG (${res.originalSize} ➔ ${res.compressedSize}, hemat ${res.savingsPercent}% ruang database)! Klik Simpan untuk memperbarui database.`
       );
@@ -233,25 +237,33 @@ export default function CompanySettingsPage() {
   const handleResetLogo = () => {
     setCompanyForm((prev) => ({ ...prev, logoUrl: '' }));
     setLogoCompressionInfo(null);
+    localStorage.removeItem('nexora_persistent_company_logo');
     showToast('Logo resmi di-reset ke inisial default (N). Simpan profil untuk memperbarui database.');
   };
 
-  // Load saved company data from backend API / database
+  // Load saved company data from backend API / database with defensive caching
   useEffect(() => {
     const loadCompanyData = async () => {
       try {
+        const cachedLogo = localStorage.getItem('nexora_persistent_company_logo') || '';
         // Fast local load
         const cached = localStorage.getItem('nexora_company_settings');
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            setCompanyForm((prev) => ({ ...prev, ...parsed }));
+            setCompanyForm((prev) => ({
+              ...prev,
+              ...parsed,
+              logoUrl: parsed.logoUrl || cachedLogo || prev.logoUrl,
+            }));
             if (parsed.branchOffices && Array.isArray(parsed.branchOffices) && parsed.branchOffices.length > 0) {
               setBranchOffices(parsed.branchOffices);
             }
           } catch {
             // ignore
           }
+        } else if (cachedLogo) {
+          setCompanyForm((prev) => ({ ...prev, logoUrl: cachedLogo }));
         }
 
         // Backend load
@@ -259,11 +271,25 @@ export default function CompanySettingsPage() {
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
-            setCompanyForm((prev) => ({ ...prev, ...json.data }));
+            setCompanyForm((prev) => {
+              // DEFENSIVE CACHING: Preserve existing logo if server returns empty string
+              const persistentLogo =
+                json.data.logoUrl || prev.logoUrl || cachedLogo || '';
+              const merged = {
+                ...prev,
+                ...json.data,
+                logoUrl: persistentLogo,
+              };
+              localStorage.setItem('nexora_company_settings', JSON.stringify(merged));
+              if (persistentLogo) {
+                localStorage.setItem('nexora_persistent_company_logo', persistentLogo);
+              }
+              return merged;
+            });
+
             if (json.data.branchOffices && Array.isArray(json.data.branchOffices)) {
               setBranchOffices(json.data.branchOffices);
             }
-            localStorage.setItem('nexora_company_settings', JSON.stringify(json.data));
           }
         }
       } catch {
@@ -282,10 +308,28 @@ export default function CompanySettingsPage() {
         branchOffices,
       };
 
-      // 1. Local backup
+      // 1. Local backup & persistent logo
       localStorage.setItem('nexora_company_settings', JSON.stringify(payload));
+      if (companyForm.logoUrl) {
+        localStorage.setItem('nexora_persistent_company_logo', companyForm.logoUrl);
+      } else {
+        localStorage.removeItem('nexora_persistent_company_logo');
+      }
 
-      // 2. Backend database save
+      // 2. Broadcast immediately to open layouts (Sidebar & Header)
+      try {
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({
+          type: 'LOGO_UPDATED',
+          logoUrl: companyForm.logoUrl,
+          companyName: companyForm.commercialName,
+        });
+        bc.close();
+      } catch {
+        // ignore
+      }
+
+      // 3. Backend database save
       const res = await fetch('/api/v1/company', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
