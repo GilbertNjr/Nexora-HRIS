@@ -190,15 +190,15 @@ export default function AdminDashboardPage() {
     },
   ];
 
-  // Try live fetch on mount (with silent mock fallback)
+  // Live real-time sync with Employee Dashboard & REST APIs
   useEffect(() => {
+    // 1. Fetch live metrics from unified APIs
     const fetchLiveMetrics = async () => {
       try {
-        const res = await fetch('http://localhost:4000/api/v1/employees?limit=1', {
-          cache: 'no-store',
-        });
-        if (res.ok) {
-          const json = await res.json();
+        // Employee headcount
+        const empRes = await fetch('/api/v1/employees?limit=1');
+        if (empRes.ok) {
+          const json = await empRes.json();
           if (json.data?.meta?.total) {
             setMetrics((prev) => ({
               ...prev,
@@ -206,11 +206,92 @@ export default function AdminDashboardPage() {
             }));
           }
         }
+
+        // Attendance stats
+        const attRes = await fetch('/api/v1/attendance');
+        if (attRes.ok) {
+          const json = await attRes.json();
+          if (json.data) {
+            setMetrics((prev) => ({
+              ...prev,
+              onTimeCount: json.data.onTimeCount || prev.onTimeCount,
+              lateCount: json.data.lateCount || prev.lateCount,
+              attendanceRate: json.data.attendanceRate || prev.attendanceRate,
+            }));
+          }
+        }
+
+        // Approvals list
+        const appRes = await fetch('/api/v1/approvals');
+        if (appRes.ok) {
+          const json = await appRes.json();
+          if (Array.isArray(json.data) && json.data.length > 0) {
+            setRequests(json.data);
+            setMetrics((prev) => ({
+              ...prev,
+              pendingApprovals: json.data.length,
+            }));
+          }
+        }
       } catch (err) {
         // Keep resilient fallback
       }
     };
+
     fetchLiveMetrics();
+    const interval = setInterval(fetchLiveMetrics, 8000);
+
+    // 2. BroadcastChannel for instant (<5ms) cross-tab live synchronization
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('nexora_live_sync');
+      channel.onmessage = (event) => {
+        const msg = event.data;
+        if (!msg || !msg.type) return;
+
+        // When employee clocks in from ESS portal
+        if (msg.type === 'EMPLOYEE_CLOCKED_IN') {
+          setMetrics((prev) => {
+            const newOnTime = msg.status === 'TEPAT_WAKTU' ? prev.onTimeCount + 1 : prev.onTimeCount;
+            const newLate = msg.status === 'TERLAMBAT' ? prev.lateCount + 1 : prev.lateCount;
+            const totalPres = newOnTime + newLate;
+            const newRate = Number(((totalPres / prev.totalEmployees) * 100).toFixed(1));
+            return {
+              ...prev,
+              onTimeCount: newOnTime,
+              lateCount: newLate,
+              attendanceRate: newRate,
+            };
+          });
+
+          showToast(
+            `⚡ Presensi Baru Real-Time: ${msg.employeeName} baru saja Clock-In pukul ${msg.time} (${
+              msg.status === 'TEPAT_WAKTU' ? 'Tepat Waktu' : 'Terlambat'
+            })!`
+          );
+        }
+
+        // When employee submits new leave or overtime request
+        if (msg.type === 'NEW_APPROVAL_REQUEST' && msg.request) {
+          setRequests((prev) => [msg.request, ...prev.filter((r) => r.id !== msg.request.id)]);
+          setMetrics((prev) => ({
+            ...prev,
+            pendingApprovals: prev.pendingApprovals + 1,
+          }));
+
+          showToast(
+            `🔔 Pengajuan Real-Time Baru: ${msg.employeeName} mengajukan "${msg.request.title}"!`
+          );
+        }
+      };
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (channel) channel.close();
+    };
   }, []);
 
   // Show Toast
@@ -218,27 +299,69 @@ export default function AdminDashboardPage() {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3500);
+    }, 4500);
   };
 
-  // Handle Approve Action
-  const handleApprove = (id: string, name: string) => {
+  // Handle Approve Action (Syncs back to Employee in Real-Time)
+  const handleApprove = async (id: string, name: string) => {
     setRequests((prev) => prev.filter((r) => r.id !== id));
     setMetrics((prev) => ({
       ...prev,
       pendingApprovals: Math.max(0, prev.pendingApprovals - 1),
     }));
-    showToast(`✓ Permohonan ${name} telah berhasil disetujui.`);
+
+    // 1. Notify employee via BroadcastChannel
+    try {
+      const bc = new BroadcastChannel('nexora_live_sync');
+      bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'APPROVED' });
+      bc.close();
+    } catch {
+      // ignore
+    }
+
+    // 2. Persist to API
+    try {
+      await fetch('/api/v1/approvals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'APPROVED' }),
+      });
+    } catch {
+      // ignore
+    }
+
+    showToast(`✓ Permohonan ${name} telah disetujui & disinkronkan ke karyawan secara real-time.`);
   };
 
-  // Handle Reject Action
-  const handleReject = (id: string, name: string) => {
+  // Handle Reject Action (Syncs back to Employee in Real-Time)
+  const handleReject = async (id: string, name: string) => {
     setRequests((prev) => prev.filter((r) => r.id !== id));
     setMetrics((prev) => ({
       ...prev,
       pendingApprovals: Math.max(0, prev.pendingApprovals - 1),
     }));
-    showToast(`✕ Permohonan ${name} telah ditolak.`);
+
+    // 1. Notify employee via BroadcastChannel
+    try {
+      const bc = new BroadcastChannel('nexora_live_sync');
+      bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'REJECTED' });
+      bc.close();
+    } catch {
+      // ignore
+    }
+
+    // 2. Persist to API
+    try {
+      await fetch('/api/v1/approvals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'REJECTED' }),
+      });
+    } catch {
+      // ignore
+    }
+
+    showToast(`✕ Permohonan ${name} telah ditolak & status diperbarui ke karyawan.`);
   };
 
   // Filtered requests

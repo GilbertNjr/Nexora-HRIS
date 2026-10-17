@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import {
@@ -196,8 +196,94 @@ export default function AdminAttendancePage() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 4000);
   };
+
+  // Real-Time Live Sync with Employee Clock-In & REST API
+  useEffect(() => {
+    // 1. Fetch live attendance data from API
+    const fetchAttendanceApi = async () => {
+      try {
+        const res = await fetch('/api/v1/attendance');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data?.records && Array.isArray(json.data.records) && json.data.records.length > 0) {
+            const apiRecords: AttendanceRecord[] = json.data.records.map((r: any) => ({
+              id: r.id,
+              name: r.employeeName,
+              nik: r.employeeId || 'NX-202501',
+              division: r.department || 'Teknologi Informasi',
+              initials: r.employeeName ? r.employeeName.slice(0, 2).toUpperCase() : 'KR',
+              avatarBg: 'from-blue-600 to-indigo-600',
+              shiftName: 'Reguler HQ (08:00 - 17:00)',
+              shiftHours: '08:00 - 17:00',
+              shiftNote: r.location || 'Presensi Mandiri ESS',
+              checkInTime: r.time,
+              checkInSourceIcon: 'globe',
+              checkInNote: r.status === 'TEPAT_WAKTU' ? 'Tepat Waktu' : 'Terlambat',
+              checkInType: r.status === 'TEPAT_WAKTU' ? 'early' : 'late',
+              checkOutTime: r.type === 'CLOCK_OUT' ? r.time : '—',
+              status: r.status === 'TEPAT_WAKTU' ? 'TEPAT_WAKTU' : 'TERLAMBAT',
+            }));
+
+            // Merge unique records
+            setRecords((prev) => {
+              const existingIds = new Set(prev.map((p) => p.id));
+              const newItems = apiRecords.filter((a) => !existingIds.has(a.id));
+              return [...newItems, ...prev];
+            });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchAttendanceApi();
+
+    // 2. BroadcastChannel for instant live sync across open tabs
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('nexora_live_sync');
+      channel.onmessage = (event) => {
+        const msg = event.data;
+        if (!msg || !msg.type) return;
+
+        if (msg.type === 'EMPLOYEE_CLOCKED_IN') {
+          const liveRec: AttendanceRecord = {
+            id: `att-${Date.now()}`,
+            name: msg.employeeName || 'Gilbert (Karyawan)',
+            nik: 'NX-202501',
+            division: 'Teknologi Informasi & Rekayasa Produk',
+            initials: msg.employeeName ? msg.employeeName.slice(0, 2).toUpperCase() : 'GB',
+            avatarBg: 'from-emerald-600 to-teal-600',
+            shiftName: 'Reguler HQ (08:00 - 17:00)',
+            shiftHours: '08:00 - 17:00',
+            shiftNote: 'Presensi Mandiri ESS (Real-Time)',
+            checkInTime: msg.time,
+            checkInSourceIcon: 'globe',
+            checkInNote: msg.status === 'TEPAT_WAKTU' ? 'Tepat Waktu' : 'Terlambat',
+            checkInType: msg.status === 'TEPAT_WAKTU' ? 'early' : 'late',
+            checkOutTime: '—',
+            status: msg.status === 'TEPAT_WAKTU' ? 'TEPAT_WAKTU' : 'TERLAMBAT',
+          };
+
+          setRecords((prev) => [liveRec, ...prev]);
+          showToast(
+            `⚡ Presensi Baru Real-Time: ${msg.employeeName} baru saja Clock-In pukul ${msg.time} (${
+              msg.status === 'TEPAT_WAKTU' ? 'Tepat Waktu' : 'Terlambat'
+            })!`
+          );
+        }
+      };
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      if (channel) channel.close();
+    };
+  }, []);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
