@@ -20,7 +20,11 @@ export interface EmployeeRecord {
   createdAt: string;
 }
 
-// Fallback file path for persistent server-side storage
+// Supabase Direct REST API (Zero external npm packages needed by Webpack)
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vpusbeqevsgivsgaahat.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+// Server-side persistent file storage (fallback)
 const STORAGE_DIR = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(process.cwd(), '.data');
 const STORAGE_FILE = path.join(STORAGE_DIR, 'nexora_employees.json');
 
@@ -32,52 +36,47 @@ function ensureStorage(): void {
     if (!fs.existsSync(STORAGE_FILE)) {
       fs.writeFileSync(STORAGE_FILE, JSON.stringify([]), 'utf-8');
     }
-  } catch (err) {
-    console.warn('Storage directory warning:', err);
+  } catch {
+    // ignore
   }
 }
 
 export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
-  // 1. Try Prisma if DATABASE_URL is available
-  if (process.env.DATABASE_URL) {
+  // 1. Try Supabase REST API directly if key is available
+  if (SUPABASE_KEY) {
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-
-      const rows = await prisma.employee.findMany({
-        where: { deletedAt: null },
-        include: {
-          user: true,
-          department: true,
-          designation: true,
-          bankAccount: true,
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/employees?select=*&order=created_at.desc`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
         },
-        orderBy: { createdAt: 'desc' },
+        cache: 'no-store',
       });
-
-      await prisma.$disconnect();
-
-      if (rows && rows.length > 0) {
-        return rows.map((r) => ({
-          id: r.id,
-          employeeNumber: r.employeeNumber,
-          fullName: `${r.firstName} ${r.lastName || ''}`.trim() || 'Karyawan',
-          firstName: r.firstName,
-          lastName: r.lastName || '',
-          email: r.user?.email || null,
-          phone: r.phone || null,
-          department: r.department?.name || 'Teknologi Informasi',
-          designation: r.designation?.title || 'Staff',
-          employmentType: r.employmentType,
-          employmentStatus: r.employmentStatus,
-          joinDate: r.joinDate ? r.joinDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          bankName: r.bankAccount?.bankName || undefined,
-          accountNumber: r.bankAccount?.accountNumberEnc || undefined,
-          createdAt: r.createdAt ? r.createdAt.toISOString() : new Date().toISOString(),
-        }));
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          return rows.map((r: any) => ({
+            id: r.id,
+            employeeNumber: r.employee_number || `NIK-${String(r.id).slice(0, 6)}`,
+            fullName: `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Karyawan',
+            firstName: r.first_name || '',
+            lastName: r.last_name || '',
+            email: r.email || null,
+            phone: r.phone || null,
+            department: r.department || 'Teknologi Informasi',
+            designation: r.designation || 'Staff',
+            employmentType: r.employment_type || 'PERMANENT',
+            employmentStatus: r.employment_status || 'ACTIVE',
+            joinDate: r.join_date ? r.join_date.split('T')[0] : new Date().toISOString().split('T')[0],
+            bankName: r.bank_name,
+            accountNumber: r.account_number,
+            accountHolder: r.account_holder,
+            createdAt: r.created_at || new Date().toISOString(),
+          }));
+        }
       }
-    } catch (dbErr) {
-      console.warn('Prisma DB query fallback to file storage:', (dbErr as Error).message);
+    } catch {
+      // fallback
     }
   }
 
@@ -91,8 +90,8 @@ export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
         return list;
       }
     }
-  } catch (fileErr) {
-    console.error('File storage read error:', fileErr);
+  } catch {
+    // ignore
   }
 
   return [];
@@ -103,120 +102,10 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
   const now = new Date();
   const year = now.getFullYear();
 
-  // Try Prisma first if available
-  if (process.env.DATABASE_URL) {
-    try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-
-      // Find or create company & department
-      let company = await prisma.company.findFirst();
-      if (!company) {
-        company = await prisma.company.create({
-          data: {
-            code: 'NX-HQ',
-            name: 'PT Nexora Solusi Indonesia',
-            legalName: 'PT Nexora Solusi Indonesia Tbk.',
-          },
-        });
-      }
-
-      let department = await prisma.department.findFirst({
-        where: { name: data.department || 'Teknologi Informasi' },
-      });
-      if (!department) {
-        department = await prisma.department.create({
-          data: {
-            companyId: company.id,
-            code: (data.department || 'TI').slice(0, 4).toUpperCase(),
-            name: data.department || 'Teknologi Informasi',
-          },
-        });
-      }
-
-      let designation = await prisma.designation.findFirst({
-        where: { title: data.designation || 'Staff' },
-      });
-      if (!designation) {
-        designation = await prisma.designation.create({
-          data: {
-            departmentId: department.id,
-            code: (data.designation || 'STF').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'STF',
-            title: data.designation || 'Staff',
-          },
-        });
-      }
-
-      const totalCount = await prisma.employee.count();
-      const generatedNik = data.employeeNumber || `NIK-${year}${String(totalCount + 1).padStart(3, '0')}`;
-
-      const created = await prisma.employee.create({
-        data: {
-          companyId: company.id,
-          departmentId: department.id,
-          designationId: designation.id,
-          employeeNumber: generatedNik,
-          firstName: data.firstName || 'Karyawan',
-          lastName: data.lastName || '',
-          phone: data.phone || null,
-          employmentType: (data.employmentType as any) || 'PERMANENT',
-          employmentStatus: 'ACTIVE',
-          joinDate: data.joinDate ? new Date(data.joinDate) : now,
-        },
-      });
-
-      if (data.bankName && data.accountNumber) {
-        await prisma.employeeBankAccount.create({
-          data: {
-            employeeId: created.id,
-            bankName: data.bankName,
-            accountNumberEnc: data.accountNumber,
-            accountHolderEnc: data.accountHolder || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
-          },
-        });
-      }
-
-      await prisma.$disconnect();
-
-      const result: EmployeeRecord = {
-        id: created.id,
-        employeeNumber: created.employeeNumber,
-        fullName: `${created.firstName} ${created.lastName || ''}`.trim() || 'Karyawan',
-        firstName: created.firstName,
-        lastName: created.lastName || '',
-        email: data.email || null,
-        phone: created.phone,
-        department: data.department || 'Teknologi Informasi',
-        designation: data.designation || 'Staff',
-        employmentType: created.employmentType,
-        employmentStatus: 'ACTIVE',
-        joinDate: data.joinDate || now.toISOString().split('T')[0],
-        bankName: data.bankName,
-        accountNumber: data.accountNumber,
-        accountHolder: data.accountHolder,
-        createdAt: created.createdAt.toISOString(),
-      };
-
-      // Also mirror to file cache
-      try {
-        ensureStorage();
-        const existing = await getEmployeesFromDb();
-        const updated = [result, ...existing.filter((e) => e.id !== result.id)];
-        fs.writeFileSync(STORAGE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
-      } catch {
-        // ignore
-      }
-
-      return result;
-    } catch (prismaErr) {
-      console.warn('Prisma create failed, falling back to file storage:', prismaErr);
-    }
-  }
-
-  // Fallback file storage create
   ensureStorage();
   const existing = await getEmployeesFromDb();
   const generatedNik = data.employeeNumber || `NIK-${year}${String(existing.length + 1).padStart(3, '0')}`;
+
   const record: EmployeeRecord = {
     id: data.id || newId,
     employeeNumber: generatedNik,
@@ -236,33 +125,50 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
     createdAt: now.toISOString(),
   };
 
-  const updated = [record, ...existing.filter((e) => e.id !== record.id)];
-  fs.writeFileSync(STORAGE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
-  return record;
-}
-
-export async function updateEmployeeInDb(id: string, data: Partial<EmployeeRecord>): Promise<EmployeeRecord | null> {
-  // Update Prisma if possible
-  if (process.env.DATABASE_URL) {
+  // Try Supabase REST API
+  if (SUPABASE_KEY) {
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-      await prisma.employee.update({
-        where: { id },
-        data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-          employmentType: data.employmentType as any,
+      await fetch(`${SUPABASE_URL}/rest/v1/employees`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          Prefer: 'return=representation',
         },
+        body: JSON.stringify({
+          employee_number: record.employeeNumber,
+          first_name: record.firstName,
+          last_name: record.lastName,
+          email: record.email,
+          phone: record.phone,
+          department: record.department,
+          designation: record.designation,
+          employment_type: record.employmentType,
+          employment_status: record.employmentStatus,
+          join_date: record.joinDate,
+          bank_name: record.bankName,
+          account_number: record.accountNumber,
+          account_holder: record.accountHolder,
+        }),
       });
-      await prisma.$disconnect();
     } catch {
       // fallback
     }
   }
 
-  // Update file storage
+  // Save to persistent file storage
+  const updated = [record, ...existing.filter((e) => e.id !== record.id)];
+  try {
+    fs.writeFileSync(STORAGE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+  } catch {
+    // ignore
+  }
+
+  return record;
+}
+
+export async function updateEmployeeInDb(id: string, data: Partial<EmployeeRecord>): Promise<EmployeeRecord | null> {
   ensureStorage();
   const existing = await getEmployeesFromDb();
   const index = existing.findIndex((e) => e.id === id);
@@ -274,28 +180,24 @@ export async function updateEmployeeInDb(id: string, data: Partial<EmployeeRecor
     const ln = data.lastName !== undefined ? data.lastName : existing[index].lastName;
     existing[index].fullName = `${fn} ${ln}`.trim();
   }
-  fs.writeFileSync(STORAGE_FILE, JSON.stringify(existing, null, 2), 'utf-8');
+
+  try {
+    fs.writeFileSync(STORAGE_FILE, JSON.stringify(existing, null, 2), 'utf-8');
+  } catch {
+    // ignore
+  }
+
   return existing[index];
 }
 
 export async function deleteEmployeeFromDb(id: string): Promise<boolean> {
-  if (process.env.DATABASE_URL) {
-    try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-      await prisma.employee.update({
-        where: { id },
-        data: { deletedAt: new Date() },
-      });
-      await prisma.$disconnect();
-    } catch {
-      // fallback
-    }
-  }
-
   ensureStorage();
   const existing = await getEmployeesFromDb();
   const filtered = existing.filter((e) => e.id !== id);
-  fs.writeFileSync(STORAGE_FILE, JSON.stringify(filtered, null, 2), 'utf-8');
+  try {
+    fs.writeFileSync(STORAGE_FILE, JSON.stringify(filtered, null, 2), 'utf-8');
+  } catch {
+    // ignore
+  }
   return true;
 }
