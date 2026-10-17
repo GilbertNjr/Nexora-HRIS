@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
@@ -31,6 +31,11 @@ import {
   CreditCard,
   Briefcase,
   IdCard,
+  Loader2,
+  Sparkles,
+  Trash2,
+  Upload,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function UserProfilePage() {
@@ -41,40 +46,226 @@ export default function UserProfilePage() {
     'profile' | 'security' | 'preferences' | 'activity' | 'delegation'
   >('profile');
 
-  // Profile Form State
+  // Dynamic Profile Form State (adapts dynamically if empty initially)
   const [profileData, setProfileData] = useState({
-    fullName: 'Dewi Lestari, S.Psi',
-    employeeNumber: 'NX-2018012',
-    email: 'dewi.lestari@nexora.co.id',
-    phone: '+62 812-9876-5432',
-    department: 'People & Culture / People Operations',
-    designation: 'HR Operations Manager',
-    manager: 'Direktur SDM & Legal (Board of Directors)',
-    location: 'Kantor Pusat - SCBD Jakarta (Hybrid Policy)',
-    joinDate: '12 Mar 2018',
+    fullName: '',
+    employeeNumber: '',
+    email: '',
+    phone: '',
+    department: '',
+    designation: '',
+    manager: '',
+    location: '',
+    joinDate: '',
+    avatarUrl: '',
   });
 
   // UI state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setTimeout(() => {
+  // Client-side automatic JPG compression for profile photo
+  const compressImageToJpg = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const MAX_DIM = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Canvas error'));
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Gagal memproses gambar'));
+      };
+      reader.onerror = () => reject(new Error('Gagal membaca gambar'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Harap pilih file gambar (JPG, PNG, WebP).');
+      return;
+    }
+
+    try {
+      setIsUploadingPhoto(true);
+      const compressedDataUrl = await compressImageToJpg(file);
+      setProfileData((prev) => ({ ...prev, avatarUrl: compressedDataUrl }));
+      localStorage.setItem('nexora_persistent_avatar', compressedDataUrl);
+      try {
+        const channel = new BroadcastChannel('nexora_live_sync');
+        channel.postMessage({
+          type: 'PROFILE_UPDATED',
+          profile: { ...profileData, avatarUrl: compressedDataUrl },
+        });
+        channel.close();
+      } catch {}
+      showToast('✓ Foto berhasil diunggah & dikompres ke JPG! Klik "Simpan Biodata" untuk menyimpan ke database.');
+    } catch {
+      showToast('Gagal mengompresi foto.');
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  };
+
+  const handleResetPhoto = () => {
+    setProfileData((prev) => ({ ...prev, avatarUrl: '' }));
+    localStorage.removeItem('nexora_persistent_avatar');
+    try {
+      const channel = new BroadcastChannel('nexora_live_sync');
+      channel.postMessage({
+        type: 'PROFILE_UPDATED',
+        profile: { ...profileData, avatarUrl: '' },
+      });
+      channel.close();
+    } catch {}
+    showToast('Foto profil di-reset ke default template inisial.');
+  };
+
+  // Load profile dynamically on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const persistentAvatar = localStorage.getItem('nexora_persistent_avatar');
+        const cached = localStorage.getItem('nexora_user_profile');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            setProfileData((prev) => ({
+              ...prev,
+              ...parsed,
+              avatarUrl: persistentAvatar || parsed.avatarUrl || prev.avatarUrl,
+            }));
+          } catch {}
+        } else if (persistentAvatar) {
+          setProfileData((prev) => ({ ...prev, avatarUrl: persistentAvatar }));
+        }
+
+        // Fetch from API
+        const res = await fetch('/api/v1/profile');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.hasData && json.data) {
+            setProfileData((prev) => {
+              const merged = {
+                ...prev,
+                ...json.data,
+                avatarUrl: json.data.avatarUrl || persistentAvatar || prev.avatarUrl || '',
+              };
+              localStorage.setItem('nexora_user_profile', JSON.stringify(merged));
+              return merged;
+            });
+          } else if (!cached) {
+            // Default session email fallback if available
+            const sessionUser = localStorage.getItem('nexora_user');
+            if (sessionUser) {
+              try {
+                const u = JSON.parse(sessionUser);
+                if (u.email) {
+                  setProfileData((prev) => ({
+                    ...prev,
+                    email: u.email,
+                    employeeNumber: `NX-${new Date().getFullYear()}001`,
+                  }));
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        setHasLoaded(true);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  const handleSaveProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      setIsSaving(true);
+      // 1. Local backup
+      localStorage.setItem('nexora_user_profile', JSON.stringify(profileData));
+      if (profileData.avatarUrl) {
+        localStorage.setItem('nexora_persistent_avatar', profileData.avatarUrl);
+      } else {
+        localStorage.removeItem('nexora_persistent_avatar');
+      }
+
+      // 2. Sync to backend API / database
+      const res = await fetch('/api/v1/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData),
+      });
+
+      // 3. Broadcast to layout topbar
+      try {
+        const channel = new BroadcastChannel('nexora_live_sync');
+        channel.postMessage({
+          type: 'PROFILE_UPDATED',
+          profile: profileData,
+        });
+        channel.close();
+      } catch {}
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        showToast('✓ Data profil dan foto berhasil disimpan ke database!');
+      } else {
+        showToast(json.error?.message || 'Data disimpan secara lokal.');
+      }
+    } catch {
+      showToast('Data berhasil disimpan secara lokal di browser.');
+    } finally {
       setIsSaving(false);
-      showToast('Perubahan profil dan kontak kerja berhasil disimpan!');
-    }, 600);
+    }
   };
 
   const handleTerminateOtherSessions = () => {
-    showToast('Sesi perangkat iPhone 15 Pro berhasil dihentikan (Logged out).');
+    showToast('Sesi perangkat lain berhasil dihentikan (Logged out).');
   };
 
   const handleLogout = () => {
@@ -148,70 +339,142 @@ export default function UserProfilePage() {
         {/* Hero Profile Card with Full Non-Clipped Name & 3 Metrics */}
         <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs">
           <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-6">
-            {/* Left: Avatar + Identity (Ensuring Name is NEVER cut off) */}
+            {/* Left: Avatar + Identity (Adapts dynamically if empty) */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              {/* Hidden file input for photo upload */}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                className="hidden"
+                onChange={handlePhotoUpload}
+              />
+
               {/* Photo Avatar with Online Dot & Camera Icon */}
               <div className="relative flex-shrink-0">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-md bg-gradient-to-tr from-amber-500 via-rose-400 to-indigo-500 p-0.5">
-                  <img
-                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=240"
-                    alt="Dewi Lestari, S.Psi"
-                    className="w-full h-full object-cover rounded-2xl bg-white"
-                  />
+                <div
+                  onClick={() => photoInputRef.current?.click()}
+                  className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-md bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 p-0.5 cursor-pointer group"
+                  title="Klik untuk unggah foto profil (otomatis dikompres ke JPG)"
+                >
+                  {profileData.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profileData.avatarUrl}
+                      alt={profileData.fullName || 'Foto Profil'}
+                      className="w-full h-full object-cover rounded-2xl bg-white"
+                    />
+                  ) : profileData.fullName ? (
+                    <div className="w-full h-full rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white font-extrabold text-2xl tracking-tight">
+                      {profileData.fullName
+                        .split(' ')
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase()}
+                    </div>
+                  ) : (
+                    <div className="w-full h-full rounded-2xl bg-slate-100 flex flex-col items-center justify-center text-slate-400 group-hover:bg-slate-200 transition-colors">
+                      <User className="w-8 h-8 text-slate-400" />
+                      <span className="text-[9px] font-bold text-slate-500 mt-1">Unggah Foto</span>
+                    </div>
+                  )}
+
+                  {/* Hover Camera Overlay */}
+                  <div className="absolute inset-0 bg-slate-950/40 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
+                    <Camera className="w-5 h-5 text-white" />
+                  </div>
+
+                  {/* Uploading Spinner */}
+                  {isUploadingPhoto && (
+                    <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-2xl">
+                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                    </div>
+                  )}
                 </div>
+
                 {/* Active Status Dot */}
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-xs" />
+
                 {/* Edit Photo Button */}
                 <button
                   type="button"
-                  onClick={() => showToast('Pilih foto baru untuk memperbarui avatar profil.')}
-                  className="absolute -bottom-1 -right-1 p-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-white transition-all active:scale-95"
+                  disabled={isUploadingPhoto}
+                  onClick={() => photoInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 p-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-white transition-all active:scale-95 disabled:opacity-60"
                   title="Ganti Foto Profil"
                 >
-                  <Camera className="w-3.5 h-3.5" />
+                  {isUploadingPhoto ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5" />
+                  )}
                 </button>
+
+                {profileData.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={handleResetPhoto}
+                    className="absolute -bottom-1 -left-1 p-1 rounded-lg bg-slate-900/80 hover:bg-rose-600 text-white shadow-sm border border-white transition-colors"
+                    title="Hapus / Reset Foto"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
               </div>
 
               {/* Bio & Details (Full unclipped text) */}
               <div className="space-y-2 min-w-0">
                 {/* Name: Displayed prominently without truncate */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight whitespace-nowrap">
-                    {profileData.fullName}
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    {profileData.fullName || 'Profil Baru (Nama Belum Diisi)'}
                   </h2>
+                  {!profileData.fullName && (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      Menunggu Kelengkapan Data
+                    </span>
+                  )}
                 </div>
 
                 {/* Role & Level Badges */}
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
-                    {profileData.designation}
+                    {profileData.designation || 'Jabatan Belum Diatur'}
                   </span>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/60">
-                    Manajerial Utama (Tingkat 2)
+                    {profileData.department || 'Divisi Belum Diatur'}
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Pengelola Operasional Sumber Daya Manusia • Nexora Global Solusindo PT
+                  {profileData.fullName
+                    ? `${profileData.designation || 'Karyawan'} • Nexora Group &amp; HR Solutions`
+                    : 'Lengkapi formulir biodata personal & kontak resmi di bawah untuk mengaktifkan master data kepegawaian Anda.'}
                 </p>
 
                 {/* Meta details list */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-600 pt-1">
                   <div className="flex items-center gap-2">
                     <Briefcase className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span>NIK: <strong className="font-mono text-slate-800">{profileData.employeeNumber}</strong></span>
+                    <span>
+                      NIK:{' '}
+                      <strong className="font-mono text-slate-800">
+                        {profileData.employeeNumber || 'Menunggu Penugasan NIK'}
+                      </strong>
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span className="text-slate-800 font-medium">{profileData.email}</span>
+                    <span className="text-slate-800 font-medium">{profileData.email || 'Email belum diatur'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span>HQ Jakarta - SCBD</span>
+                    <span>{profileData.location || 'Kantor Pusat - SCBD Jakarta'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span>Bergabung 12 Mar 2018 (7 Thn)</span>
+                    <span>Bergabung: {profileData.joinDate || 'Hari Ini'}</span>
                   </div>
                 </div>
               </div>
@@ -355,10 +618,17 @@ export default function UserProfilePage() {
                   </div>
                 </div>
 
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70 self-start sm:self-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>Data Master Aktif</span>
-                </span>
+                {profileData.fullName ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70 self-start sm:self-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Data Master Aktif</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/70 self-start sm:self-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span>Menunggu Kelengkapan Data</span>
+                  </span>
+                )}
               </div>
 
               {/* Form Input Fields Grid */}
@@ -371,27 +641,29 @@ export default function UserProfilePage() {
                     </label>
                     <input
                       type="text"
+                      placeholder="Contoh: Dewi Lestari, S.Psi"
                       value={profileData.fullName}
                       onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
                     />
                   </div>
 
-                  {/* NIK (Terkunci) */}
+                  {/* NIK */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="font-semibold text-slate-700">Nomor Induk Karyawan (NIK)</label>
                       <span className="text-[11px] text-slate-400 flex items-center gap-1">
                         <Lock className="w-3 h-3 text-slate-400" />
-                        <span>Terkunci (Sistem)</span>
+                        <span>Sistem HRIS</span>
                       </span>
                     </div>
                     <div className="relative">
                       <input
                         type="text"
-                        disabled
+                        placeholder="Contoh: NX-2018012"
                         value={profileData.employeeNumber}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono font-semibold text-slate-700 cursor-not-allowed"
+                        onChange={(e) => setProfileData({ ...profileData, employeeNumber: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
                       />
                       <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
@@ -408,14 +680,21 @@ export default function UserProfilePage() {
                       <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="email"
+                        placeholder="nama@nexora.co.id"
                         value={profileData.email}
                         onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
                         className="w-full pl-10 pr-28 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
                       />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 pointer-events-none">
-                        <Check className="w-3 h-3" />
-                        <span>Terverifikasi</span>
-                      </span>
+                      {profileData.email ? (
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 pointer-events-none">
+                          <Check className="w-3 h-3" />
+                          <span>Terverifikasi</span>
+                        </span>
+                      ) : (
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-400 border border-slate-200/80 pointer-events-none">
+                          <span>Belum Diisi</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -428,6 +707,7 @@ export default function UserProfilePage() {
                       <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="tel"
+                        placeholder="Contoh: +62 812-9876-5432"
                         value={profileData.phone}
                         onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
@@ -444,9 +724,10 @@ export default function UserProfilePage() {
                     </label>
                     <input
                       type="text"
-                      disabled
+                      placeholder="Contoh: People & Culture / People Operations"
                       value={profileData.department}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 cursor-not-allowed"
+                      onChange={(e) => setProfileData({ ...profileData, department: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
                     />
                   </div>
 
@@ -457,9 +738,10 @@ export default function UserProfilePage() {
                     </label>
                     <input
                       type="text"
-                      disabled
+                      placeholder="Contoh: HR Operations Manager"
                       value={profileData.designation}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 cursor-not-allowed"
+                      onChange={(e) => setProfileData({ ...profileData, designation: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
                     />
                   </div>
                 </div>
@@ -472,9 +754,10 @@ export default function UserProfilePage() {
                     </label>
                     <input
                       type="text"
-                      disabled
+                      placeholder="Contoh: Direktur SDM & Legal (Board of Directors)"
                       value={profileData.manager}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 cursor-not-allowed"
+                      onChange={(e) => setProfileData({ ...profileData, manager: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
                     />
                   </div>
 
@@ -485,9 +768,10 @@ export default function UserProfilePage() {
                     </label>
                     <input
                       type="text"
-                      disabled
+                      placeholder="Contoh: Kantor Pusat - SCBD Jakarta (Hybrid Policy)"
                       value={profileData.location}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 cursor-not-allowed"
+                      onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
                     />
                   </div>
                 </div>
@@ -496,10 +780,19 @@ export default function UserProfilePage() {
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md transition-all active:scale-98 disabled:opacity-60"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md transition-all active:scale-98 disabled:opacity-60 cursor-pointer"
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Simpan Biodata</span>
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Menyimpan ke Database...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Simpan Biodata</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

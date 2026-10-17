@@ -26,6 +26,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeft,
+  User,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -39,6 +40,15 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('Nexora HRIS');
+  const [userProfile, setUserProfile] = useState<{
+    fullName: string;
+    designation: string;
+    avatarUrl: string;
+  }>({
+    fullName: '',
+    designation: '',
+    avatarUrl: '',
+  });
 
   useEffect(() => {
     try {
@@ -69,6 +79,38 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
       })
       .catch(() => {});
 
+    // Load user profile for topbar pill
+    try {
+      const persistentAvatar = localStorage.getItem('nexora_persistent_avatar');
+      const cachedProfile = localStorage.getItem('nexora_user_profile');
+      if (cachedProfile) {
+        const parsed = JSON.parse(cachedProfile);
+        setUserProfile({
+          fullName: parsed.fullName || '',
+          designation: parsed.designation || '',
+          avatarUrl: persistentAvatar || parsed.avatarUrl || '',
+        });
+      } else if (persistentAvatar) {
+        setUserProfile((prev) => ({ ...prev, avatarUrl: persistentAvatar }));
+      }
+    } catch {
+      // ignore
+    }
+
+    fetch('/api/v1/profile')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.success && json?.hasData && json.data) {
+          const persistentAvatar = localStorage.getItem('nexora_persistent_avatar');
+          setUserProfile({
+            fullName: json.data.fullName || '',
+            designation: json.data.designation || '',
+            avatarUrl: json.data.avatarUrl || persistentAvatar || '',
+          });
+        }
+      })
+      .catch(() => {});
+
     // Listen to real-time BroadcastChannel
     let channel: BroadcastChannel | null = null;
     try {
@@ -78,6 +120,13 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
         if (msg?.type === 'LOGO_UPDATED') {
           setCompanyLogo(msg.logoUrl || '');
           if (msg.companyName) setCompanyName(msg.companyName);
+        }
+        if (msg?.type === 'PROFILE_UPDATED' && msg.profile) {
+          setUserProfile({
+            fullName: msg.profile.fullName || '',
+            designation: msg.profile.designation || '',
+            avatarUrl: msg.profile.avatarUrl || '',
+          });
         }
       };
     } catch {
@@ -409,24 +458,35 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
               className="flex items-center gap-2.5 pl-1 cursor-pointer group hover:opacity-90 transition-opacity"
               title="Buka Pengaturan Akun & Profil Pengguna"
             >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 to-rose-400 p-0.5 shadow-sm flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 p-0.5 shadow-sm flex-shrink-0">
                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-xs font-bold text-slate-700 overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=120"
-                    alt="Dewi Lestari"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
-                  />
+                  {userProfile.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={userProfile.avatarUrl}
+                      alt={userProfile.fullName || 'User'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : userProfile.fullName ? (
+                    <span className="text-xs font-bold text-blue-700">
+                      {userProfile.fullName
+                        .split(' ')
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase()}
+                    </span>
+                  ) : (
+                    <User className="w-4 h-4 text-slate-400" />
+                  )}
                 </div>
               </div>
               <div className="hidden xl:flex flex-col text-left">
                 <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight whitespace-nowrap">
-                  Dewi Lestari, S.Psi
+                  {userProfile.fullName || 'HR Administrator'}
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium leading-tight whitespace-nowrap">
-                  HR Operations Manager
+                  {userProfile.designation || 'Master HRIS'}
                 </span>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors hidden sm:block flex-shrink-0" />
