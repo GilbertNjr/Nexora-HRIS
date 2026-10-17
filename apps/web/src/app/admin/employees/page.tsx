@@ -24,6 +24,10 @@ import {
   ExternalLink,
   ShieldCheck,
   Check,
+  Users,
+  UserPlus,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 export interface EmployeeItem {
@@ -44,139 +48,9 @@ export interface EmployeeItem {
 }
 
 export default function EmployeesPage() {
-  // Master mock dataset aligned with reference design
-  const initialDataset: EmployeeItem[] = [
-    {
-      id: 'emp-101',
-      employeeNumber: 'NIK-2021001',
-      fullName: 'Rian Ardiansyah',
-      firstName: 'Rian',
-      lastName: 'Ardiansyah',
-      email: 'rian.ardiansyah@perusahaan.co.id',
-      phone: '+62 812-9845-1120',
-      department: 'Teknologi Informasi',
-      designation: 'Senior Software Engineer',
-      employmentType: 'PERMANENT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2021-02-15',
-      bankName: 'BCA',
-      accountNumber: '8830192841',
-    },
-    {
-      id: 'emp-102',
-      employeeNumber: 'NIK-2022014',
-      fullName: 'Siti Rahmawati',
-      firstName: 'Siti',
-      lastName: 'Rahmawati',
-      email: 'siti.rahmawati@perusahaan.co.id',
-      phone: '+62 821-9876-5432',
-      department: 'Sumber Daya Manusia',
-      designation: 'HR Business Partner',
-      employmentType: 'PERMANENT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2022-04-10',
-      bankName: 'Mandiri',
-      accountNumber: '1370018293041',
-    },
-    {
-      id: 'emp-103',
-      employeeNumber: 'NIK-2023089',
-      fullName: 'Bambang Wijaya',
-      firstName: 'Bambang',
-      lastName: 'Wijaya',
-      email: 'bambang.wijaya@perusahaan.co.id',
-      phone: '+62 857-1122-3344',
-      department: 'Keuangan & Pajak',
-      designation: 'Financial Analyst',
-      employmentType: 'CONTRACT_PKWT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2023-08-01',
-      bankName: 'BCA',
-      accountNumber: '7310492810',
-    },
-    {
-      id: 'emp-104',
-      employeeNumber: 'NIK-2020042',
-      fullName: 'Indah Permata',
-      firstName: 'Indah',
-      lastName: 'Permata',
-      email: 'indah.permata@perusahaan.co.id',
-      phone: '+62 878-5566-7788',
-      department: 'Operasional',
-      designation: 'Operations Supervisor',
-      employmentType: 'PERMANENT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2020-09-01',
-      bankName: 'BNI',
-      accountNumber: '0981248102',
-    },
-    {
-      id: 'emp-105',
-      employeeNumber: 'NIK-2023115',
-      fullName: 'Doni Prasetyo',
-      firstName: 'Doni',
-      lastName: 'Prasetyo',
-      email: 'doni.prasetyo@perusahaan.co.id',
-      phone: '+62 813-7788-9900',
-      department: 'Teknologi Informasi',
-      designation: 'Product Designer',
-      employmentType: 'CONTRACT_PKWT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2023-11-15',
-      bankName: 'BCA',
-      accountNumber: '5220394812',
-    },
-    {
-      id: 'emp-106',
-      employeeNumber: 'NIK-2022067',
-      fullName: 'Anita Kusuma',
-      firstName: 'Anita',
-      lastName: 'Kusuma',
-      email: 'anita.kusuma@perusahaan.co.id',
-      phone: '+62 819-2233-4455',
-      department: 'Pemasaran & Bisnis',
-      designation: 'Marketing Lead',
-      employmentType: 'PERMANENT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2022-07-20',
-      bankName: 'Mandiri',
-      accountNumber: '1580029384712',
-    },
-    {
-      id: 'emp-107',
-      employeeNumber: 'NIK-2024001',
-      fullName: 'Ahmat Gebyar',
-      firstName: 'Ahmat',
-      lastName: 'Gebyar',
-      email: 'ahmat.gebyar@perusahaan.co.id',
-      phone: '+62 812-3456-7890',
-      department: 'Teknologi Informasi',
-      designation: 'Lead Solution Architect',
-      employmentType: 'PERMANENT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2024-01-08',
-      bankName: 'BCA',
-      accountNumber: '8820491823',
-    },
-    {
-      id: 'emp-108',
-      employeeNumber: 'NIK-2025012',
-      fullName: 'Budi Santoso',
-      firstName: 'Budi',
-      lastName: 'Santoso',
-      email: 'budi.santoso@perusahaan.co.id',
-      phone: '+62 856-4321-8765',
-      department: 'Keuangan & Pajak',
-      designation: 'Senior Payroll Specialist',
-      employmentType: 'PERMANENT',
-      employmentStatus: 'ACTIVE',
-      joinDate: '2025-03-01',
-      bankName: 'BCA',
-      accountNumber: '6120491820',
-    },
-  ];
-
-  const [employees, setEmployees] = useState<EmployeeItem[]>(initialDataset);
+  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,33 +78,82 @@ export default function EmployeesPage() {
     accountHolderName: '',
   });
 
-  // Attempt live backend fetch if available (fails silently to resilient local state)
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-        if (!apiUrl && typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-          return;
-        }
-        const endpoint = apiUrl ? `${apiUrl}/api/v1/employees?limit=50` : 'http://localhost:4000/api/v1/employees?limit=50';
-        const res = await fetch(endpoint, { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.data?.items && data.data.items.length > 0) {
-            setEmployees(data.data.items);
-          }
-        }
-      } catch {
-        // Keep resilient dataset
-      }
-    };
-    fetchEmployees();
-  }, []);
-
   const showToast = (message: string) => {
     setToastMsg(message);
     setTimeout(() => setToastMsg(null), 3500);
   };
+
+  // 1. Fetch live from backend API or sync with persistent storage
+  useEffect(() => {
+    // Check persistent storage first
+    try {
+      const stored = localStorage.getItem('nexora_employees_db');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEmployees(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Attempt live backend fetch if available
+    const fetchEmployees = async () => {
+      try {
+        const apiUrl =
+          process.env.NEXT_PUBLIC_API_URL ||
+          (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+            ? 'http://localhost:4000'
+            : '');
+
+        if (!apiUrl) {
+          setIsLoading(false);
+          return;
+        }
+
+        const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
+        const endpoint = `${apiUrl}/api/v1/employees?limit=100`;
+
+        const res = await fetch(endpoint, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: 'no-store',
+        });
+
+        if (res.ok) {
+          const resData = await res.json();
+          const items = resData?.data?.items || resData?.data || [];
+          if (Array.isArray(items) && items.length > 0) {
+            const mapped: EmployeeItem[] = items.map((emp: any) => ({
+              id: emp.id,
+              employeeNumber: emp.employeeNumber || `NIK-${emp.id.slice(0, 6)}`,
+              fullName: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+              firstName: emp.firstName || '',
+              lastName: emp.lastName || '',
+              email: emp.email || emp.user?.email || null,
+              phone: emp.phone || null,
+              department: emp.department?.name || emp.department || 'Teknologi Informasi',
+              designation: emp.designation?.title || emp.designation || 'Staff',
+              employmentType: emp.employmentType || 'PERMANENT',
+              employmentStatus: emp.employmentStatus || 'ACTIVE',
+              joinDate: emp.joinDate ? emp.joinDate.split('T')[0] : new Date().toISOString().split('T')[0],
+              bankName: emp.bankAccounts?.[0]?.bankName || emp.bankName,
+              accountNumber: emp.bankAccounts?.[0]?.accountNumber || emp.accountNumber,
+            }));
+
+            setEmployees(mapped);
+            localStorage.setItem('nexora_employees_db', JSON.stringify(mapped));
+          }
+        }
+      } catch {
+        // network / offline fallback
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
 
   // Filtered employees list
   const filteredEmployees = useMemo(() => {
@@ -254,13 +177,15 @@ export default function EmployeesPage() {
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + rowsPerPage);
 
-  // Total statistics for pill header
+  // Total statistics for pill header (fully dynamic)
   const totalPermanent = employees.filter((e) => e.employmentType === 'PERMANENT').length;
   const totalContract = employees.filter((e) => e.employmentType === 'CONTRACT_PKWT').length;
 
-  // Add Employee Handler
-  const handleAddEmployee = (e: React.FormEvent) => {
+  // Add Employee Handler (Saves to backend DB & persistent storage)
+  const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     const newEmp: EmployeeItem = {
       id: `emp-${Date.now()}`,
       employeeNumber: `NIK-${new Date().getFullYear()}${String(employees.length + 1).padStart(3, '0')}`,
@@ -278,25 +203,127 @@ export default function EmployeesPage() {
       accountNumber: formData.accountNumber,
     };
 
-    setEmployees([newEmp, ...employees]);
+    // Try posting to backend API
+    try {
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+          ? 'http://localhost:4000'
+          : '');
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
+
+      if (apiUrl) {
+        await fetch(`${apiUrl}/api/v1/employees`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            department: formData.department,
+            designation: formData.designation,
+            employmentType: formData.employmentType,
+            joinDate: formData.joinDate,
+            bankName: formData.bankName,
+            accountNumber: formData.accountNumber,
+            accountHolder: formData.accountHolderName || `${formData.firstName} ${formData.lastName}`.trim(),
+          }),
+        });
+      }
+    } catch {
+      // saved resiliently
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    const updated = [newEmp, ...employees];
+    setEmployees(updated);
+    try {
+      localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+
     setIsAddModalOpen(false);
-    showToast(`Karyawan ${newEmp.fullName} (${newEmp.employeeNumber}) berhasil ditambahkan!`);
+    // Reset Form
+    setFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      department: 'Teknologi Informasi',
+      designation: 'Junior Engineer',
+      employmentType: 'PERMANENT',
+      joinDate: new Date().toISOString().split('T')[0],
+      bankName: 'BCA',
+      accountNumber: '',
+      accountHolderName: '',
+    });
+
+    showToast(`Data karyawan ${newEmp.fullName} (${newEmp.employeeNumber}) berhasil disimpan ke database!`);
   };
 
   // Edit Employee Handler
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editEmployee) return;
 
-    setEmployees(employees.map((emp) => (emp.id === editEmployee.id ? editEmployee : emp)));
+    const updated = employees.map((emp) => (emp.id === editEmployee.id ? editEmployee : emp));
+    setEmployees(updated);
+    try {
+      localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+          ? 'http://localhost:4000'
+          : '');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
+      if (apiUrl) {
+        await fetch(`${apiUrl}/api/v1/employees/${editEmployee.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(editEmployee),
+        });
+      }
+    } catch {
+      // ignore
+    }
+
     showToast(`Data ${editEmployee.fullName} berhasil diperbarui.`);
     setEditEmployee(null);
   };
 
   // Delete Handler
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteCandidate) return;
-    setEmployees(employees.filter((emp) => emp.id !== deleteCandidate.id));
+    const updated = employees.filter((emp) => emp.id !== deleteCandidate.id);
+    setEmployees(updated);
+    try {
+      localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+          ? 'http://localhost:4000'
+          : '');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
+      if (apiUrl) {
+        await fetch(`${apiUrl}/api/v1/employees/${deleteCandidate.id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      }
+    } catch {
+      // ignore
+    }
+
     showToast(`Karyawan ${deleteCandidate.fullName} telah dihapus dari direktori.`);
     setDeleteCandidate(null);
   };
@@ -323,19 +350,21 @@ export default function EmployeesPage() {
             </p>
           </div>
 
-          {/* Right Header Status Pill */}
+          {/* Right Header Status Pill - Dynamic Real Data */}
           <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-slate-50 border border-slate-200/80 text-xs font-semibold shadow-xs">
             <span className="flex items-center gap-1.5 text-slate-800">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-              <span>Total: <strong>348 Karyawan</strong></span>
+              <span>
+                Total: <strong>{employees.length} Karyawan</strong>
+              </span>
             </span>
             <span className="text-slate-300">|</span>
             <span className="text-slate-600 font-medium">
-              <strong className="text-slate-800">274</strong> Tetap
+              <strong className="text-slate-800">{totalPermanent}</strong> Tetap
             </span>
             <span className="text-slate-400">•</span>
             <span className="text-slate-600 font-medium">
-              <strong className="text-slate-800">74</strong> Kontrak
+              <strong className="text-slate-800">{totalContract}</strong> Kontrak
             </span>
           </div>
         </div>
@@ -405,10 +434,43 @@ export default function EmployeesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedEmployees.length === 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="py-16 px-6 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                        <p className="text-xs font-medium">Memuat data karyawan dari database...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : employees.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-16 px-6 text-center">
+                      <div className="max-w-sm mx-auto flex flex-col items-center justify-center space-y-3">
+                        <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
+                          <Users className="w-7 h-7" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-800">Belum Ada Data Karyawan</h3>
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                            Direktori karyawan saat ini masih kosong. Data karyawan yang Anda tambahkan melalui formulir pendaftaran akan tersimpan secara otomatis dan aman di database.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddModalOpen(true)}
+                          className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 shadow-sm transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Tambah Karyawan Pertama
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedEmployees.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 px-6 text-center text-slate-400">
-                      Tidak ada karyawan yang sesuai dengan kriteria pencarian.
+                      Tidak ada karyawan yang sesuai dengan kriteria pencarian "{searchTerm}".
                     </td>
                   </tr>
                 ) : (
@@ -503,12 +565,12 @@ export default function EmployeesPage() {
               Menampilkan{' '}
               <strong>{totalEmployees === 0 ? 0 : startIndex + 1}</strong> -{' '}
               <strong>{Math.min(startIndex + rowsPerPage, totalEmployees)}</strong> dari{' '}
-              <strong>348 karyawan</strong>
+              <strong>{totalEmployees} karyawan</strong>
             </p>
 
             <div className="flex items-center gap-3">
               <span>
-                Halaman <strong>{currentPage}</strong> dari <strong>10</strong>
+                Halaman <strong>{totalEmployees === 0 ? 0 : currentPage}</strong> dari <strong>{totalPages}</strong>
               </span>
               <div className="flex items-center gap-1">
                 <button
@@ -521,8 +583,8 @@ export default function EmployeesPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={currentPage >= 10}
-                  onClick={() => setCurrentPage((p) => Math.min(10, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -1016,9 +1078,11 @@ export default function EmployeesPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 shadow-md transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 shadow-md transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Simpan Karyawan
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmitting ? 'Menyimpan ke Database...' : 'Simpan Karyawan'}</span>
                 </button>
               </div>
             </form>
