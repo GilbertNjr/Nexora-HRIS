@@ -144,46 +144,59 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
       >
         <div className="flex flex-col flex-1 overflow-y-auto">
           {/* Logo Brand Header */}
-          <div className="h-16 px-4 flex items-center justify-between border-b border-slate-100 flex-shrink-0">
-            <Link href="/admin" className="flex items-center gap-2.5 overflow-hidden">
-              {/* Logo Ribbon Icon */}
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base shadow-sm flex-shrink-0">
+          <div
+            className={`h-16 border-b border-slate-100 flex-shrink-0 flex items-center transition-all ${
+              isSidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'
+            }`}
+          >
+            {isSidebarCollapsed ? (
+              /* Minimized view: Centered Logo with click to expand */
+              <button
+                type="button"
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base shadow-sm hover:scale-105 hover:ring-2 hover:ring-blue-400 transition-all cursor-pointer"
+                title="Buka Sidebar Penuh"
+              >
                 N
-              </div>
-              {!isSidebarCollapsed && (
-                <div className="flex flex-col min-w-0">
-                  <span className="font-bold text-[15px] tracking-tight text-[#0F172A] leading-tight">
-                    Nexora HRIS
-                  </span>
-                  <span className="text-[10px] font-medium text-slate-400 tracking-wider">
-                    Enterprise Portal
-                  </span>
-                </div>
-              )}
-            </Link>
+              </button>
+            ) : (
+              /* Expanded view: Logo + Brand + Close Button */
+              <>
+                <Link href="/admin" className="flex items-center gap-2.5 overflow-hidden min-w-0">
+                  {/* Logo Ribbon Icon */}
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base shadow-sm flex-shrink-0">
+                    N
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-[15px] tracking-tight text-[#0F172A] leading-tight truncate">
+                      Nexora HRIS
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-400 tracking-wider truncate">
+                      Enterprise Portal
+                    </span>
+                  </div>
+                </Link>
 
-            {/* Collapse / Close Button */}
-            <div className="flex items-center">
-              <button
-                type="button"
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                title={isSidebarCollapsed ? 'Buka Sidebar' : 'Ciutkan Sidebar'}
-              >
-                {isSidebarCollapsed ? (
-                  <PanelLeft className="w-4 h-4" />
-                ) : (
-                  <PanelLeftClose className="w-4 h-4" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+                {/* Collapse / Close Button */}
+                <div className="flex items-center flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarCollapsed(true)}
+                    className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    title="Ciutkan Sidebar"
+                  >
+                    <PanelLeftClose className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Nav Links per Section */}
@@ -255,12 +268,27 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
         <header className="h-16 bg-white border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 flex-shrink-0">
-          {/* Left: Mobile Toggle & Search Bar */}
-          <div className="flex items-center gap-3 flex-1 max-w-lg">
+          {/* Left: Mobile Toggle, Desktop Toggle & Search Bar */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-lg">
+            {/* Desktop Sidebar Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="hidden lg:flex p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors flex-shrink-0"
+              title={isSidebarCollapsed ? 'Buka Sidebar' : 'Ciutkan Sidebar'}
+            >
+              {isSidebarCollapsed ? (
+                <PanelLeft className="w-5 h-5" />
+              ) : (
+                <PanelLeftClose className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Mobile Drawer Menu Button */}
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 flex-shrink-0"
             >
               <Menu className="w-5 h-5" />
             </button>
