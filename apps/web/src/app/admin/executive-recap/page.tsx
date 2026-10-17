@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
+import { downloadExecutiveRecapPDF } from '@/utils/generateExecutiveRecapPDF';
 import {
   ChevronRight,
   ArrowLeft,
@@ -77,9 +78,38 @@ export default function ExecutiveRecapExportPage() {
   const handleDownloadPDF = () => {
     showToast('Menyiapkan file PDF resolusi tinggi siap cetak...', 'info');
     setTimeout(() => {
-      window.print();
-      showToast('Dokumen Rekap Eksekutif PDF siap dicetak/diunduh!');
-    }, 600);
+      try {
+        downloadExecutiveRecapPDF({
+          period: selectedPeriod,
+          totalEmployees: 1248,
+          attendanceRate: 96.8,
+          onTimeCount: 1203,
+          lateCount: 28,
+          leaveCount: 17,
+          estimatedPayroll: 'Rp 1.428.500.000',
+          departments: [
+            { name: 'Teknologi & Produk (Engineering)', count: 412, percentage: 33 },
+            { name: 'Operasional & Logistik (Ops)', count: 310, percentage: 25 },
+            { name: 'Pemasaran & Penjualan (Commercial)', count: 285, percentage: 23 },
+            { name: 'Keuangan & SDM (Finance & HR)', count: 141, percentage: 11 },
+            { name: 'Legal, Kepatuhan & Audit Internal', count: 100, percentage: 8 },
+          ],
+          preparedBy: 'Dewi Lestari, S.Psi (HR Operations Manager)',
+          printedAt: `${new Date().toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}, ${new Date().toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })} WIB`,
+        });
+        showToast('Dokumen Rekap Eksekutif PDF berhasil diunduh!');
+      } catch (err) {
+        console.error('Download error:', err);
+        window.print();
+      }
+    }, 450);
   };
 
   // Send to Board of Directors

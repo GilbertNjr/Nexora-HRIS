@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
+import { downloadExecutiveRecapPDF } from '@/utils/generateExecutiveRecapPDF';
 import {
   Users,
   CalendarCheck,
@@ -56,6 +57,43 @@ export default function AdminDashboardPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
+  const [isDownloadingRecap, setIsDownloadingRecap] = useState(false);
+
+  // Direct Executive PDF Download Handler
+  const handleDownloadExecutiveRecap = () => {
+    setIsDownloadingRecap(true);
+    setToastMessage(`Menyiapkan Rekap Eksekutif SDM (${selectedMonth})...`);
+
+    setTimeout(() => {
+      try {
+        downloadExecutiveRecapPDF({
+          period: selectedMonth,
+          totalEmployees: metrics.totalEmployees,
+          attendanceRate: metrics.attendanceRate,
+          onTimeCount: metrics.onTimeCount,
+          lateCount: metrics.lateCount,
+          leaveCount: metrics.leaveCount,
+          estimatedPayroll: `${metrics.estimatedPayroll} Miliar`,
+          departments: departments,
+          preparedBy: 'Dewi Lestari, S.Psi (HR Operations Manager)',
+          printedAt: `${new Date().toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}, ${new Date().toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })} WIB`,
+        });
+        setToastMessage(`Laporan Rekap Eksekutif (${selectedMonth}) berhasil diunduh!`);
+      } catch (err) {
+        console.error('Failed to download executive PDF:', err);
+        setToastMessage('Gagal mengunduh dokumen PDF. Silakan coba kembali.');
+      } finally {
+        setIsDownloadingRecap(false);
+      }
+    }, 450);
+  };
 
   // Dynamic approval list state
   const [requests, setRequests] = useState<ApprovalRequest[]>([
@@ -286,14 +324,17 @@ export default function AdminDashboardPage() {
               )}
             </div>
 
-            {/* Executive PDF Export Button */}
-            <Link
-              href="/admin/executive-recap"
-              className="h-10 px-4 rounded-xl bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition-all transform active:scale-95"
+            {/* Executive PDF Direct Download Button */}
+            <button
+              type="button"
+              onClick={handleDownloadExecutiveRecap}
+              disabled={isDownloadingRecap}
+              className="h-10 px-4 rounded-xl bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition-all transform active:scale-95 disabled:opacity-75 cursor-pointer"
+              title="Klik untuk langsung mengunduh Rekap Eksekutif PDF"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Unduh Rekap Eksekutif (PDF)</span>
-            </Link>
+              <Download className={`w-3.5 h-3.5 ${isDownloadingRecap ? 'animate-bounce' : ''}`} />
+              <span>{isDownloadingRecap ? 'Mengunduh PDF...' : 'Unduh Rekap Eksekutif (PDF)'}</span>
+            </button>
           </div>
         </div>
 
