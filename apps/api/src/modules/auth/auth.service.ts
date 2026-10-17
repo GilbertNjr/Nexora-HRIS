@@ -327,7 +327,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       roles,
-      permissions,
+      permissions: permissions as string[],
     };
 
     const newAccessToken = this.jwtService.sign(payload);
