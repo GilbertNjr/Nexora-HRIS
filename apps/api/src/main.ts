@@ -14,7 +14,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('APP_PORT', 4000);
+  const port = process.env.PORT || configService.get<number>('APP_PORT', 4000);
   const apiPrefix = configService.get<string>('API_PREFIX', '/api/v1').replace(/^\//, '');
 
   // 1. Security Headers (Helmet)
@@ -31,7 +31,10 @@ async function bootstrap() {
   // 3. CORS Configuration
   const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:3000'],
+    origin: (origin, callback) => {
+      // Izinkan request dari frontend apa pun di cloud (Vercel, Render) atau localhost
+      callback(null, true);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true,
@@ -86,7 +89,7 @@ async function bootstrap() {
   });
 
   // 8. Start Listening
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 NEXORA Backend API is running on: http://localhost:${port}/${apiPrefix}`);
   logger.log(`📑 Swagger Documentation available at: http://localhost:${port}/api/docs`);
 }
