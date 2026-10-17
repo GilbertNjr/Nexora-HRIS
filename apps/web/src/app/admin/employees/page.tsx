@@ -101,21 +101,8 @@ export default function EmployeesPage() {
     // Attempt live backend fetch if available
     const fetchEmployees = async () => {
       try {
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL ||
-          (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-            ? 'http://localhost:4000'
-            : '');
-
-        if (!apiUrl) {
-          setIsLoading(false);
-          return;
-        }
-
         const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
-        const endpoint = `${apiUrl}/api/v1/employees?limit=100`;
-
-        const res = await fetch(endpoint, {
+        const res = await fetch('/api/v1/employees?limit=100', {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: 'no-store',
         });
@@ -205,36 +192,28 @@ export default function EmployeesPage() {
 
     // Try posting to backend API
     try {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ||
-        (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-          ? 'http://localhost:4000'
-          : '');
-
       const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
 
-      if (apiUrl) {
-        await fetch(`${apiUrl}/api/v1/employees`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            phone: formData.phone,
-            department: formData.department,
-            designation: formData.designation,
-            employmentType: formData.employmentType,
-            joinDate: formData.joinDate,
-            bankName: formData.bankName,
-            accountNumber: formData.accountNumber,
-            accountHolder: formData.accountHolderName || `${formData.firstName} ${formData.lastName}`.trim(),
-          }),
-        });
-      }
+      await fetch('/api/v1/employees', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          department: formData.department,
+          designation: formData.designation,
+          employmentType: formData.employmentType,
+          joinDate: formData.joinDate,
+          bankName: formData.bankName,
+          accountNumber: formData.accountNumber,
+          accountHolder: formData.accountHolderName || `${formData.firstName} ${formData.lastName}`.trim(),
+        }),
+      });
     } catch {
       // saved resiliently
     } finally {
@@ -277,22 +256,15 @@ export default function EmployeesPage() {
     setEmployees(updated);
     try {
       localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ||
-        (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-          ? 'http://localhost:4000'
-          : '');
       const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
-      if (apiUrl) {
-        await fetch(`${apiUrl}/api/v1/employees/${editEmployee.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(editEmployee),
-        });
-      }
+      await fetch(`/api/v1/employees/${editEmployee.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(editEmployee),
+      });
     } catch {
       // ignore
     }
@@ -308,18 +280,11 @@ export default function EmployeesPage() {
     setEmployees(updated);
     try {
       localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ||
-        (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-          ? 'http://localhost:4000'
-          : '');
       const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
-      if (apiUrl) {
-        await fetch(`${apiUrl}/api/v1/employees/${deleteCandidate.id}`, {
-          method: 'DELETE',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-      }
+      await fetch(`/api/v1/employees/${deleteCandidate.id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
     } catch {
       // ignore
     }
