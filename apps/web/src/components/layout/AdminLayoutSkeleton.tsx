@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NexoraLogo } from '../common/NexoraLogo';
+import { NotificationBellDropdown } from '../notifications/NotificationBellDropdown';
 import {
   LayoutDashboard,
   Users,
@@ -439,15 +440,7 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
             </Link>
 
             {/* Notification Bell with Badge */}
-            <button
-              type="button"
-              className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">
-                3
-              </span>
-            </button>
+            <NotificationBellDropdown portal="admin" />
 
             {/* Vertical Separator */}
             <div className="hidden sm:block h-6 w-px bg-slate-200" />

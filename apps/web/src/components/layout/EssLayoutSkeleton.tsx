@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NexoraLogo } from '../common/NexoraLogo';
+import { NotificationBellDropdown } from '../notifications/NotificationBellDropdown';
 import {
   LayoutDashboard,
   Clock,
@@ -115,10 +116,7 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
             <span>Portal HR Admin</span>
           </Link>
 
-          <button className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-600" />
-          </button>
+          <NotificationBellDropdown portal="ess" />
 
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
             GB

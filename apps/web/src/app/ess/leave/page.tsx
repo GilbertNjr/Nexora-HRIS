@@ -233,6 +233,28 @@ export default function EssLeavePage() {
     setEndDate('');
     setReason('');
     setDocumentUrl('');
+
+    // Sync with backend approvals & real-time notification
+    try {
+      fetch('/api/v1/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Gilbert (Karyawan)',
+          role: 'Technology & Development Team',
+          type: 'cuti',
+          title: `Pengajuan ${newReq.typeName} (${newReq.totalDays} Hari)`,
+          highlightType: newReq.typeName,
+          detail: `${newReq.totalDays} Hari: ${newReq.startDate} s/d ${newReq.endDate}`,
+          quotaMeta: `Alasan: ${newReq.reason}`,
+        }),
+      }).catch(() => {});
+
+      const ch = new BroadcastChannel('nexora_live_sync');
+      ch.postMessage({ type: 'APPROVAL_SUBMITTED' });
+      ch.close();
+    } catch {}
+
     setNotification({
       type: 'success',
       message: 'Permohonan cuti berhasil diajukan dan diteruskan ke Line Manager untuk persetujuan.',

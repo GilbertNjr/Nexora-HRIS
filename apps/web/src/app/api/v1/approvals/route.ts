@@ -149,6 +149,38 @@ export async function POST(request: NextRequest) {
     const updated = [newItem, ...approvals];
     saveStoredApprovals(updated);
 
+    // Automatically generate real-time notification for Admin
+    try {
+      const NOTIFICATIONS_FILE = path.join(STORAGE_DIR, 'nexora_notifications.json');
+      let notifs: any[] = [];
+      if (fs.existsSync(NOTIFICATIONS_FILE)) {
+        try {
+          notifs = JSON.parse(fs.readFileSync(NOTIFICATIONS_FILE, 'utf-8'));
+        } catch {}
+      }
+      const newNotif = {
+        id: `notif-${Date.now()}`,
+        title: `Pengajuan ${newItem.highlightType} Baru`,
+        message: `${newItem.name} (${newItem.role.split('•')[0]?.trim() || 'Karyawan'}) mengajukan ${newItem.title}.`,
+        category: 'leave',
+        type: 'warning',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        actionUrl: '/admin/leave',
+        actionLabel: 'Tinjau Pengajuan',
+        actor: {
+          name: newItem.name,
+          initials: newItem.initials,
+          avatarColor: newItem.avatarColor,
+        },
+        metadata: {
+          requestId: newItem.id,
+          type: newItem.type,
+        },
+      };
+      fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify([newNotif, ...notifs].slice(0, 50), null, 2), 'utf-8');
+    } catch {}
+
     return NextResponse.json(
       {
         success: true,
