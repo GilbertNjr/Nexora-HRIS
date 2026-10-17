@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
+import { PartnerBankSelect } from '@/components/common/PartnerBankSelect';
 import {
   Search,
   Plus,
@@ -200,6 +201,7 @@ export default function EmployeesPage() {
     joinDate: new Date().toISOString().split('T')[0],
     bankName: 'BCA',
     accountNumber: '',
+    accountHolderName: '',
   });
 
   // Attempt live backend fetch if available (fails silently to resilient local state)
@@ -716,6 +718,45 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
+              {/* Edit Bank Account Details */}
+              <div className="p-3.5 rounded-2xl bg-blue-50/40 border border-blue-100/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    <span>Rekening Penggajian (Payroll)</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    Mitra BI-FAST
+                  </span>
+                </div>
+
+                <PartnerBankSelect
+                  value={editEmployee.bankName || 'BCA'}
+                  onChange={(bankName) => setEditEmployee({ ...editEmployee, bankName })}
+                  label="Pilih Bank Mitra Payroll"
+                  showPills={true}
+                />
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Nomor Rekening
+                  </label>
+                  <input
+                    type="text"
+                    value={editEmployee.accountNumber || ''}
+                    onChange={(e) =>
+                      setEditEmployee({
+                        ...editEmployee,
+                        accountNumber: e.target.value.replace(/[^0-9]/g, ''),
+                      })
+                    }
+                    placeholder="Contoh: 8830192841"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -889,31 +930,77 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
-              {/* Bank Account Section */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-                  <CreditCard className="w-4 h-4 text-blue-600" />
-                  <span>Informasi Rekening Penggajian</span>
+              {/* Bank Account Section with PartnerBankSelect */}
+              <div className="p-3.5 rounded-2xl bg-blue-50/40 border border-blue-100/90 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    <span>Informasi Rekening Penggajian</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    Terhubung API BI-FAST
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                <PartnerBankSelect
+                  value={formData.bankName}
+                  onChange={(bankName) => setFormData({ ...formData, bankName })}
+                  label="Nama Bank Penyalur Payroll"
+                  showPills={true}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-600 mb-1">Nama Bank</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Nomor Rekening Bank *
+                    </label>
                     <input
                       type="text"
-                      value={formData.bankName}
-                      onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                      placeholder="BCA / Mandiri / BNI"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+                      required
+                      value={formData.accountNumber}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          accountNumber: e.target.value.replace(/[^0-9]/g, ''),
+                        })
+                      }
+                      placeholder="Contoh: 8830192841"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-600 mb-1">Nomor Rekening</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Nama Pemilik Rekening
+                      </label>
+                      {formData.firstName && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              accountHolderName: `${formData.firstName} ${formData.lastName}`.trim(),
+                            })
+                          }
+                          className="text-[10px] text-blue-600 hover:underline font-semibold"
+                        >
+                          Sesuai Nama Karyawan
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="text"
-                      value={formData.accountNumber}
-                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                      placeholder="Contoh: 8830192841"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+                      value={
+                        formData.accountHolderName !== undefined && formData.accountHolderName !== ''
+                          ? formData.accountHolderName
+                          : `${formData.firstName} ${formData.lastName}`.trim()
+                      }
+                      onChange={(e) =>
+                        setFormData({ ...formData, accountHolderName: e.target.value })
+                      }
+                      placeholder="Atas Nama Pemilik Rekening"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     />
                   </div>
                 </div>

@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
+import { PartnerBankSelect } from '@/components/common/PartnerBankSelect';
 import {
   ChevronRight,
   Save,
@@ -839,20 +840,14 @@ export default function AdminQuickEntryPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Nama Bank Penyalur Payroll
-                      </label>
-                      <select
+                      <PartnerBankSelect
                         value={formData.bankName}
-                        onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
-                      >
-                        <option value="BCA">Bank Central Asia (BCA Corporate)</option>
-                        <option value="Mandiri">Bank Mandiri</option>
-                        <option value="BNI">Bank Negara Indonesia (BNI)</option>
-                        <option value="BRI">Bank Rakyat Indonesia (BRI)</option>
-                      </select>
+                        onChange={(bankName) => setFormData({ ...formData, bankName })}
+                        label="Nama Bank Penyalur Payroll"
+                        showPills={true}
+                      />
                     </div>
+
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
