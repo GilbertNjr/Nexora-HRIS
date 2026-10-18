@@ -1,125 +1,158 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import {
   LayoutDashboard,
   Clock,
-  User,
-  Settings,
-  Building2,
-  Calendar,
-  ChevronDown,
-  Download,
-  Plus,
-  ShieldCheck,
-  CheckCircle2,
   CalendarDays,
-  Briefcase,
+  CreditCard,
+  TrendingUp,
+  GraduationCap,
+  FolderArchive,
+  Headphones,
+  Search,
+  Calendar,
+  CheckCircle2,
+  CalendarPlus,
   Umbrella,
-  Landmark,
-  FileCheck,
+  Award,
+  Users,
   FileText,
+  Download,
   Paperclip,
   Check,
   X,
   HelpCircle,
-  MapPin,
-  Camera,
-  TrendingUp,
+  Building2,
+  FileCheck,
+  BookOpen,
   AlertCircle,
-  Loader2,
-  Sparkles,
+  Clock3,
+  UserCheck,
   ExternalLink,
   ChevronRight,
-  Filter,
+  ShieldCheck,
+  Loader2,
+  MapPin,
+  RefreshCw,
+  Sliders,
+  Utensils,
+  Navigation,
+  LogOut,
+  SlidersHorizontal,
+  Plus,
+  Edit3,
+  ArrowRight,
+  Sparkles,
+  Fingerprint,
+  LogIn,
+  Hourglass,
+  Ticket,
+  Timer,
 } from 'lucide-react';
 
-interface LeaveRequestItem {
+interface OvertimeItem {
   ticketNo: string;
-  type: string;
-  typeBadge?: string;
-  hasAttachment?: boolean;
-  dateRange: string;
-  duration: string;
-  reason: string;
-  handover: string;
-  status: 'APPROVED_ALL' | 'APPROVED_HR' | 'PENDING' | 'REJECTED';
+  title: string;
+  date: string;
+  hours: number;
+  approver: string;
+  status: 'APPROVED' | 'PENDING';
   statusLabel: string;
 }
 
-interface DailyAttendanceLog {
+interface CorrectionItem {
+  ticketNo: string;
+  type: string;
   date: string;
-  dayName: string;
-  shift: string;
-  clockIn: string;
-  clockOut: string;
-  workHours: string;
-  location: string;
-  status: 'ON_TIME' | 'LATE' | 'LEAVE' | 'HOLIDAY';
+  revisedTime: string;
+  reason: string;
+  status: 'APPROVED' | 'PENDING' | 'REJECTED';
   statusLabel: string;
 }
 
 export default function EssAttendanceOverhaulPage() {
-  const pathname = usePathname();
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Active Tab: 1 = Kalender & Log Presensi, 2 = Izin & Cuti Non-Kerja, 3 = Pengajuan Koreksi Presensi
-  const [activeTab, setActiveTab] = useState<'calendar' | 'leave' | 'correction'>('calendar');
+  // Live Digital Clock state
+  const [liveTime, setLiveTime] = useState('09:57:44 WIB');
+  const [liveDate, setLiveDate] = useState('Senin, 24 Maret 2025');
 
-  // Interactive Period State
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('Februari 2025');
-  const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
-
-  // Modals & Feedback
-  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
-  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  // Modals state
+  const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [isOvertimeModalOpen, setIsOvertimeModalOpen] = useState(false);
+  const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+  const [isExternalVisitModalOpen, setIsExternalVisitModalOpen] = useState(false);
+  const [isCalibratingGps, setIsCalibratingGps] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Live Digital Clock
-  const [currentLiveTime, setCurrentLiveTime] = useState<string>('');
-  const [currentLiveDate, setCurrentLiveDate] = useState<string>('');
+  // Check-out Status State
+  const [hasClockedOut, setHasClockedOut] = useState(false);
+  const [clockOutTimeStr, setClockOutTimeStr] = useState('-- : -- : -- WIB');
 
-  // Attendance Check-in State
-  const [hasClockedInToday, setHasClockedInToday] = useState(false);
-  const [todayClockInTime, setTodayClockInTime] = useState<string>('08:16 WIB');
-  const [todayClockOutTime, setTodayClockOutTime] = useState<string>('Belum Tap-Out');
-
-  // New Leave Form State
-  const [newLeaveType, setNewLeaveType] = useState('Cuti Tahunan');
-  const [newLeaveStartDate, setNewLeaveStartDate] = useState('');
-  const [newLeaveEndDate, setNewLeaveEndDate] = useState('');
-  const [newLeaveReason, setNewLeaveReason] = useState('');
-  const [newLeaveHandover, setNewLeaveHandover] = useState('Rizky Ramadhan');
+  // Break Time Status
+  const [isBreakTaken, setIsBreakTaken] = useState(false);
 
   // Correction Form State
-  const [correctionDate, setCorrectionDate] = useState('');
+  const [correctionDate, setCorrectionDate] = useState('2025-03-24');
   const [correctionType, setCorrectionType] = useState('Lupa Tap-Out');
-  const [correctionTargetTime, setCorrectionTargetTime] = useState('17:30');
+  const [correctionTargetTime, setCorrectionTargetTime] = useState('16:30');
   const [correctionReason, setCorrectionReason] = useState('');
+  const [remainingCorrectionQuota, setRemainingCorrectionQuota] = useState(2);
 
-  // Toast Helper
+  // Overtime Form State
+  const [overtimeTitle, setOvertimeTitle] = useState('');
+  const [overtimeHours, setOvertimeHours] = useState('3.0');
+  const [overtimeDate, setOvertimeDate] = useState('2025-03-24');
+
+  // Overtime list
+  const [overtimeList, setOvertimeList] = useState<OvertimeItem[]>([
+    {
+      ticketNo: '#OT-202503-021',
+      title: 'Pemeliharaan Basis Data Core V2 & Migrasi Klaster DB',
+      date: 'Kamis, 20 Mar 2025',
+      hours: 3.0,
+      approver: 'Arya Wibowo',
+      status: 'APPROVED',
+      statusLabel: 'Disetujui Manager',
+    },
+  ]);
+
+  // Correction history list
+  const [correctionList, setCorrectionList] = useState<CorrectionItem[]>([
+    {
+      ticketNo: '#ADJ-2025-001',
+      type: 'Lupa Tap-Out (Dinas Luar Meeting SCBD)',
+      date: '12 Mar 2025',
+      revisedTime: '18:00 WIB',
+      reason: 'Meeting koordinasi klien hingga malam di SCBD Tower 2',
+      status: 'APPROVED',
+      statusLabel: 'Disetujui HR & Manager',
+    },
+  ]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Clock Ticker
+  // Clock ticker
   useEffect(() => {
-    const updateTime = () => {
+    const update = () => {
       const now = new Date();
-      setCurrentLiveTime(
-        now.toLocaleTimeString('id-ID', {
+      setLiveTime(
+        `${now.toLocaleTimeString('id-ID', {
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
           hour12: false,
-        })
+        })} WIB`
       );
-      setCurrentLiveDate(
+      setLiveDate(
         now.toLocaleDateString('id-ID', {
           weekday: 'long',
           day: 'numeric',
@@ -129,187 +162,102 @@ export default function EssAttendanceOverhaulPage() {
       );
     };
 
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Leave Requests dataset matching screenshot
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequestItem[]>([
-    {
-      ticketNo: '#LV-2025-014',
-      type: 'Cuti Tahunan',
-      dateRange: 'Senin, 17 Feb 2025',
-      duration: '1 Hari Kerja',
-      reason: 'Urusan Keluarga di Luar Kota',
-      handover: 'Rizky Ramadhan',
-      status: 'APPROVED_ALL',
-      statusLabel: 'Disetujui HR & Lead',
-    },
-    {
-      ticketNo: '#LV-2025-009',
-      type: 'Izin Sakit (Medical)',
-      hasAttachment: true,
-      dateRange: 'Rabu, 12 Feb 2025',
-      duration: '1 Hari Kerja',
-      reason: 'Demam & Flu Berat (RS Siloam, Surat Dokter Valid)',
-      handover: 'Handover Tim Support',
-      status: 'APPROVED_HR',
-      statusLabel: 'Disetujui HR',
-    },
-    {
-      ticketNo: '#LV-2025-004',
-      type: 'Cuti Bersama (Imlek)',
-      dateRange: 'Rabu, 29 Jan 2025',
-      duration: '1 Hari',
-      reason: 'Libur Resmi Cuti Bersama Nasional 2025',
-      handover: 'Sistem Terjadwal',
-      status: 'APPROVED_ALL',
-      statusLabel: 'Otomatis Disetujui',
-    },
-  ]);
+  // GPS Calibration simulation
+  const handleCalibrateGps = () => {
+    setIsCalibratingGps(true);
+    showToast('Mengalibrasi titik koordinat GPS dan akurasi biometrik...');
+    setTimeout(() => {
+      setIsCalibratingGps(false);
+      showToast('✓ Kalibrasi berhasil! Koordinat akurat (-6.2253°, 106.8091°), radius 18m valid.');
+    }, 800);
+  };
 
-  // Daily attendance dataset for Kalender & Log tab
-  const [attendanceLogs] = useState<DailyAttendanceLog[]>([
-    {
-      date: '28 Feb 2025',
-      dayName: 'Jumat',
-      shift: 'Pagi (08:30 - 17:30)',
-      clockIn: '08:16 WIB',
-      clockOut: '17:35 WIB',
-      workHours: '9j 19m',
-      location: 'SCBD Tower Lt. 18 (WiFi Core)',
-      status: 'ON_TIME',
-      statusLabel: 'Tepat Waktu',
-    },
-    {
-      date: '27 Feb 2025',
-      dayName: 'Kamis',
-      shift: 'Pagi (08:30 - 17:30)',
-      clockIn: '08:22 WIB',
-      clockOut: '17:40 WIB',
-      workHours: '9j 18m',
-      location: 'SCBD Tower Lt. 18 (Face ID)',
-      status: 'ON_TIME',
-      statusLabel: 'Tepat Waktu',
-    },
-    {
-      date: '26 Feb 2025',
-      dayName: 'Rabu',
-      shift: 'Pagi (08:30 - 17:30)',
-      clockIn: '08:41 WIB',
-      clockOut: '17:50 WIB',
-      workHours: '9j 09m',
-      location: 'SCBD Tower Lt. 18 (GPS Valid)',
-      status: 'LATE',
-      statusLabel: 'Terlambat (Toleransi)',
-    },
-    {
-      date: '25 Feb 2025',
-      dayName: 'Selasa',
-      shift: 'Pagi (08:30 - 17:30)',
-      clockIn: '08:14 WIB',
-      clockOut: '17:32 WIB',
-      workHours: '9j 18m',
-      location: 'SCBD Tower Lt. 18 (Face ID)',
-      status: 'ON_TIME',
-      statusLabel: 'Tepat Waktu',
-    },
-    {
-      date: '17 Feb 2025',
-      dayName: 'Senin',
-      shift: 'Reguler',
-      clockIn: '-',
-      clockOut: '-',
-      workHours: '0j 00m',
-      location: 'Pengajuan #LV-2025-014',
-      status: 'LEAVE',
-      statusLabel: 'Cuti Tahunan',
-    },
-  ]);
+  // Handle Check-out
+  const handlePerformCheckOut = () => {
+    const timeStr = `${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
+    setHasClockedOut(true);
+    setClockOutTimeStr(timeStr);
+    setIsCheckOutModalOpen(false);
+    showToast(`✓ Check-Out Berhasil dicatat (${timeStr})! Terima kasih atas dedikasi Anda hari ini.`);
 
-  // Handle Presensi Hari Ini submit
-  const handlePerformCheckIn = async (type: 'IN' | 'OUT') => {
     try {
-      setIsSubmitting(true);
-      const timeStr = `${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
-
-      if (type === 'IN') {
-        setHasClockedInToday(true);
-        setTodayClockInTime(timeStr);
-        showToast(`✓ Check-In Berhasil dicatat (${timeStr}) di SCBD Jakarta.`);
-      } else {
-        setTodayClockOutTime(timeStr);
-        showToast(`✓ Check-Out Berhasil dicatat (${timeStr}). Selamat beristirahat!`);
-      }
-
-      // Sync with attendance API and broadcast to Admin
-      await fetch('/api/v1/attendance', {
+      fetch('/api/v1/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employeeId: 'emp-user-1',
-          employeeName: 'Budi Pratama',
-          type: type === 'IN' ? 'CLOCK_IN' : 'CLOCK_OUT',
+          employeeId: 'NX-2021008',
+          employeeName: 'Rian Pratama, S.Kom',
+          type: 'CLOCK_OUT',
           time: timeStr,
-          location: 'Nexora Tower SCBD Jakarta',
+          location: 'HQ Jakarta — Pacific Tower SCBD Lt. 7',
         }),
       }).catch(() => {});
 
-      try {
-        const ch = new BroadcastChannel('nexora_live_sync');
-        ch.postMessage({ type: 'ATTENDANCE_RECORDED', employeeName: 'Budi Pratama', time: timeStr });
-        ch.close();
-      } catch {}
-
-      setIsCheckInModalOpen(false);
-    } catch {
-      showToast('Gagal memproses presensi.');
-    } finally {
-      setIsSubmitting(false);
-    }
+      const ch = new BroadcastChannel('nexora_live_sync');
+      ch.postMessage({ type: 'ATTENDANCE_RECORDED', employeeName: 'Rian Pratama', time: timeStr });
+      ch.close();
+    } catch {}
   };
 
-  // Submit Leave Request
-  const handleSubmitLeave = async (e: React.FormEvent) => {
+  // Handle Correction Submit
+  const handleCorrectionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLeaveStartDate) {
-      showToast('Harap tentukan tanggal cuti.');
+    if (remainingCorrectionQuota <= 0) {
+      showToast('Batas kuota koreksi mandiri bulan ini telah habis.');
       return;
     }
 
-    const newTicket: LeaveRequestItem = {
-      ticketNo: `#LV-2025-${Math.floor(100 + Math.random() * 900)}`,
-      type: newLeaveType,
-      dateRange: newLeaveStartDate + (newLeaveEndDate ? ` s/d ${newLeaveEndDate}` : ''),
-      duration: '1 Hari Kerja',
-      reason: newLeaveReason || 'Keperluan Pribadi',
-      handover: newLeaveHandover || 'Rizky Ramadhan',
+    const newTicket: CorrectionItem = {
+      ticketNo: `#ADJ-2025-00${Math.floor(2 + Math.random() * 8)}`,
+      type: `${correctionType} (${correctionTargetTime} WIB)`,
+      date: correctionDate,
+      revisedTime: `${correctionTargetTime} WIB`,
+      reason: correctionReason || 'Pengajuan koreksi presensi mandiri',
       status: 'PENDING',
-      statusLabel: 'Menunggu Review HR',
+      statusLabel: 'Menunggu Review Atasan',
     };
 
-    setLeaveRequests([newTicket, ...leaveRequests]);
-    setIsLeaveModalOpen(false);
-    setNewLeaveStartDate('');
-    setNewLeaveEndDate('');
-    setNewLeaveReason('');
+    setCorrectionList([newTicket, ...correctionList]);
+    setRemainingCorrectionQuota((prev) => Math.max(0, prev - 1));
+    setIsCorrectionModalOpen(false);
+    setCorrectionReason('');
+    showToast(`✓ Permohonan ${newTicket.ticketNo} berhasil diajukan ke HR Operations & Arya Wibowo.`);
+  };
 
-    showToast('✓ Pengajuan Izin/Cuti berhasil dikirim dan tersinkronisasi ke HR Admin.');
+  // Handle Overtime Submit
+  const handleOvertimeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newOT: OvertimeItem = {
+      ticketNo: `#OT-202503-0${Math.floor(22 + Math.random() * 30)}`,
+      title: overtimeTitle || 'Lembur Operasional Backend Release',
+      date: overtimeDate,
+      hours: parseFloat(overtimeHours),
+      approver: 'Arya Wibowo',
+      status: 'PENDING',
+      statusLabel: 'Menunggu Verifikasi',
+    };
 
-    // Broadcast to Notification engine
+    setOvertimeList([newOT, ...overtimeList]);
+    setIsOvertimeModalOpen(false);
+    setOvertimeTitle('');
+    showToast(`✓ Pengajuan lembur ${newOT.ticketNo} (${newOT.hours} Jam) berhasil diajukan!`);
+
     try {
       fetch('/api/v1/approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'Budi Pratama',
-          role: 'Software Engineer • Technology',
-          type: 'cuti',
-          title: `Pengajuan ${newTicket.type}`,
-          highlightType: newTicket.type,
-          detail: `${newTicket.duration} (${newTicket.dateRange})`,
-          quotaMeta: `Alasan: ${newTicket.reason}`,
+          name: 'Rian Pratama, S.Kom',
+          role: 'Lead Backend Architect',
+          type: 'lembur',
+          title: newOT.title,
+          highlightType: 'Lembur Operasional',
+          detail: `${newOT.hours} Jam • ${newOT.date}`,
         }),
       }).catch(() => {});
 
@@ -317,23 +265,6 @@ export default function EssAttendanceOverhaulPage() {
       ch.postMessage({ type: 'APPROVAL_SUBMITTED' });
       ch.close();
     } catch {}
-  };
-
-  // Submit Correction
-  const handleSubmitCorrection = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCorrectionModalOpen(false);
-    setCorrectionDate('');
-    setCorrectionReason('');
-    showToast('✓ Permohonan koreksi presensi berhasil diajukan ke HR Admin.');
-  };
-
-  // Download Rekap simulation
-  const handleDownloadRekap = () => {
-    showToast(`✓ Menyiapkan unduhan rekap presensi (${selectedPeriod})...`);
-    setTimeout(() => {
-      showToast(`✓ Rekap Presensi & Kehadiran (${selectedPeriod}) berhasil diunduh!`);
-    }, 800);
   };
 
   return (
@@ -348,88 +279,152 @@ export default function EssAttendanceOverhaulPage() {
 
       {/* LEFT SIDEBAR matching screenshot */}
       <aside className="w-full md:w-64 bg-white border-r border-slate-200/90 flex flex-col flex-shrink-0 justify-between p-4 sm:p-5 sticky top-0 md:h-screen z-30 shadow-2xs">
-        <div className="space-y-6">
-          {/* Logo brand matching screenshot */}
+        <div className="space-y-5">
+          {/* Logo brand */}
           <Link href="/ess" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-extrabold text-lg shadow-md shadow-blue-500/20 flex-shrink-0">
-              M
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-base shadow-sm shadow-blue-500/20 flex-shrink-0">
+              <span className="text-white font-black tracking-tight">❖</span>
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-extrabold text-sm text-slate-900 tracking-tight leading-snug group-hover:text-blue-600 transition-colors">
-                Nexora ESS
+                Nexora <span className="text-blue-600 font-bold">HRIS</span>
               </span>
               <span className="text-[11px] font-semibold text-slate-400 leading-tight">
-                HR Portal Karyawan
+                Portal Karyawan (ESS)
               </span>
             </div>
           </Link>
 
-          {/* Navigation Section */}
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-2">
-              MENU UTAMA
+          {/* Active Session Pill */}
+          <div className="px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 text-[11px] font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Sesi Aktif: NX-2021008</span>
+          </div>
+
+          {/* SECTION 1: UTAMA */}
+          <div className="space-y-1">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
+              UTAMA
             </p>
 
-            {/* Menu Items with subtle rounded border styling */}
-            <div className="space-y-1.5 border border-dashed border-blue-200/90 rounded-2xl p-1.5 bg-blue-50/20">
-              {/* Beranda / Ringkasan */}
-              <Link
-                href="/ess"
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white transition-all"
-              >
-                <LayoutDashboard className="w-4 h-4 text-slate-400" />
-                <span>Beranda / Ringkasan</span>
-              </Link>
+            <Link
+              href="/ess"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              <LayoutDashboard className="w-4 h-4 text-slate-400" />
+              <span>Beranda Saya</span>
+            </Link>
 
-              {/* Presensi & Kehadiran (ACTIVE) */}
-              <Link
-                href="/ess/attendance"
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-white text-blue-700 shadow-xs border border-blue-200/80 transition-all"
-              >
-                <Clock className="w-4 h-4 text-blue-600" />
-                <span>Presensi & Kehadiran</span>
-              </Link>
-            </div>
+            {/* Presensi & Absensi (ACTIVE matching screenshot) */}
+            <Link
+              href="/ess/attendance"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-900 transition-all"
+            >
+              <Fingerprint className="w-4 h-4 text-slate-800" />
+              <span>Presensi & Absensi</span>
+            </Link>
 
-            <div className="space-y-1.5 border border-dashed border-blue-200/90 rounded-2xl p-1.5 bg-blue-50/20 mt-2">
-              {/* Profil Saya */}
-              <Link
-                href="/admin/profile"
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white transition-all"
-              >
-                <User className="w-4 h-4 text-slate-400" />
-                <span>Profil Saya</span>
-              </Link>
+            <Link
+              href="/ess/leave"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              <CalendarDays className="w-4 h-4 text-slate-400" />
+              <span>Cuti & Izin Saya</span>
+            </Link>
 
-              {/* Pengaturan Akun */}
-              <Link
-                href="/admin/profile/preferences"
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white transition-all"
-              >
-                <Settings className="w-4 h-4 text-slate-400" />
-                <span>Pengaturan Akun</span>
-              </Link>
-            </div>
+            <Link
+              href="/ess/payroll"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              <CreditCard className="w-4 h-4 text-slate-400" />
+              <span>Slip Gaji & Kompensasi</span>
+            </Link>
+          </div>
+
+          {/* SECTION 2: KARIR & PENGEMBANGAN */}
+          <div className="space-y-1 pt-1">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
+              KARIR & PENGEMBANGAN
+            </p>
+
+            <button
+              type="button"
+              onClick={() => showToast('Membuka Modul Kinerja & KPI Pribadi...')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <TrendingUp className="w-4 h-4 text-slate-400" />
+              <span>Kinerja & KPI Pribadi</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => showToast('Membuka Pelatihan & Modul Mandiri...')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <GraduationCap className="w-4 h-4 text-slate-400" />
+              <span>Pelatihan & Modul</span>
+            </button>
+          </div>
+
+          {/* SECTION 3: DOKUMEN & BANTUAN */}
+          <div className="space-y-1 pt-1">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
+              DOKUMEN & BANTUAN
+            </p>
+
+            <button
+              type="button"
+              onClick={() => showToast('Membuka Arsip Formulir & Dokumen Kehadiran...')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <FolderArchive className="w-4 h-4 text-slate-400" />
+              <span>Arsip & Formulir</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => showToast('Kontak HR Helpdesk: Ext. 402 / helpdesk-hr@nexora.co.id')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <Headphones className="w-4 h-4 text-slate-400" />
+              <span>Bantuan & Kontak HR</span>
+            </button>
           </div>
         </div>
 
-        {/* Bottom Status Koneksi Box */}
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-          <div>
-            <p className="text-[10px] text-slate-400 font-medium">Status Koneksi</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[11px] font-bold text-slate-700">Tersinkronisasi</span>
-            </div>
+        {/* BOTTOM CARD: PUSAT DUKUNGAN */}
+        <div className="mt-6 p-4 rounded-2xl bg-blue-50/60 border border-blue-200/70 text-xs space-y-2">
+          <div className="flex items-center gap-2 text-blue-900 font-bold">
+            <HelpCircle className="w-4 h-4 text-blue-600" />
+            <span>Pusat Dukungan</span>
           </div>
-          <button
-            type="button"
-            onClick={() => showToast('Koneksi WebSocket & Database Master HRIS Aktif.')}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-            title="Info Koneksi"
-          >
-            <HelpCircle className="w-4 h-4" />
-          </button>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Ada kendala data kehadiran atau klaim?
+          </p>
+          <div className="pt-1 space-y-1 font-semibold text-[11px]">
+            <a
+              href="#sop"
+              onClick={(e) => {
+                e.preventDefault();
+                showToast('Membuka SOP Kepegawaian & Panduan Absensi...');
+              }}
+              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+            >
+              <span>SOP Kepegawaian</span>
+              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </a>
+            <a
+              href="#tiket"
+              onClick={(e) => {
+                e.preventDefault();
+                showToast('Membuka Tiket Bantuan HR Operations...');
+              }}
+              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+            >
+              <span>Tiket Helpdesk HR</span>
+              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </a>
+          </div>
         </div>
       </aside>
 
@@ -437,919 +432,606 @@ export default function EssAttendanceOverhaulPage() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOP HEADER BAR matching screenshot */}
         <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
-          {/* Left Header Pills */}
-          <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1">
-            {/* Company Pill */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50/70 border border-blue-200/70 text-blue-700 text-xs font-semibold flex-shrink-0">
-              <Building2 className="w-3.5 h-3.5 text-blue-600" />
-              <span>PT Nexora Solusi Nusantara</span>
-            </div>
-
-            {/* Shift Pill */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50/70 border border-emerald-200/70 text-emerald-700 text-xs font-semibold flex-shrink-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>Shift Pagi: 08:30 - 17:30 WIB</span>
-            </div>
+          {/* Search Input Box */}
+          <div className="relative w-72 sm:w-96 max-w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
+              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+            />
           </div>
 
-          {/* Right Controls */}
+          {/* Right Header Controls */}
           <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
-            {/* Date display */}
-            <div className="hidden lg:flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span>{currentLiveDate || 'Rabu, 24 Mei 2024'}</span>
+            <div className="hidden lg:flex items-center gap-2 text-xs text-slate-600">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <div className="flex flex-col text-[11px] leading-tight text-left">
+                <span className="font-bold text-slate-800">Senin, 24</span>
+                <span className="text-slate-500 font-medium">Maret 2025</span>
+              </div>
             </div>
 
-            {/* Real-time Notification Bell */}
             <NotificationBellDropdown portal="ess" />
 
-            {/* User Profile Pill matching screenshot */}
             <Link
               href="/admin/profile"
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
-              title="Profil Pengguna"
             >
-              <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shadow-2xs flex-shrink-0 bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120"
-                  alt="Budi Pratama"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">
+                RP
               </div>
               <div className="hidden sm:flex flex-col text-left leading-tight">
-                <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
-                  Budi Pratama
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
+                    Rian Pratama, S.Kom
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-[9px] font-bold text-slate-600">
+                    Karyawan (ESS)
+                  </span>
+                </div>
                 <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                  Software Engineer
+                  Lead Backend Architect • NX-2021008
                 </span>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
             </Link>
           </div>
         </header>
 
-        {/* PAGE CONTENT CONTAINER */}
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto">
+        {/* PAGE CONTENT CONTAINER (Generous bottom padding pb-36 to prevent ANY cut-off!) */}
+        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto pb-36">
           {/* HEADER SECTION matching screenshot */}
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-2">
-            <div>
-              {/* Breadcrumb with Portal ESS pill */}
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-1.5">
-                <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/80 font-bold text-[11px]">
-                  Portal ESS
-                </span>
-                <span className="text-slate-400">&gt;</span>
-                <span className="text-slate-700 font-semibold">Presensi & Kehadiran</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+            <div className="space-y-1.5">
+              {/* Breadcrumb matching screenshot */}
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                <Link href="/ess" className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>Portal Karyawan (ESS)</span>
+                </Link>
+                <span>/</span>
+                <span className="text-slate-800 font-bold">Presensi &amp; Absensi Mandiri</span>
               </div>
 
-              {/* Title + Active Employee Badge */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                  Presensi & Kehadiran
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
-                  Karyawan Aktif
+              {/* Title matching screenshot */}
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                Presensi &amp; Waktu Kerja Mandiri
+              </h1>
+
+              {/* Status Pill on its own line matching screenshot */}
+              <div className="pt-0.5">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Status: Aktif Bekerja (Tercatat 07:51 WIB)</span>
                 </span>
               </div>
 
-              <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                Kelola riwayat absensi, tinjau kalender kerja bulanan, rincian jam kerja akumulatif, dan status kepatuhan shift reguler Anda.
+              {/* Subtitle */}
+              <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
+                Kelola catatan jam kerja, verifikasi check-in/out biometrik &amp; geofencing kantor, klaim lembur (SPL), serta ajukan dispensasi koreksi kehadiran secara mandiri.
               </p>
             </div>
 
-            {/* Top Right Actions matching screenshot */}
-            <div className="flex flex-wrap items-center gap-2.5 flex-shrink-0">
-              {/* Periode Kerja Dropdown */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all active:scale-98"
-                >
-                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Periode Kerja: {selectedPeriod}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-
-                {isPeriodDropdownOpen && (
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1.5 z-40 text-xs">
-                    {['Februari 2025', 'Januari 2025', 'Maret 2025'].map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => {
-                          setSelectedPeriod(p);
-                          setIsPeriodDropdownOpen(false);
-                          showToast(`Menampilkan data presensi periode: ${p}`);
-                        }}
-                        className={`w-full text-left px-3.5 py-2 font-semibold transition-colors ${
-                          selectedPeriod === p
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Unduh Rekap Button */}
+            {/* Top Right Action Buttons matching screenshot */}
+            <div className="flex items-center gap-2.5 flex-shrink-0">
+              {/* Ajukan Koreksi Presensi (White Button) */}
               <button
                 type="button"
-                onClick={handleDownloadRekap}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all active:scale-98"
+                onClick={() => setIsCorrectionModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs transition-all active:scale-95"
               >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span>Unduh Rekap</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <Edit3 className="w-4 h-4 text-slate-500" />
+                <span>Ajukan Koreksi Presensi</span>
               </button>
 
-              {/* Ajukan Izin / Cuti Button */}
+              {/* Catat Presensi (Check-Out) (Solid Blue Button) */}
               <button
                 type="button"
-                onClick={() => setIsLeaveModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 text-xs font-bold shadow-2xs transition-all active:scale-98"
+                onClick={() => setIsCheckOutModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Ajukan Izin / Cuti</span>
-              </button>
-
-              {/* Presensi Hari Ini (Primary Solid Blue Button) */}
-              <button
-                type="button"
-                onClick={() => setIsCheckInModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-98"
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>Presensi Hari Ini</span>
+                <Clock className="w-4 h-4" />
+                <span>Catat Presensi (Check-Out)</span>
               </button>
             </div>
           </div>
 
           {/* SECTION 1: 4 KEY METRIC CARDS matching screenshot */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {/* Card 1: Hari Kerja Efektif */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-4">
+            {/* Card 1: Kehadiran Bulan Ini */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600">Hari Kerja Efektif</span>
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-slate-600">Kehadiran Bulan Ini</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Calendar className="w-4 h-4" />
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl font-black text-slate-900 tracking-tight">20</span>
-                  <span className="text-xs font-bold text-slate-500">/ 20 Hari Kerja</span>
-                </div>
-              </div>
-
-              {/* Badges footer */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  18 Hadir
-                </span>
-                <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  1 Cuti
-                </span>
-                <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                  1 Izin
-                </span>
-                <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                  • 0 Alpa
-                </span>
-              </div>
-            </div>
-
-            {/* Card 2: Akumulasi Jam Kerja */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600">Akumulasi Jam Kerja</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div>
-                <span className="text-3xl font-black text-slate-900 tracking-tight">
-                  168j 30m
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-slate-500 font-medium">Target: 160 Jam</span>
-                <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Efisiensi 105%
-                </span>
-              </div>
-            </div>
-
-            {/* Card 3: Ketepatan Waktu (Punctuality) */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600">Ketepatan Waktu (Punctuality)</span>
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">94.4%</span>
-                <span className="inline-flex items-center text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">
-                  ↗ +1.8%
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium pt-1">
-                <span>17 Tepat Waktu</span>
-                <span>•</span>
-                <span>1 Terlambat (Toleransi)</span>
-              </div>
-            </div>
-
-            {/* Card 4: Rata-rata Punch Time */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600">Rata-rata Punch Time</span>
-                <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div>
-                <span className="text-2xl font-black text-slate-900 tracking-tight">08:16</span>
-                <span className="text-xs text-slate-400 font-semibold mx-1">s/d</span>
-                <span className="text-2xl font-black text-slate-900 tracking-tight">17:35</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">WIB</span>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-slate-500 font-medium">Shift: Regular (08:30)</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>+14m Lebih Cepat</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 2: INTERACTIVE TABS BAR matching screenshot */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-              {/* Tab 1: Kalender & Log Presensi */}
-              <button
-                type="button"
-                onClick={() => setActiveTab('calendar')}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  activeTab === 'calendar'
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Kalender & Log Presensi</span>
-              </button>
-
-              {/* Tab 2: Izin & Cuti Non-Kerja */}
-              <button
-                type="button"
-                onClick={() => setActiveTab('leave')}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  activeTab === 'leave'
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
-                }`}
-              >
-                <CalendarDays className="w-4 h-4" />
-                <span>Izin & Cuti Non-Kerja</span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    activeTab === 'leave'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-blue-50 text-blue-700 border border-blue-200'
-                  }`}
-                >
-                  11 Hari Tersisa
-                </span>
-              </button>
-
-              {/* Tab 3: Pengajuan Koreksi Presensi */}
-              <button
-                type="button"
-                onClick={() => setActiveTab('correction')}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  activeTab === 'correction'
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
-                }`}
-              >
-                <Briefcase className="w-4 h-4" />
-                <span>Pengajuan Koreksi Presensi</span>
-              </button>
-            </div>
-
-            {/* Right Status Indicator matching screenshot */}
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50/70 border border-emerald-200/70 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>Sinkronisasi Hak Cuti HRIS Terverifikasi</span>
-            </div>
-          </div>
-
-          {/* SECTION 3: 4 QUOTA / LEAVE CARDS matching screenshot */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {/* Card 1: Cuti Tahunan 2025 */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Cuti Tahunan 2025</span>
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Umbrella className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div>
-                <span className="text-2xl font-black text-slate-900">11</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">/ 12 Hari</span>
-              </div>
-
-              {/* Progress Line */}
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-blue-600 h-full rounded-full w-[91%]" />
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span>1 Hari Terpakai</span>
-                <span>Exp: 31 Des 2025</span>
-              </div>
-            </div>
-
-            {/* Card 2: Cuti Bersama (Nasional) */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Cuti Bersama (Nasional)</span>
-                <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                  <Landmark className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div>
-                <span className="text-2xl font-black text-slate-900">4</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">Hari Otomatis</span>
-              </div>
-
-              <div className="w-full bg-slate-100 h-1.5 rounded-full" />
-
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span>Kalender SKB 3 Menteri</span>
-                <span className="text-emerald-700 font-bold">Terjadwal</span>
-              </div>
-            </div>
-
-            {/* Card 3: Izin Sakit (Medical Leave) */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Izin Sakit (Medical Leave)</span>
-                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <FileText className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div>
-                <span className="text-2xl font-black text-slate-900">1</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">Hari Digunakan</span>
-              </div>
-
-              <div className="w-full bg-slate-100 h-1.5 rounded-full" />
-
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span>Plafon Rawat Jalan</span>
-                <span>Lampiran RS/Klinik</span>
-              </div>
-            </div>
-
-            {/* Card 4: Dispensasi & Izin Khusus */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Dispensasi & Izin Khusus</span>
-                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <FileCheck className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div>
-                <span className="text-2xl font-black text-slate-900">Tersedia</span>
-              </div>
-
-              <p className="text-[11px] text-slate-500 font-medium truncate">
-                Nikah (3h), Duka Cita (2h), Istri Lahiran (2h), Ibadah
-              </p>
-
-              <div className="flex items-center justify-between text-[11px] pt-0.5">
-                <span className="text-amber-700 font-bold">Tanpa Potong Cuti</span>
-                <span className="text-slate-400">Ajukan Online</span>
-              </div>
-            </div>
-          </div>
-
-          {/* TAB 1 & 2: TABLE "Riwayat Pengajuan Izin & Cuti (Leave Requests)" matching screenshot */}
-          {activeTab !== 'correction' && (
-            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden space-y-4">
-              {/* Table Header Section matching screenshot */}
-              <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-baseline justify-between">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-extrabold text-slate-900">
-                      Riwayat Pengajuan Izin & Cuti (Leave Requests)
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700">
-                      Tahun 2025
-                    </span>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">21</span>
+                  <span className="text-slate-400 font-bold text-2xl mx-1">/</span>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">21</span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  100% Sempurna
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>0 Terlambat • 0 Alpha</span>
+              </div>
+
+              {/* Solid blue accent bar at bottom matching screenshot */}
+              <div className="pt-0.5">
+                <div className="w-28 h-1 bg-blue-600 rounded-full" />
+              </div>
+            </div>
+
+            {/* Card 2: Jam Kerja Akumulasi */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Jam Kerja Akumulasi</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-3xl font-black text-slate-900 tracking-tight">168.5</span>
+                <span className="text-xs font-bold text-slate-500 ml-1.5">Jam</span>
+              </div>
+
+              <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
+                <span className="font-bold">↑ +8.5 Jam</span>
+                <span className="text-slate-500 font-normal">Waktu Produktif / Lembur</span>
+              </div>
+
+              {/* Solid blue accent bar at bottom matching screenshot */}
+              <div className="pt-0.5">
+                <div className="w-28 h-1 bg-blue-600 rounded-full" />
+              </div>
+            </div>
+
+            {/* Card 3: Status Check-In Hari Ini */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Status Check-In Hari Ini</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <LogIn className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-3xl font-black text-slate-900 tracking-tight">07:51</span>
+                <span className="text-xs font-bold text-slate-500 ml-1.5">WIB</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium truncate">
+                <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                <span className="truncate">Biometrik Mesin Lt. 7 HQ SCBD</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-0.5">
+                <span className="text-slate-500 font-medium">Target: 08:30 WIB</span>
+                <span className="text-emerald-700 font-bold text-[11px]">39 Menit Lebih Awal</span>
+              </div>
+            </div>
+
+            {/* Card 4: Sisa Kuota Koreksi Mandiri */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Sisa Kuota Koreksi Mandiri</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Ticket className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {remainingCorrectionQuota}
+                  </span>
+                  <span className="text-slate-400 font-bold text-2xl mx-1">/</span>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">3</span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  Kuota Tersedia
+                </span>
+              </div>
+
+              <div className="text-[11px] text-slate-500 font-medium">
+                @ Sesuai PKB HR Pasal 14
+              </div>
+
+              {/* Segmented bar matching screenshot (2/3 blue, 1/3 gray) */}
+              <div className="pt-0.5">
+                <div className="w-28 grid grid-cols-3 gap-1 h-1">
+                  <div className="bg-blue-600 rounded-full h-full" />
+                  <div className="bg-blue-600 rounded-full h-full" />
+                  <div className="bg-slate-200 rounded-full h-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 2: 2-COLUMN LAYOUT (LEFT 8 COLS, RIGHT 4 COLS) matching screenshot */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* LEFT COLUMN (8 COLS): LIVE ATTENDANCE & GEOLOCATION CARD */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* MAIN CARD: Presensi Biometrik & Geofence SCBD matching screenshot */}
+              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-6">
+                {/* Header Row: Live Clock, Status, and Work Model */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <span className="text-xl sm:text-2xl font-black font-mono text-slate-900 tracking-tight">
+                        {liveTime}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Sinkronisasi GPS Server Aktif</span>
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {liveDate} • Waktu Indonesia Barat (UTC+7)
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                    Daftar permohonan dispensasi kehadiran kerja, status persetujuan berjenjang Atasan & Divisi HR.
-                  </p>
+
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-xs font-bold text-slate-700 self-start sm:self-auto">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>WFO (Work From Office)</span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* Geolocation Radius Box matching screenshot */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-extrabold text-slate-900">
+                          HQ Jakarta — Pacific Tower SCBD Lt. 7
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                          Area Valid (Radius 18m)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Presensi biometrik &amp; geofence terverifikasi pada titik koordinat{' '}
+                        <strong className="text-slate-800 font-mono">-6.2253°, 106.8091°</strong>{' '}
+                        (Akurasi Tinggi ±3m).
+                      </p>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => setIsLeaveModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-all active:scale-95"
+                    disabled={isCalibratingGps}
+                    onClick={handleCalibrateGps}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-2xs transition-all active:scale-95 flex-shrink-0 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isCalibratingGps ? 'animate-spin' : ''}`} />
+                    <span>Kalibrasi Lokasi</span>
+                  </button>
+                </div>
+
+                {/* 3-Grid Shift Details matching screenshot */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                  {/* Shift Ditugaskan */}
+                  <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 space-y-1">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
+                      <span>Shift Ditugaskan</span>
+                      <Calendar className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-900 leading-snug">
+                      Reguler Ramadhan 1446H
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      08:30 - 16:30 WIB (7 Jam Efektif)
+                    </p>
+                  </div>
+
+                  {/* Waktu Masuk (Check-In) */}
+                  <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 space-y-1">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
+                      <span>Waktu Masuk (Check-In)</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-base font-black font-mono text-emerald-600">
+                        07:51:20 WIB
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700">(Tepat Waktu)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Terminal ID: BIO-SCBD-07A
+                    </p>
+                  </div>
+
+                  {/* Waktu Pulang (Check-Out) */}
+                  <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 space-y-1">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
+                      <span>Waktu Pulang (Check-Out)</span>
+                      <Clock className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-base font-black font-mono text-slate-900">
+                      {hasClockedOut ? clockOutTimeStr : '-- : -- : -- WIB'}
+                    </p>
+                    <p className="text-[11px] text-amber-700 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span>{hasClockedOut ? 'Selesai Bekerja' : 'Buka mulai pukul 16:30 WIB'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Additional Action Pills matching screenshot */}
+                <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBreakTaken(true);
+                      showToast('✓ Jam istirahat (12:00 - 13:00 WIB) berhasil dicatat ke sistem.');
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                      isBreakTaken
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <Utensils className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Catat Jam Istirahat (12:00 - 13:00)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsExternalVisitModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-all"
+                  >
+                    <Navigation className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Kunjungan Kantor Eksternal</span>
+                  </button>
+                </div>
+
+                {/* Bottom Status Bar matching screenshot */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+                  <span className="font-medium">
+                    {hasClockedOut
+                      ? '✓ Anda telah menyelesaikan seluruh sesi kerja hari ini.'
+                      : 'Check-out mandiri dinonaktifkan hingga shift berakhir.'}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsCheckOutModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-bold text-xs transition-all active:scale-95 self-start sm:self-auto"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Check-Out Mandiri</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN (4 COLS): LEMBUR SPL & PENGAJUAN KOREKSI ABSENSI (Full unclipped content!) */}
+            <div className="lg:col-span-4 space-y-6 flex flex-col">
+              {/* CARD 1: LEMBUR (SPL) TERKINI matching screenshot */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Clock3 className="w-4 h-4 text-blue-600" />
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Lembur (SPL) Terkini
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    Maret 2025
+                  </span>
+                </div>
+
+                {/* Recent Overtime List */}
+                <div className="space-y-3">
+                  {overtimeList.map((ot) => (
+                    <div key={ot.ticketNo} className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-blue-600 text-xs">
+                          {ot.ticketNo}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {ot.statusLabel}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 leading-snug">
+                        {ot.title}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {ot.date} • {ot.hours} Jam • Penyetuju: {ot.approver}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ESTIMASI LEMBUR PAYROLL Blue Box matching screenshot */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white shadow-sm flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">
+                      ESTIMASI LEMBUR PAYROLL
+                    </p>
+                    <p className="text-2xl font-black font-mono tracking-tight text-white">
+                      Rp 1.150.000
+                    </p>
+                    <p className="text-[10px] text-blue-100/80">
+                      Dicairkan pada Payroll 28 Mar 2025
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-white/10 text-white flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                </div>
+
+                {/* Ajukan Form Lembur Baru Link Button */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsOvertimeModalOpen(true)}
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-blue-200 text-xs font-bold text-blue-600 hover:bg-blue-50/60 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Buat Pengajuan Baru</span>
+                    <span>Ajukan Form Lembur Baru</span>
                   </button>
                 </div>
               </div>
 
-              {/* Table Grid matching screenshot */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-5 whitespace-nowrap">NO. TIKET</th>
-                      <th className="py-3 px-4 whitespace-nowrap">TIPE PERMOHONAN</th>
-                      <th className="py-3 px-4 whitespace-nowrap">RENTANG TANGGAL</th>
-                      <th className="py-3 px-4 whitespace-nowrap">DURASI</th>
-                      <th className="py-3 px-4 whitespace-nowrap">ALASAN & DELEGASI HANDOVER</th>
-                      <th className="py-3 px-4 whitespace-nowrap">STATUS APPROVAL</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">AKSI</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
-                    {leaveRequests.map((item) => (
-                      <tr key={item.ticketNo} className="hover:bg-slate-50/60 transition-colors">
-                        {/* No Tiket (Blue Monospace) */}
-                        <td className="py-4 px-5 whitespace-nowrap">
-                          <span className="font-mono font-bold text-blue-600">
-                            {item.ticketNo}
-                          </span>
-                        </td>
-
-                        {/* Tipe Permohonan */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                            <span>{item.type}</span>
-                            {item.hasAttachment && (
-                              <span title="Terdapat lampiran dokumen resmi">
-                                <Paperclip className="w-3.5 h-3.5 text-blue-500 ml-1" />
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Rentang Tanggal */}
-                        <td className="py-4 px-4 whitespace-nowrap font-medium text-slate-700">
-                          {item.dateRange}
-                        </td>
-
-                        {/* Durasi (Badge) */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            {item.duration}
-                          </span>
-                        </td>
-
-                        {/* Alasan & Delegasi Handover */}
-                        <td className="py-4 px-4 min-w-[220px]">
-                          <p className="font-semibold text-slate-800 leading-tight">
-                            {item.reason}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            Handover: <strong className="text-slate-600">{item.handover}</strong>
-                          </p>
-                        </td>
-
-                        {/* Status Approval */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          {item.status === 'APPROVED_ALL' || item.status === 'APPROVED_HR' ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              <span>{item.statusLabel}</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                              <span>{item.statusLabel}</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Aksi (Document Receipt Icon) */}
-                        <td className="py-4 px-4 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              showToast(`Detail Tiket ${item.ticketNo}: ${item.type} (${item.dateRange}) - ${item.statusLabel}`)
-                            }
-                            className="p-1.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="Lihat Detail Dokumen"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 1 ADDITIONAL: DETAIL KALENDER & LOG HARIAN PRESENSI */}
-          {activeTab === 'calendar' && (
-            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden space-y-4">
-              <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">
-                    Log Presensi Harian — {selectedPeriod}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Data rekaman kehadiran biometrik, geolocation GPS, dan kepatuhan jam kerja reguler.
-                  </p>
-                </div>
-                <span className="text-xs font-semibold text-slate-500">
-                  Total Hari Kerja: <strong>20 Hari</strong>
-                </span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-5 whitespace-nowrap">TANGGAL</th>
-                      <th className="py-3 px-4 whitespace-nowrap">SHIFT JADWAL</th>
-                      <th className="py-3 px-4 whitespace-nowrap">JAM MASUK</th>
-                      <th className="py-3 px-4 whitespace-nowrap">JAM PULANG</th>
-                      <th className="py-3 px-4 whitespace-nowrap">TOTAL JAM</th>
-                      <th className="py-3 px-4 whitespace-nowrap">LOKASI & VERIFIKASI</th>
-                      <th className="py-3 px-4 whitespace-nowrap">STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {attendanceLogs.map((log, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3.5 px-5 whitespace-nowrap">
-                          <span className="font-bold text-slate-900">{log.date}</span>
-                          <span className="text-[10px] text-slate-400 ml-1.5">({log.dayName})</span>
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-600">
-                          {log.shift}
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap font-mono font-bold text-slate-800">
-                          {log.clockIn}
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap font-mono font-bold text-slate-800">
-                          {log.clockOut}
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap font-semibold text-blue-700">
-                          {log.workHours}
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 text-[11px]">
-                          {log.location}
-                        </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {log.status === 'ON_TIME' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>{log.statusLabel}</span>
-                            </span>
-                          ) : log.status === 'LATE' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              <Clock className="w-3 h-3" />
-                              <span>{log.statusLabel}</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              <Umbrella className="w-3 h-3" />
-                              <span>{log.statusLabel}</span>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: PENGAJUAN KOREKSI PRESENSI */}
-          {activeTab === 'correction' && (
-            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-6 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">
-                    Pengajuan Koreksi Presensi (Attendance Adjustment)
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Ajukan koreksi jika terdapat kegagalan tap-in/tap-out karena anomali mesin, lupa absen, atau penugasan dinas luar.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCorrectionModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition-all active:scale-95 self-start sm:self-auto"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Koreksi Baru</span>
-                </button>
-              </div>
-
-              {/* Information Alert */}
-              <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 text-xs text-blue-800 space-y-1">
-                <p className="font-bold flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <span>Kebijakan Koreksi Kehadiran Nexora</span>
-                </p>
-                <p className="text-[11px] text-blue-700 leading-relaxed">
-                  Setiap pengajuan koreksi presensi wajib melampirkan alasan jelas dan akan diteruskan ke Line Manager & HR Operations untuk diverifikasi. Maksimal pengajuan koreksi adalah 3 hari kerja setelah tanggal kejadian.
-                </p>
-              </div>
-
-              {/* Sample Past Corrections List */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-700">Riwayat Pengajuan Koreksi Bulan Ini</h4>
-                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-blue-600">#ADJ-2025-003</span>
-                      <span className="font-bold text-slate-800">Lupa Tap-Out (Dinas Luar Meeting Klien)</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      Tanggal: 14 Feb 2025 • Target Jam Pulang: 18:00 WIB • Atasan: Rina Wijaya
-                    </p>
+              {/* CARD 2: PENGAJUAN KOREKSI ABSENSI (THE ONE THAT WAS CLIPPED IN SCREENSHOT, NOW FULLY UNCLIPPED!) */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Ticket className="w-4 h-4 text-blue-600" />
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Pengajuan Koreksi Absensi
+                    </h3>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 self-start sm:self-center">
-                    ✓ Disetujui HR
+                  <span className="text-xs font-semibold text-slate-500">
+                    Sisa {remainingCorrectionQuota} Kuota
                   </span>
                 </div>
+
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Ajukan permohonan revisi kehadiran jika terdapat kendala mesin biometrik, lupa tap-in/out, atau tugas dinas luar.
+                </p>
+
+                {/* Complete History List of Adjustments */}
+                <div className="space-y-3">
+                  {correctionList.map((adj) => (
+                    <div
+                      key={adj.ticketNo}
+                      className="p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/50 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-blue-600 text-xs">
+                          {adj.ticketNo}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            adj.status === 'APPROVED'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          {adj.statusLabel}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-900">{adj.type}</p>
+                      <p className="text-[11px] text-slate-500">
+                        Tanggal: {adj.date} • Waktu Revisi: {adj.revisedTime} WIB
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Policy Rules */}
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-[11px] text-slate-600 space-y-1">
+                  <p className="font-bold text-slate-800">Ketentuan Koreksi Absensi:</p>
+                  <p>• Maksimal 3 kali koreksi per periode bulan berjalan.</p>
+                  <p>• Wajib disertai alasan objektif dan persetujuan atasan langsung.</p>
+                </div>
+
+                {/* Trigger Button */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCorrectionModalOpen(true)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95 text-center flex items-center justify-center gap-2"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Ajukan Koreksi Sekarang</span>
+                  </button>
+                </div>
               </div>
             </div>
-          )}
+          </div>
         </main>
       </div>
 
-      {/* MODAL 1: PRESENSI HARI INI (CHECK-IN / CHECK-OUT) */}
-      {isCheckInModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-5 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
-                    Presensi Kehadiran Mandiri
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Shift Pagi (08:30 - 17:30 WIB)</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCheckInModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Live Clock Card */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-center shadow-md">
-              <p className="text-xs font-semibold text-blue-100 uppercase tracking-wider">
-                {currentLiveDate}
-              </p>
-              <h2 className="text-4xl font-black tracking-tight mt-1 font-mono">
-                {currentLiveTime || '08:16:00'}
-              </h2>
-              <p className="text-[11px] text-blue-100/80 mt-1">
-                Waktu Indonesia Barat (WIB • GMT+7)
-              </p>
-            </div>
-
-            {/* Geolocation Radius Status */}
-            <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-emerald-900">
-                  Dalam Radius Resmi Kantor (25m)
-                </p>
-                <p className="text-[11px] text-emerald-700 truncate">
-                  Nexora Tower SCBD Jakarta • Geofencing Valid
-                </p>
-              </div>
-            </div>
-
-            {/* Status Record */}
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase">Jam Masuk (In)</p>
-                <p className="font-mono font-bold text-slate-900 text-sm mt-0.5">
-                  {hasClockedInToday ? todayClockInTime : 'Belum Tap-In'}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase">Jam Pulang (Out)</p>
-                <p className="font-mono font-bold text-slate-900 text-sm mt-0.5">
-                  {todayClockOutTime}
-                </p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handlePerformCheckIn('IN')}
-                className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-1.5"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>Check-In Pagi</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handlePerformCheckIn('OUT')}
-                className="py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-1.5"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Clock className="w-4 h-4" />
-                    <span>Check-Out Sore</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: AJUKAN IZIN / CUTI */}
-      {isLeaveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
-                  <CalendarDays className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
-                    Pengajuan Izin &amp; Cuti Baru
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Hak Saldo Cuti Tersedia: 11 Hari</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsLeaveModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitLeave} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Kategori Permohonan
-                </label>
-                <select
-                  value={newLeaveType}
-                  onChange={(e) => setNewLeaveType(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  <option value="Cuti Tahunan">Cuti Tahunan (Potong Saldo 12 Hari)</option>
-                  <option value="Izin Sakit (Medical)">Izin Sakit (Lampiran Surat Dokter)</option>
-                  <option value="Cuti Menikah">Cuti Menikah (3 Hari Khusus)</option>
-                  <option value="Izin Duka Cita">Izin Duka Cita (2 Hari Khusus)</option>
-                  <option value="Izin Kepentingan Pribadi">Izin Kepentingan Pribadi</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tanggal Mulai</label>
-                  <input
-                    type="date"
-                    required
-                    value={newLeaveStartDate}
-                    onChange={(e) => setNewLeaveStartDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tanggal Selesai</label>
-                  <input
-                    type="date"
-                    value={newLeaveEndDate}
-                    onChange={(e) => setNewLeaveEndDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Penerima Delegasi Pekerjaan (Handover)
-                </label>
-                <input
-                  type="text"
-                  value={newLeaveHandover}
-                  onChange={(e) => setNewLeaveHandover(e.target.value)}
-                  placeholder="Nama rekan kerja handover..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Alasan / Keterangan Izin
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={newLeaveReason}
-                  onChange={(e) => setNewLeaveReason(e.target.value)}
-                  placeholder="Jelaskan keperluan izin atau cuti secara detail..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsLeaveModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
-                >
-                  Kirim Pengajuan Cuti
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: PENGAJUAN KOREKSI PRESENSI */}
-      {isCorrectionModalOpen && (
+      {/* MODAL 1: CHECK-OUT MANDIRI */}
+      {isCheckOutModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
-                  <Briefcase className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
-                    Koreksi Presensi Mandiri
+                    Catat Presensi Pulang (Check-Out)
                   </h3>
-                  <p className="text-[11px] text-slate-400">Pengajuan revisi log kehadiran</p>
+                  <p className="text-[11px] text-slate-400">HQ Jakarta SCBD Lt. 7</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCheckOutModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-center shadow-md">
+              <p className="text-xs font-semibold text-blue-100 uppercase tracking-wider">{liveDate}</p>
+              <h2 className="text-3xl font-black font-mono tracking-tight mt-1">{liveTime}</h2>
+              <p className="text-[11px] text-blue-100/80 mt-1">Status Geofencing: Valid (Radius 18m)</p>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed text-center">
+              Apakah Anda yakin ingin menyelesaikan sesi kerja dan mencatat waktu kepulangan hari ini?
+            </p>
+
+            <div className="pt-2 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setIsCheckOutModalOpen(false)}
+                className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                onClick={handlePerformCheckOut}
+                className="py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+              >
+                Konfirmasi Check-Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: PENGAJUAN KOREKSI PRESENSI */}
+      {isCorrectionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Pengajuan Koreksi Presensi Mandiri
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Sisa Kuota Koreksi: {remainingCorrectionQuota} Kali Bulan Ini
+                  </p>
                 </div>
               </div>
               <button
@@ -1361,7 +1043,7 @@ export default function EssAttendanceOverhaulPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitCorrection} className="space-y-4 text-xs">
+            <form onSubmit={handleCorrectionSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Jenis Anomali / Kesalahan
@@ -1369,7 +1051,7 @@ export default function EssAttendanceOverhaulPage() {
                 <select
                   value={correctionType}
                   onChange={(e) => setCorrectionType(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   <option value="Lupa Tap-Out">Lupa Tap-Out (Pulang)</option>
                   <option value="Lupa Tap-In">Lupa Tap-In (Masuk)</option>
@@ -1403,14 +1085,14 @@ export default function EssAttendanceOverhaulPage() {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Alasan & Penjelasan
+                  Alasan &amp; Penjelasan Objektif
                 </label>
                 <textarea
                   rows={3}
                   required
                   value={correctionReason}
                   onChange={(e) => setCorrectionReason(e.target.value)}
-                  placeholder="Jelaskan alasan koreksi kehadiran secara objektif..."
+                  placeholder="Jelaskan alasan kendala presensi secara jelas untuk verifikasi atasan..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
                 />
               </div>
@@ -1419,18 +1101,175 @@ export default function EssAttendanceOverhaulPage() {
                 <button
                   type="button"
                   onClick={() => setIsCorrectionModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
                 >
-                  Ajukan Koreksi
+                  Kirim Pengajuan Koreksi
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: AJUKAN FORM LEMBUR (SPL) */}
+      {isOvertimeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Clock3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Formulir Surat Perintah Lembur (SPL)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Verifikasi otomatis ke Arya Wibowo</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOvertimeModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleOvertimeSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Judul / Tugas Lembur</label>
+                <input
+                  type="text"
+                  required
+                  value={overtimeTitle}
+                  onChange={(e) => setOvertimeTitle(e.target.value)}
+                  placeholder="Contoh: Deployment Release Sprint v3.4 Core"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Tanggal</label>
+                  <input
+                    type="date"
+                    required
+                    value={overtimeDate}
+                    onChange={(e) => setOvertimeDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Durasi (Jam)</label>
+                  <select
+                    value={overtimeHours}
+                    onChange={(e) => setOvertimeHours(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
+                  >
+                    <option value="1.0">1.0 Jam</option>
+                    <option value="2.0">2.0 Jam</option>
+                    <option value="3.0">3.0 Jam</option>
+                    <option value="4.0">4.0 Jam</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-100 text-[11px] text-blue-800 space-y-0.5">
+                <p className="font-bold">Estimasi Kompensasi Payroll:</p>
+                <p>Upah lembur dihitung otomatis sesuai UU Cipta Kerja No. 11/2020.</p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsOvertimeModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                >
+                  Ajukan SPL
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: KUNJUNGAN KANTOR EKSTERNAL */}
+      {isExternalVisitModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Navigation className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Kunjungan Kantor Eksternal (Client Visit)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Pencatatan lokasi tugas luar kantor</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExternalVisitModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Nama Instansi / Klien</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Bank Mandiri Plaza SCBD"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Tujuan Penugasan</label>
+                <textarea
+                  rows={2}
+                  placeholder="Contoh: UAT Integrasi Payment Gateway API"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsExternalVisitModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExternalVisitModalOpen(false);
+                  showToast('✓ Penugasan kunjungan eksternal berhasil dicatat dengan GPS koordinat valid.');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md"
+              >
+                Catat Kunjungan
+              </button>
+            </div>
           </div>
         </div>
       )}
