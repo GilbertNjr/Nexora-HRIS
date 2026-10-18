@@ -347,14 +347,13 @@ export default function EssAttendanceOverhaulPage() {
               KARIR & PENGEMBANGAN
             </p>
 
-            <button
-              type="button"
-              onClick={() => showToast('Membuka Modul Kinerja & KPI Pribadi...')}
-              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            <Link
+              href="/ess/performance"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
             >
               <TrendingUp className="w-4 h-4 text-slate-400" />
               <span>Kinerja & KPI Pribadi</span>
-            </button>
+            </Link>
 
             <button
               type="button"
