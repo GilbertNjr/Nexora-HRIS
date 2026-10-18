@@ -2,42 +2,208 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { EssLayoutSkeleton } from '@/components/layout/EssLayoutSkeleton';
+import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import {
-  FileText,
-  Download,
-  Calendar,
-  Eye,
+  LayoutDashboard,
+  Clock,
+  CalendarDays,
   CreditCard,
-  Building2,
-  ShieldCheck,
+  TrendingUp,
+  GraduationCap,
+  FolderArchive,
+  Headphones,
+  Search,
+  Calendar,
   CheckCircle2,
   Lock,
-  Printer,
+  Mail,
+  Download,
+  ShieldCheck,
+  Building2,
+  TrendingDown,
+  Sparkles,
+  HelpCircle,
+  ChevronDown,
   X,
-  ChevronRight,
-  TrendingUp,
+  FileText,
+  Printer,
+  Check,
+  AlertCircle,
+  ExternalLink,
+  Share2,
+  KeyRound,
+  MinusCircle,
+  PlusCircle,
+  Info,
+  Fingerprint,
 } from 'lucide-react';
 
-interface EssPayslipItem {
-  id: string;
-  periodCode: string;
-  periodName: string;
-  payDate: string;
-  baseSalary: number;
-  allowances: number;
-  overtimePay: number;
-  grossSalary: number;
-  pph21Rate: string;
-  pph21Amount: number;
-  bpjsTk: number;
-  bpjsKes: number;
-  otherDeductions: number;
-  totalDeductions: number;
+interface PayrollPeriodData {
+  periodKey: string;
+  periodLabel: string;
+  isLatest: boolean;
   takeHomePay: number;
-  bankName: string;
+  grossSalary: number;
+  totalDeductions: number;
+  allowancesAndOvertime: number;
+  transferBank: string;
   accountNumberMasked: string;
+  transferDate: string;
+  earnings: {
+    title: string;
+    description: string;
+    amount: number;
+    badge?: string;
+  }[];
+  deductions: {
+    title: string;
+    description: string;
+    amount: number;
+    badge?: string;
+    isZero?: boolean;
+  }[];
 }
+
+const PAYROLL_PERIODS: Record<string, PayrollPeriodData> = {
+  '2025-02': {
+    periodKey: '2025-02',
+    periodLabel: 'Februari 2025 (Terbaru)',
+    isLatest: true,
+    takeHomePay: 27842500,
+    grossSalary: 31250000,
+    totalDeductions: 3407500,
+    allowancesAndOvertime: 2750000,
+    transferBank: 'Bank Central Asia (BCA)',
+    accountNumberMasked: '8820****823',
+    transferDate: '28 Februari 2025, 08:30 WIB',
+    earnings: [
+      {
+        title: 'Gaji Pokok (Base Salary)',
+        description: 'Tingkat Jabatan: Senior Specialist / Lead Band 4',
+        amount: 28500000,
+      },
+      {
+        title: 'Tunjangan Jabatan & Keahlian',
+        description: 'Lead Backend Architecture Specialist Allowance',
+        amount: 1500000,
+      },
+      {
+        title: 'Tunjangan Komunikasi & Fasilitas Kerja',
+        description: 'Subsidi Internet & Paket Mobilitas WFH / WFO Hybrid',
+        amount: 750000,
+      },
+      {
+        title: 'Kompensasi On-Call Standby & Lembur',
+        description: 'Maintenance Core Switch Migrasi Cloud (8 Jam Terverifikasi)',
+        amount: 500000,
+        badge: 'SPL: #SPL-0225-88',
+      },
+    ],
+    deductions: [
+      {
+        title: 'PPh 21 (Skema Tarif Efektif Rata-rata / TER)',
+        description: 'Sesuai PP No. 58/2023 & PMK-168/2023 (Status: Kawin 1 Tanggungan)',
+        amount: 1845000,
+        badge: 'Kategori TER A • PTKP K/1',
+      },
+      {
+        title: 'BPJS Ketenagakerjaan - JHT (2,0%)',
+        description: 'Jaminan Hari Tua porsi karyawan dari Gaji Pokok',
+        amount: 570000,
+      },
+      {
+        title: 'BPJS Ketenagakerjaan - Jaminan Pensiun (1,0%)',
+        description: 'Sesuai batas pagu maksimal upah JP nasional',
+        amount: 100423,
+      },
+      {
+        title: 'BPJS Kesehatan (1,0%)',
+        description: 'Iuran perlindungan jaminan kesehatan nasional batas atas',
+        amount: 120000,
+      },
+      {
+        title: 'Potongan Kehadiran / Unpaid Leave',
+        description: 'Tingkat Disiplin Presensi 100% (Tanpa pemotongan)',
+        amount: 0,
+        isZero: true,
+      },
+      {
+        title: 'Iuran Koperasi Karyawan & Simpanan Wajib',
+        description: 'Simpanan wajib bulanan & dana program gotong-royong kesejahteraan',
+        amount: 772077,
+      },
+    ],
+  },
+  '2025-01': {
+    periodKey: '2025-01',
+    periodLabel: 'Januari 2025',
+    isLatest: false,
+    takeHomePay: 27542500,
+    grossSalary: 30950000,
+    totalDeductions: 3407500,
+    allowancesAndOvertime: 2450000,
+    transferBank: 'Bank Central Asia (BCA)',
+    accountNumberMasked: '8820****823',
+    transferDate: '28 Januari 2025, 08:30 WIB',
+    earnings: [
+      {
+        title: 'Gaji Pokok (Base Salary)',
+        description: 'Tingkat Jabatan: Senior Specialist / Lead Band 4',
+        amount: 28500000,
+      },
+      {
+        title: 'Tunjangan Jabatan & Keahlian',
+        description: 'Lead Backend Architecture Specialist Allowance',
+        amount: 1500000,
+      },
+      {
+        title: 'Tunjangan Komunikasi & Fasilitas Kerja',
+        description: 'Subsidi Internet & Paket Mobilitas WFH / WFO Hybrid',
+        amount: 750000,
+      },
+      {
+        title: 'Kompensasi On-Call Standby & Lembur',
+        description: 'Security Patching Cluster DB V1',
+        amount: 200000,
+        badge: 'SPL: #SPL-0125-14',
+      },
+    ],
+    deductions: [
+      {
+        title: 'PPh 21 (Skema Tarif Efektif Rata-rata / TER)',
+        description: 'Sesuai PP No. 58/2023 & PMK-168/2023 (Status: Kawin 1 Tanggungan)',
+        amount: 1845000,
+        badge: 'Kategori TER A • PTKP K/1',
+      },
+      {
+        title: 'BPJS Ketenagakerjaan - JHT (2,0%)',
+        description: 'Jaminan Hari Tua porsi karyawan dari Gaji Pokok',
+        amount: 570000,
+      },
+      {
+        title: 'BPJS Ketenagakerjaan - Jaminan Pensiun (1,0%)',
+        description: 'Sesuai batas pagu maksimal upah JP nasional',
+        amount: 100423,
+      },
+      {
+        title: 'BPJS Kesehatan (1,0%)',
+        description: 'Iuran perlindungan jaminan kesehatan nasional batas atas',
+        amount: 120000,
+      },
+      {
+        title: 'Potongan Kehadiran / Unpaid Leave',
+        description: 'Tingkat Disiplin Presensi 100% (Tanpa pemotongan)',
+        amount: 0,
+        isZero: true,
+      },
+      {
+        title: 'Iuran Koperasi Karyawan & Simpanan Wajib',
+        description: 'Simpanan wajib bulanan & dana program gotong-royong kesejahteraan',
+        amount: 772077,
+      },
+    ],
+  },
+};
 
 const formatRupiah = (val: number) => {
   return new Intl.NumberFormat('id-ID', {
@@ -48,352 +214,865 @@ const formatRupiah = (val: number) => {
 };
 
 export default function EssPayrollPage() {
-  const [payslips, setPayslips] = useState<EssPayslipItem[]>([
-    {
-      id: 'slip-09',
-      periodCode: '2026-09',
-      periodName: 'Gaji Bulan September 2026',
-      payDate: '25 September 2026',
-      baseSalary: 18000000,
-      allowances: 2000000,
-      overtimePay: 624277,
-      grossSalary: 20624277,
-      pph21Rate: '8.00% (TER A)',
-      pph21Amount: 1649942,
-      bpjsTk: 540000,
-      bpjsKes: 120000,
-      otherDeductions: 0,
-      totalDeductions: 2309942,
-      takeHomePay: 18314335,
-      bankName: 'BCA',
-      accountNumberMasked: '••••••1842',
-    },
-    {
-      id: 'slip-08',
-      periodCode: '2026-08',
-      periodName: 'Gaji Bulan Agustus 2026',
-      payDate: '25 Agustus 2026',
-      baseSalary: 18000000,
-      allowances: 2000000,
-      overtimePay: 312138,
-      grossSalary: 20312138,
-      pph21Rate: '8.00% (TER A)',
-      pph21Amount: 1624971,
-      bpjsTk: 540000,
-      bpjsKes: 120000,
-      otherDeductions: 0,
-      totalDeductions: 2284971,
-      takeHomePay: 18027167,
-      bankName: 'BCA',
-      accountNumberMasked: '••••••1842',
-    },
-    {
-      id: 'slip-07',
-      periodCode: '2026-07',
-      periodName: 'Gaji Bulan Juli 2026',
-      payDate: '25 Juli 2026',
-      baseSalary: 18000000,
-      allowances: 2000000,
-      overtimePay: 0,
-      grossSalary: 20000000,
-      pph21Rate: '8.00% (TER A)',
-      pph21Amount: 1600000,
-      bpjsTk: 540000,
-      bpjsKes: 120000,
-      otherDeductions: 0,
-      totalDeductions: 2260000,
-      takeHomePay: 17740000,
-      bankName: 'BCA',
-      accountNumberMasked: '••••••1842',
-    },
-  ]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('2025-02');
+  const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
 
-  const [selectedSlip, setSelectedSlip] = useState<EssPayslipItem | null>(null);
+  // Modals state
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const latestSlip = payslips[0];
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const currentData = PAYROLL_PERIODS[selectedPeriod] || PAYROLL_PERIODS['2025-02'];
+
+  const handlePrintSlip = () => {
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
+  };
 
   return (
-    <EssLayoutSkeleton>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs uppercase tracking-wider mb-1">
-              <FileText className="w-4 h-4" />
-              <span>Employee Financial Portal</span>
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row text-slate-800 antialiased font-sans">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-slate-900 text-white text-xs font-semibold shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* LEFT SIDEBAR matching screenshot */}
+      <aside className="w-full md:w-64 bg-white border-r border-slate-200/90 flex flex-col flex-shrink-0 justify-between p-4 sm:p-5 sticky top-0 md:h-screen z-30 shadow-2xs overflow-y-auto">
+        <div className="space-y-5">
+          {/* Logo brand */}
+          <Link href="/ess" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-base shadow-sm shadow-blue-500/20 flex-shrink-0">
+              <span className="text-white font-black tracking-tight">❖</span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">Slip Gaji Digital (Payslips)</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Akses riwayat slip gaji resmi, rincian potongan PPh 21 TER, dan iuran BPJS ketenagakerjaan.
-            </p>
+            <div className="flex flex-col min-w-0">
+              <span className="font-extrabold text-sm text-slate-900 tracking-tight leading-snug group-hover:text-blue-600 transition-colors">
+                Nexora <span className="text-blue-600 font-bold">HRIS</span>
+              </span>
+              <span className="text-[11px] font-semibold text-slate-400 leading-tight">
+                Portal Karyawan (ESS)
+              </span>
+            </div>
+          </Link>
+
+          {/* Active Session Pill */}
+          <div className="px-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200/80 text-slate-700 text-[11px] font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Sesi Aktif: NX-2021008</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Rekening Terverifikasi BCA</span>
-            </span>
+          {/* SECTION 1: UTAMA */}
+          <div className="space-y-1">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
+              UTAMA
+            </p>
+
+            <Link
+              href="/ess"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              <LayoutDashboard className="w-4 h-4 text-slate-400" />
+              <span>Beranda Saya</span>
+            </Link>
+
+            <Link
+              href="/ess/attendance"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              <Fingerprint className="w-4 h-4 text-slate-400" />
+              <span>Presensi &amp; Absensi</span>
+            </Link>
+
+            <Link
+              href="/ess/leave"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              <CalendarDays className="w-4 h-4 text-slate-400" />
+              <span>Cuti &amp; Izin Saya</span>
+            </Link>
+
+            {/* Slip Gaji & Kompensasi (ACTIVE matching screenshot: Solid Blue Pill) */}
+            <Link
+              href="/ess/payroll"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm shadow-blue-500/20 transition-all"
+            >
+              <CreditCard className="w-4 h-4 text-white" />
+              <span>Slip Gaji &amp; Kompensasi</span>
+            </Link>
+          </div>
+
+          {/* SECTION 2: KARIR & PENGEMBANGAN */}
+          <div className="space-y-1 pt-1">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
+              KARIR &amp; PENGEMBANGAN
+            </p>
+
+            <button
+              type="button"
+              onClick={() => showToast('Membuka Modul Kinerja & KPI Pribadi...')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <TrendingUp className="w-4 h-4 text-slate-400" />
+              <span>Kinerja &amp; KPI Pribadi</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => showToast('Membuka Pelatihan & Modul Mandiri...')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <GraduationCap className="w-4 h-4 text-slate-400" />
+              <span>Pelatihan &amp; Modul</span>
+            </button>
+          </div>
+
+          {/* SECTION 3: DOKUMEN & BANTUAN */}
+          <div className="space-y-1 pt-1">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
+              DOKUMEN &amp; BANTUAN
+            </p>
+
+            <button
+              type="button"
+              onClick={() => showToast('Membuka Arsip & Formulir Kepegawaian...')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <FolderArchive className="w-4 h-4 text-slate-400" />
+              <span>Arsip &amp; Formulir</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => showToast('Menghubungi Helpdesk HR Operations...')}
+              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
+            >
+              <Headphones className="w-4 h-4 text-slate-400" />
+              <span>Bantuan &amp; Kontak HR</span>
+            </button>
           </div>
         </div>
 
-        {/* Kartu Highlight Gaji Bulan Terakhir */}
-        <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white p-6 sm:p-7 rounded-2xl shadow-xl border border-indigo-700/40 relative overflow-hidden">
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">
-                Gaji Bersih Bulan Berjalan (Take Home Pay)
-              </span>
-              <div className="text-3xl sm:text-4xl font-black tracking-tight mt-1 text-white">
-                {formatRupiah(latestSlip.takeHomePay)}
+        {/* BOTTOM SUPPORT CARD matching screenshot */}
+        <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100/80 space-y-2 mt-4">
+          <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
+            <HelpCircle className="w-4 h-4 text-blue-600" />
+            <span>Pusat Dukungan</span>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-snug">
+            Ada kendala data kehadiran atau klaim?
+          </p>
+          <div className="space-y-1 text-[11px] font-bold pt-0.5">
+            <a
+              href="#sop"
+              onClick={(e) => {
+                e.preventDefault();
+                showToast('Membuka SOP Kepegawaian & Kebijakan Payroll...');
+              }}
+              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+            >
+              <span>SOP Kepegawaian</span>
+              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </a>
+            <a
+              href="#tiket"
+              onClick={(e) => {
+                e.preventDefault();
+                showToast('Membuka Tiket Bantuan HR Operations...');
+              }}
+              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+            >
+              <span>Tiket Helpdesk HR</span>
+              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* TOP HEADER BAR matching screenshot */}
+        <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
+          {/* Search Input Box */}
+          <div className="relative w-72 sm:w-96 max-w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
+              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+            />
+          </div>
+
+          {/* Right Header Controls */}
+          <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-slate-600">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <div className="flex flex-col text-[11px] leading-tight text-left">
+                <span className="font-bold text-slate-800">Senin, 24</span>
+                <span className="text-slate-500 font-medium">Maret 2025</span>
               </div>
-              <p className="text-xs text-indigo-200 mt-2 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>
-                  Telah ditransfer ke rekening {latestSlip.bankName} {latestSlip.accountNumberMasked} pada {latestSlip.payDate}
+            </div>
+
+            <NotificationBellDropdown portal="ess" />
+
+            <Link
+              href="/admin/profile"
+              className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">
+                RP
+              </div>
+              <div className="hidden sm:flex flex-col text-left leading-tight">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
+                    Rian Pratama, S.Kom
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-[9px] font-bold text-slate-600">
+                    Karyawan (ESS)
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                  Lead Backend Architect • NX-2021008
                 </span>
+              </div>
+            </Link>
+          </div>
+        </header>
+
+        {/* PAGE CONTENT CONTAINER (Generous bottom padding pb-36 to prevent ANY cut-off!) */}
+        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto pb-36">
+          {/* HEADER SECTION matching screenshot */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+            <div className="space-y-1.5">
+              {/* Breadcrumb matching screenshot */}
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                <Link href="/ess" className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>Portal Karyawan (ESS)</span>
+                </Link>
+                <span>&gt;</span>
+                <span className="text-blue-600 font-bold">Slip Gaji &amp; Kompensasi</span>
+              </div>
+
+              {/* Title & Encryption Pill matching screenshot */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                  Slip Gaji &amp; Rincian Kompensasi
+                </h1>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/90">
+                  <Lock className="w-3 h-3 text-blue-600" />
+                  <span>Terenkripsi AES-256</span>
+                </span>
+              </div>
+
+              {/* Subtitle */}
+              <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
+                Akses riwayat penggajian terenkripsi, rincian take-home pay, bukti potong PPh 21 (TER), dan benefit korporat Anda secara transparan dan aman.
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Top Right Action Buttons matching screenshot */}
+            <div className="flex flex-wrap items-center gap-2.5 flex-shrink-0">
+              {/* Period Dropdown Selector */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold shadow-2xs transition-all"
+                >
+                  <Calendar className="w-4 h-4 text-slate-500" />
+                  <span>{currentData.periodLabel}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
+                </button>
+
+                {isPeriodDropdownOpen && (
+                  <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-40 animate-in fade-in zoom-in-95">
+                    {Object.values(PAYROLL_PERIODS).map((item) => (
+                      <button
+                        key={item.periodKey}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPeriod(item.periodKey);
+                          setIsPeriodDropdownOpen(false);
+                          showToast(`Memuat data slip gaji periode ${item.periodLabel}`);
+                        }}
+                        className={`w-full px-4 py-2 text-left text-xs flex items-center justify-between hover:bg-slate-50 transition-colors ${
+                          selectedPeriod === item.periodKey
+                            ? 'font-bold text-blue-600 bg-blue-50/50'
+                            : 'text-slate-700'
+                        }`}
+                      >
+                        <span>{item.periodLabel}</span>
+                        {selectedPeriod === item.periodKey && (
+                          <Check className="w-3.5 h-3.5 text-blue-600" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Kirim ke Email Button */}
               <button
-                onClick={() => setSelectedSlip(latestSlip)}
-                className="px-4 py-2.5 rounded-xl bg-white text-indigo-950 font-semibold text-xs hover:bg-indigo-50 shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
+                type="button"
+                onClick={() => setIsEmailModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs transition-all active:scale-95"
               >
-                <Eye className="w-4 h-4" />
-                <span>Lihat Rincian Lengkap</span>
+                <Mail className="w-4 h-4 text-slate-500" />
+                <span>Kirim ke Email</span>
               </button>
+
+              {/* Unduh PDF Resmi (Solid Blue Button) */}
               <button
-                onClick={() => alert(`Mengunduh PDF Slip Gaji ${latestSlip.periodName}...`)}
-                className="px-4 py-2.5 rounded-xl bg-indigo-700/60 hover:bg-indigo-700 text-white font-medium text-xs border border-indigo-500/30 flex items-center justify-center gap-2 transition-all"
+                type="button"
+                onClick={() => setIsPdfModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95"
               >
                 <Download className="w-4 h-4" />
-                <span>Unduh PDF</span>
+                <span>Unduh PDF Resmi</span>
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Riwayat Slip Gaji Bulanan */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <h2 className="font-bold text-slate-900">Arsip Slip Gaji Bulanan</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Semua dokumen slip gaji tersimpan permanen dan kebal mutasi data [REQ-DEC-09].
+          {/* PRIVACY & COMPLIANCE BANNER matching screenshot */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    Kepatuhan Privasi &amp; Standar Perlindungan Data
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-800">
+                    ISO/IEC 27001 • UU PDP No. 27/2022
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed max-w-4xl">
+                  Dokumen ini bersifat <strong className="text-slate-900 font-bold">SANGAT RAHASIA (Strictly Confidential)</strong>. Kata sandi default pembuka berkas PDF resmi adalah <strong className="text-slate-900 font-bold">6 digit tanggal lahir (DDMMYY)</strong> digabung dengan <strong className="text-slate-900 font-bold">4 digit terakhir NIK</strong> Anda.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 self-end sm:self-center flex-shrink-0 text-xs">
+              <span className="text-slate-500 font-medium">PIN Master: <strong className="text-slate-800 font-bold">Aktif</strong></span>
+              <button
+                type="button"
+                onClick={() => setIsPinModalOpen(true)}
+                className="font-bold text-blue-600 hover:text-blue-800 underline decoration-blue-300 underline-offset-2"
+              >
+                Ganti Kata Sandi
+              </button>
+            </div>
+          </div>
+
+          {/* SUMMARY ROW: 4 CARDS (TAKE HOME PAY HERO + 3 STAT CARDS) matching screenshot */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
+            {/* Card 1: GAJI BERSIH DITERIMA HERO CARD (~5 cols on lg) */}
+            <div className="lg:col-span-5 bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                    GAJI BERSIH DITERIMA (TAKE-HOME PAY)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Lunas &amp; Terverifikasi HR Operations</span>
+                  </span>
+                </div>
+
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-black text-blue-700 tracking-tight">
+                    {formatRupiah(currentData.takeHomePay)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 font-medium">
+                  / Siklus {currentData.periodKey === '2025-02' ? 'Februari 2025' : 'Januari 2025'}
+                </p>
+              </div>
+
+              {/* Transfer Details Bottom */}
+              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span>
+                    Ditransfer via <strong className="text-slate-900 font-bold">{currentData.transferBank}</strong> • No. Rek. <strong className="text-slate-900 font-bold">{currentData.accountNumberMasked}</strong>
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {currentData.transferDate}
+                </span>
+              </div>
+            </div>
+
+            {/* Card 2: Penerimaan Kotor (~2.3 cols on lg) */}
+            <div className="lg:col-span-2 sm:col-span-1 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Penerimaan Kotor</span>
+                <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <PlusCircle className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xl font-black text-slate-900 tracking-tight">
+                  {formatRupiah(currentData.grossSalary)}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Termasuk tunjangan &amp; lembur
               </p>
             </div>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
-              Tahun 2026
-            </span>
-          </div>
 
-          <div className="divide-y divide-slate-100">
-            {payslips.map((slip) => (
-              <div
-                key={slip.id}
-                className="p-5 hover:bg-slate-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 text-sm">{slip.periodName}</span>
-                    <span className="text-xs font-medium text-slate-400">•</span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Transfer Sukses
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Dibayarkan pada: {slip.payDate} • Rekening: {slip.bankName} {slip.accountNumberMasked}
-                  </p>
-                  <div className="flex items-center gap-4 text-xs text-slate-600 pt-1">
-                    <span>Bruto: {formatRupiah(slip.grossSalary)}</span>
-                    <span className="text-slate-300">|</span>
-                    <span className="text-rose-600">Pajak: {formatRupiah(slip.pph21Amount)}</span>
-                    <span className="text-slate-300">|</span>
-                    <span className="text-indigo-600">BPJS: {formatRupiah(slip.bpjsTk + slip.bpjsKes)}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-4">
-                  <div className="text-right">
-                    <span className="text-xs text-slate-400">Take Home Pay</span>
-                    <div className="text-base font-extrabold text-indigo-600">
-                      {formatRupiah(slip.takeHomePay)}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setSelectedSlip(slip)}
-                    className="p-2 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 transition-colors"
-                    title="Lihat Rincian Slip Gaji"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
+            {/* Card 3: Total Potongan (~2.3 cols on lg) */}
+            <div className="lg:col-span-2 sm:col-span-1 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Total Potongan</span>
+                <div className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <MinusCircle className="w-4 h-4" />
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* MODAL SLIP GAJI LENGKAP */}
-        {selectedSlip && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+              <div>
+                <span className="text-xl font-black text-rose-600 tracking-tight">
+                  -{formatRupiah(currentData.totalDeductions)}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-snug">
+                PPh 21, BPJS &amp; Koperasi
+              </p>
+            </div>
+
+            {/* Card 4: Tunjangan & Lembur (~2.4 cols on lg) */}
+            <div className="lg:col-span-3 sm:col-span-2 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">Tunjangan &amp; Lembur</span>
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xl font-black text-slate-900 tracking-tight">
+                  +{formatRupiah(currentData.allowancesAndOvertime)}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Kehadiran &amp; On-Call 8 jam
+              </p>
+            </div>
+          </div>
+
+          {/* TWO-COLUMN DETAILED BREAKDOWN: PENERIMAAN (LEFT) vs POTONGAN (RIGHT) matching screenshot */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* LEFT COLUMN: PENERIMAAN & PENDAPATAN (4 Komponen) */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-6">
               {/* Header */}
-              <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-indigo-600" />
-                  <h3 className="font-bold text-slate-900">Slip Gaji Elektronik Resmi</h3>
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Penerimaan &amp; Pendapatan
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Rincian Komponen Gaji Bruto (Earnings)
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => alert(`Mengunduh PDF Slip Gaji ${selectedSlip.periodName}...`)}
-                    className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-white text-xs flex items-center gap-1 font-medium"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Unduh PDF</span>
-                  </button>
-                  <button
-                    onClick={() => setSelectedSlip(null)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">
+                  {currentData.earnings.length} Komponen
+                </span>
               </div>
 
-              {/* Body */}
-              <div className="p-6 space-y-6 overflow-y-auto flex-1 font-sans">
-                {/* Header Perusahaan */}
-                <div className="flex justify-between items-start border-b border-slate-200 pb-4">
-                  <div>
-                    <h2 className="text-base font-extrabold text-slate-900">PT NEXORA DIGITAL INOVASI</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">Nexora Tower SCBD Lt. 18, Jakarta Selatan</p>
-                    <p className="text-xs text-slate-500">NPWP: 01.345.678.9-012.000</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                      SLIP GAJI
-                    </span>
-                    <p className="text-xs font-semibold text-slate-700 mt-1">{selectedSlip.periodName}</p>
-                  </div>
-                </div>
+              {/* Items List */}
+              <div className="space-y-4">
+                {currentData.earnings.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-2xl hover:bg-slate-50/80 transition-colors border border-transparent hover:border-slate-100"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900">{item.title}</span>
+                        {item.badge && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">{item.description}</p>
+                    </div>
 
-                {/* Info Karyawan */}
-                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                  <div className="space-y-1">
-                    <div>
-                      <span className="text-slate-500">Nama: </span>
-                      <span className="font-bold text-slate-800">Budi Santoso</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">NIK: </span>
-                      <span className="font-semibold text-slate-800">NX-2026-0001</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Jabatan: </span>
-                      <span className="font-semibold text-slate-800">Senior Backend Engineer</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div>
-                      <span className="text-slate-500">Departemen: </span>
-                      <span className="font-semibold text-slate-800">Technology & Engineering</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Kategori Pajak: </span>
-                      <span className="font-semibold text-slate-800">{selectedSlip.pph21Rate}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Rekening: </span>
-                      <span className="font-semibold text-slate-800">
-                        {selectedSlip.bankName} {selectedSlip.accountNumberMasked}
+                    <div className="text-right sm:self-center flex-shrink-0">
+                      <span className="text-sm font-black font-mono text-slate-900">
+                        {formatRupiah(item.amount)}
                       </span>
                     </div>
                   </div>
-                </div>
+                ))}
+              </div>
 
-                {/* Rincian Komponen Gaji */}
-                <div className="grid grid-cols-2 gap-6 text-xs">
-                  {/* Penerimaan */}
-                  <div className="space-y-2.5">
-                    <h4 className="font-bold uppercase tracking-wider text-[11px] text-emerald-700 border-b border-slate-200 pb-1">
-                      Penerimaan
-                    </h4>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Gaji Pokok</span>
-                        <span className="font-medium text-slate-900">{formatRupiah(selectedSlip.baseSalary)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Tunjangan Operasional</span>
-                        <span className="font-medium text-slate-900">{formatRupiah(selectedSlip.allowances)}</span>
-                      </div>
-                      {selectedSlip.overtimePay > 0 && (
-                        <div className="flex justify-between text-emerald-700">
-                          <span>Upah Lembur</span>
-                          <span className="font-medium">{formatRupiah(selectedSlip.overtimePay)}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-slate-900">
-                      <span>Total Penghasilan Bruto</span>
-                      <span>{formatRupiah(selectedSlip.grossSalary)}</span>
-                    </div>
+              {/* Total Row */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Total Penerimaan Kotor (Gross):</span>
+                <span className="text-base font-black font-mono text-slate-900">
+                  {formatRupiah(currentData.grossSalary)}
+                </span>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: POTONGAN RESMI & KEWAJIBAN PAJAK (6 Komponen, FULLY UNCLIPPED!) */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-6">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-2xs">
+                    <TrendingDown className="w-4 h-4" />
                   </div>
-
-                  {/* Potongan */}
-                  <div className="space-y-2.5">
-                    <h4 className="font-bold uppercase tracking-wider text-[11px] text-rose-700 border-b border-slate-200 pb-1">
-                      Potongan
-                    </h4>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">PPh 21 TER ({selectedSlip.pph21Rate})</span>
-                        <span className="font-medium text-rose-600">{formatRupiah(selectedSlip.pph21Amount)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">BPJS Ketenagakerjaan (3%)</span>
-                        <span className="font-medium text-slate-900">{formatRupiah(selectedSlip.bpjsTk)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">BPJS Kesehatan (1%)</span>
-                        <span className="font-medium text-slate-900">{formatRupiah(selectedSlip.bpjsKes)}</span>
-                      </div>
-                    </div>
-                    <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-slate-900">
-                      <span>Total Potongan</span>
-                      <span className="text-rose-600">{formatRupiah(selectedSlip.totalDeductions)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Take Home Pay */}
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between">
                   <div>
-                    <span className="text-xs uppercase font-bold text-indigo-800 tracking-wider">
-                      Penghasilan Bersih Diterima
-                    </span>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Telah disalurkan ke rekening bank Anda pada {selectedSlip.payDate}.
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Potongan Resmi &amp; Kewajiban Pajak
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Rincian Penahanan Pajak &amp; Asuransi (Deductions)
                     </p>
                   </div>
-                  <div className="text-2xl font-black text-indigo-700">
-                    {formatRupiah(selectedSlip.takeHomePay)}
-                  </div>
                 </div>
+                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">
+                  {currentData.deductions.length} Komponen
+                </span>
+              </div>
 
-                <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[11px] text-slate-400">
-                  <div className="flex items-center gap-1 text-emerald-700 font-medium">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Terverifikasi Digital Resmi NEXORA [REQ-DEC-09]</span>
+              {/* Items List (All 6 items fully unclipped!) */}
+              <div className="space-y-4">
+                {currentData.deductions.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-2xl hover:bg-slate-50/80 transition-colors border border-transparent hover:border-slate-100"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900">{item.title}</span>
+                        {item.badge && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">{item.description}</p>
+                    </div>
+
+                    <div className="text-right sm:self-center flex-shrink-0">
+                      <span
+                        className={`text-sm font-black font-mono ${
+                          item.isZero ? 'text-slate-900' : 'text-rose-600'
+                        }`}
+                      >
+                        {item.isZero ? 'Rp 0' : formatRupiah(item.amount)}
+                      </span>
+                    </div>
                   </div>
-                  <span>Dicetak otomatis</span>
-                </div>
+                ))}
+              </div>
+
+              {/* Total Row */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">Total Potongan Resmi (Deductions):</span>
+                <span className="text-base font-black font-mono text-rose-600">
+                  -{formatRupiah(currentData.totalDeductions)}
+                </span>
               </div>
             </div>
           </div>
-        )}
+
+          {/* NET SALARY EQUATION & SECURITY VALIDATION CARD */}
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-200">
+                Formula Perhitungan Penggajian (Nett Calculation)
+              </p>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm sm:text-base font-mono">
+                <span className="text-slate-300">Penerimaan Kotor ({formatRupiah(currentData.grossSalary)})</span>
+                <span className="text-rose-400 font-bold">-</span>
+                <span className="text-rose-300">Potongan ({formatRupiah(currentData.totalDeductions)})</span>
+                <span className="text-emerald-400 font-bold">=</span>
+                <span className="text-emerald-400 font-black text-lg sm:text-xl">
+                  Take-Home Pay ({formatRupiah(currentData.takeHomePay)})
+                </span>
+              </div>
+              <p className="text-[11px] text-blue-200/80">
+                Dokumen ini sah, dicetak secara elektronik dan terdaftar pada sistem Payroll Engine Nexora HRIS.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-start md:self-center flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-white text-slate-900 text-xs font-bold hover:bg-slate-100 transition-all flex items-center gap-2 shadow-sm"
+              >
+                <Download className="w-4 h-4 text-blue-600" />
+                <span>Unduh Bukti Potong</span>
+              </button>
+            </div>
+          </div>
+        </main>
       </div>
-    </EssLayoutSkeleton>
+
+      {/* MODAL 1: UNDUH PDF RESMI */}
+      {isPdfModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 p-6 space-y-5 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Berkas Slip Gaji Digital Resmi (PDF)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Periode {currentData.periodLabel}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Official PDF Document Preview Box */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm">PT NEXORA DIGITAL NUSANTARA</h4>
+                  <p className="text-[10px] text-slate-500">Pacific Century Tower Lt. 7, SCBD Jakarta Selatan</p>
+                </div>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  TERVERIFIKASI
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-400 text-[11px]">Nama Karyawan:</span>
+                  <p className="font-bold text-slate-900">Rian Pratama, S.Kom</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[11px]">NIK / Employee ID:</span>
+                  <p className="font-bold text-slate-900">NX-2021008</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[11px]">Jabatan / Divisi:</span>
+                  <p className="font-bold text-slate-900">Lead Backend Architect</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[11px]">Take-Home Pay:</span>
+                  <p className="font-black text-blue-700 font-mono">{formatRupiah(currentData.takeHomePay)}</p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] text-blue-900 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <span>Berkas ini dilindungi enkripsi sandi PDF (Tanggal Lahir DDMMYY + 4 digit NIK).</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+              >
+                Tutup
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintSlip}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center gap-1.5"
+              >
+                <Printer className="w-4 h-4 text-slate-600" />
+                <span>Cetak</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPdfModalOpen(false);
+                  showToast('✓ Berkas PDF Slip Gaji resmi berhasil diunduh ke perangkat Anda.');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Download className="w-4 h-4" />
+                <span>Unduh Berkas</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: KIRIM KE EMAIL */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Kirim Slip Gaji ke Email Terdaftar
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Pengiriman dokumen aman berenkripsi</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEmailModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Email Karyawan Penerima</label>
+                <input
+                  type="email"
+                  disabled
+                  value="rian.pratama@nexora.co.id"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Periode Slip Gaji</label>
+                <input
+                  type="text"
+                  disabled
+                  value={currentData.periodLabel}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700"
+                />
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                <p className="font-bold text-slate-800">Catatan Keamanan:</p>
+                <p>Dokumen PDF terenkripsi AES-256 akan dikirimkan otomatis sebagai lampiran terlindungi kata sandi.</p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsEmailModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEmailModalOpen(false);
+                  showToast('✓ Berkas slip gaji resmi telah dikirim ke rian.pratama@nexora.co.id');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Mail className="w-4 h-4" />
+                <span>Kirim Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: GANTI KATA SANDI / PIN MASTER */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Pengaturan Sandi Berkas Slip Gaji
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Kepatuhan UU PDP No. 27/2022</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPinModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Sandi Default Sistem</label>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-mono text-[11px]">
+                  [DDMMYY Tanggal Lahir] + [4 Digit Terakhir NIK]
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Kustomisasi PIN Baru (Opsional 6 Digit)</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="Masukkan 6 angka PIN kustom..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsPinModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPinModalOpen(false);
+                  showToast('✓ Pengaturan kata sandi slip gaji berhasil diperbarui.');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+              >
+                Simpan PIN
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
