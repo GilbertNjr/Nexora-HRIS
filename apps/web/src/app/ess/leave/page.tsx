@@ -434,14 +434,13 @@ export default function EssLeaveOverhaulPage() {
               DOKUMEN & BANTUAN
             </p>
 
-            <button
-              type="button"
-              onClick={() => showToast('Membuka Arsip Formulir Cuti & Surat Tugas...')}
+            <Link
+              href="/ess/documents"
               className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
             >
               <FolderArchive className="w-4 h-4 text-slate-400" />
               <span>Arsip & Formulir</span>
-            </button>
+            </Link>
 
             <button
               type="button"
