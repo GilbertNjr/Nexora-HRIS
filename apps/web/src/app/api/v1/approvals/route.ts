@@ -28,55 +28,62 @@ export interface ApprovalItem {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
 
-const defaultApprovals: ApprovalItem[] = [
-  {
-    id: 'req-01',
-    name: 'Budi Santoso',
-    role: 'Senior UI Designer • Product',
-    type: 'cuti',
-    title: 'Pengajuan Cuti Tahunan (3 Hari: 26 - 28 Mar 2025)',
-    highlightType: 'Cuti Tahunan',
-    detail: '3 Hari: 26 - 28 Mar 2025',
-    quotaMeta: 'Sisa Kuota: 9 Hari',
-    timestamp: 'Diajukan: 2 jam lalu',
-    avatarColor: 'from-blue-600 to-indigo-600',
-    initials: 'BS',
-    verifiedBadge: 'check',
-    status: 'PENDING',
-  },
-  {
-    id: 'req-02',
-    name: 'Siti Rahmawati',
-    role: 'Talent Acquisition Specialist',
-    type: 'cuti',
-    title: 'Pengajuan Cuti Sakit — 1 Hari (24 Mar 2025)',
-    highlightType: 'Cuti Sakit',
-    detail: '1 Hari (24 Mar 2025)',
-    hasAttachment: true,
-    attachmentName: 'Surat_Dokter_Klinik.pdf (Terlampir)',
-    timestamp: 'Diajukan: 07:45 WIB',
-    avatarColor: 'from-amber-500 to-rose-500',
-    initials: 'SR',
-    verifiedBadge: 'alert',
-    status: 'PENDING',
-  },
-  {
-    id: 'req-03',
-    name: 'Dimas Aditya',
-    role: 'Backend Engineer • Tech',
-    type: 'lembur',
-    title: 'Klaim Lembur Akhir Pekan (4 Jam • Deployment Server Core)',
-    highlightType: 'Lembur Akhir Pekan',
-    detail: '4 Jam • Deployment Server Core',
-    estimatedCost: 'Total Taksiran: Rp 320.000',
-    verifiedBy: 'Disetujui Tech Lead: Ya',
-    timestamp: 'Diajukan: Kemarin',
-    avatarColor: 'from-emerald-500 to-teal-700',
-    initials: 'DA',
-    verifiedBadge: 'bolt',
-    status: 'PENDING',
-  },
-];
+function generateDefaultApprovals(): ApprovalItem[] {
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthShort = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(now);
+  const day = now.getDate();
+
+  return [
+    {
+      id: 'req-01',
+      name: 'Budi Santoso, M.T.',
+      role: 'Staff DevOps & Security Engineer • Departemen Sistem Inti',
+      type: 'cuti',
+      title: `Pengajuan Cuti Tahunan (3 Hari: ${day + 2} - ${day + 4} ${monthShort} ${year})`,
+      highlightType: 'Cuti Tahunan',
+      detail: `3 Hari: ${day + 2} - ${day + 4} ${monthShort} ${year}`,
+      quotaMeta: 'Sisa Kuota: 9 Hari',
+      timestamp: 'Diajukan: 2 jam lalu',
+      avatarColor: 'from-blue-600 to-indigo-600',
+      initials: 'BS',
+      verifiedBadge: 'check',
+      status: 'PENDING',
+    },
+    {
+      id: 'req-02',
+      name: 'Siti Rahma, S.Psi',
+      role: 'HR Talent & People Partner • Human Resource',
+      type: 'cuti',
+      title: `Pengajuan Cuti Sakit — 1 Hari (${day} ${monthShort} ${year})`,
+      highlightType: 'Cuti Sakit',
+      detail: `1 Hari (${day} ${monthShort} ${year})`,
+      hasAttachment: true,
+      attachmentName: 'Surat_Dokter_Klinik.pdf (Terlampir)',
+      timestamp: 'Diajukan: 08:30 WIB',
+      avatarColor: 'from-amber-500 to-rose-500',
+      initials: 'SR',
+      verifiedBadge: 'alert',
+      status: 'PENDING',
+    },
+    {
+      id: 'req-03',
+      name: 'Maya Anggraini, S.Ds',
+      role: 'UI/UX Product Designer • Technology & Product',
+      type: 'lembur',
+      title: `Klaim Lembur Rilis Aplikasi (4 Jam • Deployment Server Core)`,
+      highlightType: 'Lembur Akhir Pekan',
+      detail: `4 Jam • Deployment Server Core (${Math.max(1, day - 1)} ${monthShort} ${year})`,
+      estimatedCost: 'Total Taksiran: Rp 360.000',
+      verifiedBy: 'Disetujui Tech Lead: Ya',
+      timestamp: 'Diajukan: Kemarin',
+      avatarColor: 'from-emerald-500 to-teal-700',
+      initials: 'MA',
+      verifiedBadge: 'bolt',
+      status: 'PENDING',
+    },
+  ];
+}
 
 function ensureStorage(): void {
   try {
@@ -93,12 +100,21 @@ function getStoredApprovals(): ApprovalItem[] {
     ensureStorage();
     if (fs.existsSync(APPROVALS_FILE)) {
       const data = JSON.parse(fs.readFileSync(APPROVALS_FILE, 'utf-8'));
-      if (Array.isArray(data)) return data;
+      if (Array.isArray(data) && data.length > 0) {
+        // If data contains outdated 2025 strings, refresh with current dates
+        const hasOutdated = data.some((item) => item.detail?.includes('2025') || item.title?.includes('2025'));
+        if (!hasOutdated) {
+          return data;
+        }
+      }
     }
   } catch {
     // fallback
   }
-  return defaultApprovals;
+
+  const fresh = generateDefaultApprovals();
+  saveStoredApprovals(fresh);
+  return fresh;
 }
 
 function saveStoredApprovals(data: ApprovalItem[]): void {
