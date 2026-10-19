@@ -50,9 +50,29 @@ interface ApprovalRequest {
 }
 
 export default function AdminDashboardPage() {
+  // Dynamic current date calculations
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonthShort = new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(now);
+  const currentMonthLong = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(now);
+  const currentMonthYear = `${currentMonthLong} ${currentYear}`;
+  const todayFormatted = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(now);
+
+  // Month selector options (Last 4 months)
+  const monthOptions = Array.from({ length: 4 }).map((_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mName = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(d);
+    return `${mName} ${d.getFullYear()}`;
+  });
+
   // State for interactive features
   const [activeFilter, setActiveFilter] = useState<'all' | 'cuti' | 'lembur'>('all');
-  const [selectedMonth, setSelectedMonth] = useState('Maret 2025');
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthYear);
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
@@ -73,7 +93,7 @@ export default function AdminDashboardPage() {
           onTimeCount: metrics.onTimeCount,
           lateCount: metrics.lateCount,
           leaveCount: metrics.leaveCount,
-          estimatedPayroll: `${metrics.estimatedPayroll} Miliar`,
+          estimatedPayroll: `${metrics.estimatedPayroll}`,
           departments: departments,
           preparedBy: 'Dewi Lestari, S.Psi (HR Operations Manager)',
           printedAt: `${new Date().toLocaleDateString('id-ID', {
@@ -95,16 +115,16 @@ export default function AdminDashboardPage() {
     }, 450);
   };
 
-  // Dynamic approval list state
+  // Dynamic approval list state synchronized with employee data and current date
   const [requests, setRequests] = useState<ApprovalRequest[]>([
     {
       id: 'req-01',
-      name: 'Budi Santoso',
-      role: 'Senior UI Designer • Product',
+      name: 'Budi Santoso, M.T.',
+      role: 'Staff DevOps & Security Engineer • Departemen Sistem Inti',
       type: 'cuti',
-      title: 'Pengajuan Cuti Tahunan (3 Hari: 26 - 28 Mar 2025)',
+      title: `Pengajuan Cuti Tahunan (3 Hari: ${now.getDate() + 2} - ${now.getDate() + 4} ${currentMonthShort} ${currentYear})`,
       highlightType: 'Cuti Tahunan',
-      detail: '3 Hari: 26 - 28 Mar 2025',
+      detail: `3 Hari: ${now.getDate() + 2} - ${now.getDate() + 4} ${currentMonthShort} ${currentYear}`,
       quotaMeta: 'Sisa Kuota: 9 Hari',
       timestamp: 'Diajukan: 2 jam lalu',
       avatarColor: 'from-blue-600 to-indigo-600',
@@ -113,102 +133,121 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'req-02',
-      name: 'Siti Rahmawati',
-      role: 'Talent Acquisition Specialist',
+      name: 'Siti Rahma, S.Psi',
+      role: 'HR Talent & People Partner • Human Resource',
       type: 'cuti',
-      title: 'Pengajuan Cuti Sakit — 1 Hari (24 Mar 2025)',
+      title: `Pengajuan Cuti Sakit — 1 Hari (${now.getDate()} ${currentMonthShort} ${currentYear})`,
       highlightType: 'Cuti Sakit',
-      detail: '1 Hari (24 Mar 2025)',
+      detail: `1 Hari (${now.getDate()} ${currentMonthShort} ${currentYear})`,
       hasAttachment: true,
       attachmentName: 'Surat_Dokter_Klinik.pdf (Terlampir)',
-      timestamp: 'Diajukan: 07:45 WIB',
+      timestamp: 'Diajukan: 08:30 WIB',
       avatarColor: 'from-amber-500 to-rose-500',
       initials: 'SR',
       verifiedBadge: 'alert',
     },
     {
       id: 'req-03',
-      name: 'Dimas Aditya',
-      role: 'Backend Engineer • Tech',
+      name: 'Maya Anggraini, S.Ds',
+      role: 'UI/UX Product Designer • Technology & Product',
       type: 'lembur',
-      title: 'Klaim Lembur Akhir Pekan (4 Jam • Deployment Server Core)',
+      title: 'Klaim Lembur Rilis Aplikasi (4 Jam • Deployment Server Core)',
       highlightType: 'Lembur Akhir Pekan',
-      detail: '4 Jam • Deployment Server Core',
-      estimatedCost: 'Total Taksiran: Rp 320.000',
+      detail: `4 Jam • Deployment Server Core (${Math.max(1, now.getDate() - 1)} ${currentMonthShort} ${currentYear})`,
+      estimatedCost: 'Total Taksiran: Rp 360.000',
       verifiedBy: 'Disetujui Tech Lead: Ya',
       timestamp: 'Diajukan: Kemarin',
       avatarColor: 'from-emerald-500 to-teal-700',
-      initials: 'DA',
+      initials: 'MA',
       verifiedBadge: 'bolt',
     },
   ]);
 
   // Dynamic Metrics State
   const [metrics, setMetrics] = useState({
-    totalEmployees: 1248,
-    attendanceRate: 96.4,
-    onTimeCount: 1203,
-    lateCount: 28,
-    leaveCount: 17,
-    pendingApprovals: 12,
-    pendingLeave: 8,
-    pendingOvertime: 4,
-    estimatedPayroll: 'Rp 3.84',
+    totalEmployees: 6,
+    activeEmployees: 6,
+    permanentCount: 4,
+    contractCount: 2,
+    probationCount: 0,
+    attendanceRate: 98.2,
+    onTimeCount: 6,
+    lateCount: 0,
+    leaveCount: 0,
+    pendingApprovals: 3,
+    pendingLeave: 2,
+    pendingOvertime: 1,
+    estimatedPayroll: 'Rp 118.5 Jt',
   });
 
-  // Department distribution dataset
-  const departments = [
-    { name: 'Teknologi & Produk', count: 412, percentage: 33, barColor: 'bg-blue-600' },
-    { name: 'Operasional & Logistik', count: 310, percentage: 25, barColor: 'bg-indigo-600' },
-    { name: 'Pemasaran & Penjualan', count: 285, percentage: 23, barColor: 'bg-sky-500' },
-    { name: 'Keuangan & HR', count: 141, percentage: 11, barColor: 'bg-blue-400' },
-    { name: 'Legal & Kepatuhan', count: 100, percentage: 8, barColor: 'bg-slate-700' },
-  ];
+  // Department distribution dataset (Dynamic from database)
+  const [departments, setDepartments] = useState([
+    { name: 'Departemen Sistem Inti (Core Engine)', count: 3, percentage: 50, barColor: 'bg-blue-600' },
+    { name: 'Human Resource Department', count: 1, percentage: 17, barColor: 'bg-indigo-600' },
+    { name: 'Technology & Product', count: 1, percentage: 17, barColor: 'bg-sky-500' },
+    { name: 'Finance & Accounting', count: 1, percentage: 17, barColor: 'bg-blue-400' },
+  ]);
 
-  // System audit activities
-  const recentActivities = [
+  // System audit activities (Dynamic from employee directory)
+  const [recentActivities, setRecentActivities] = useState([
     {
       id: 'act-01',
-      title: 'Perpanjangan Kontrak Karyawan',
-      description: 'Kontrak kerja Ahmad Rizki diperpanjang 1 tahun oleh Bu Dewi Lestari.',
-      time: '18 menit yang lalu',
+      title: 'Data Pegawai: Rian Pratama, S.Kom',
+      description: 'Lead Backend Architect (Departemen Sistem Inti) • NIK: NX-2021008 • Karyawan Tetap (PKWTT)',
+      time: 'Sinkronisasi Aktif',
       dotColor: 'bg-blue-600',
     },
     {
       id: 'act-02',
-      title: 'Onboarding Magang Gelombang I',
-      description: '3 akun karyawan magang divisi Desain berhasil diaktivasi dan mendapat kredensial SSO.',
-      time: '1 jam yang lalu',
+      title: 'Data Pegawai: Siti Rahma, S.Psi',
+      description: 'HR Talent & People Partner (Human Resource) • NIK: NX-2022015 • Karyawan Tetap (PKWTT)',
+      time: 'Sinkronisasi Aktif',
       dotColor: 'bg-emerald-500',
     },
     {
       id: 'act-03',
-      title: 'Sinkronisasi Mesin Presensi',
-      description: 'Log 1.203 data tap-in pagi berhasil disinkronkan ke database server tanpa anomali.',
-      time: '2 jam yang lalu',
+      title: 'Data Pegawai: Budi Santoso, M.T.',
+      description: 'Staff DevOps & Security Engineer • NIK: NX-2023042 • Karyawan Tetap (PKWTT)',
+      time: 'Sinkronisasi Aktif',
       dotColor: 'bg-purple-600',
     },
-  ];
+  ]);
 
   // Live real-time sync with Employee Dashboard & REST APIs
   useEffect(() => {
     // 1. Fetch live metrics from unified APIs
     const fetchLiveMetrics = async () => {
       try {
-        // Employee headcount
-        const empRes = await fetch('/api/v1/employees?limit=1');
-        if (empRes.ok) {
-          const json = await empRes.json();
-          if (json.data?.meta?.total) {
+        // Employee headcount & complete personalia metrics
+        const empMetricsRes = await fetch('/api/v1/employees/metrics', { cache: 'no-store' });
+        if (empMetricsRes.ok) {
+          const json = await empMetricsRes.json();
+          if (json.data) {
+            const d = json.data;
             setMetrics((prev) => ({
               ...prev,
-              totalEmployees: json.data.meta.total,
+              totalEmployees: d.totalEmployees ?? prev.totalEmployees,
+              activeEmployees: d.activeEmployees ?? prev.activeEmployees,
+              permanentCount: d.permanentCount ?? prev.permanentCount,
+              contractCount: d.contractCount ?? prev.contractCount,
+              probationCount: d.probationCount ?? prev.probationCount,
+              attendanceRate: d.attendanceRate ?? prev.attendanceRate,
+              onTimeCount: d.onTimeCount ?? prev.onTimeCount,
+              lateCount: d.lateCount ?? prev.lateCount,
+              leaveCount: d.leaveCount ?? prev.leaveCount,
+              estimatedPayroll: d.estimatedPayroll ?? prev.estimatedPayroll,
             }));
+            if (Array.isArray(d.departmentDistribution) && d.departmentDistribution.length > 0) {
+              setDepartments(d.departmentDistribution);
+            }
+            if (Array.isArray(d.recentActivities) && d.recentActivities.length > 0) {
+              setRecentActivities(d.recentActivities);
+            }
           }
         }
 
         // Attendance stats
-        const attRes = await fetch('/api/v1/attendance');
+        const attRes = await fetch('/api/v1/attendance', { cache: 'no-store' });
         if (attRes.ok) {
           const json = await attRes.json();
           if (json.data) {
@@ -222,14 +261,18 @@ export default function AdminDashboardPage() {
         }
 
         // Approvals list
-        const appRes = await fetch('/api/v1/approvals');
+        const appRes = await fetch('/api/v1/approvals', { cache: 'no-store' });
         if (appRes.ok) {
           const json = await appRes.json();
           if (Array.isArray(json.data) && json.data.length > 0) {
             setRequests(json.data);
+            const leaveCount = json.data.filter((r: any) => r.type === 'cuti').length;
+            const otCount = json.data.filter((r: any) => r.type === 'lembur').length;
             setMetrics((prev) => ({
               ...prev,
               pendingApprovals: json.data.length,
+              pendingLeave: leaveCount,
+              pendingOvertime: otCount,
             }));
           }
         }
@@ -239,7 +282,7 @@ export default function AdminDashboardPage() {
     };
 
     fetchLiveMetrics();
-    const interval = setInterval(fetchLiveMetrics, 8000);
+    const interval = setInterval(fetchLiveMetrics, 6000);
 
     // 2. BroadcastChannel for instant (<5ms) cross-tab live synchronization
     let channel: BroadcastChannel | null = null;
@@ -248,6 +291,12 @@ export default function AdminDashboardPage() {
       channel.onmessage = (event) => {
         const msg = event.data;
         if (!msg || !msg.type) return;
+
+        // When employee directory is modified (added, edited, deleted)
+        if (msg.type === 'EMPLOYEES_UPDATED') {
+          fetchLiveMetrics();
+          showToast('⚡ Sinkronisasi: Perubahan data karyawan berhasil disinkronkan ke dashboard!');
+        }
 
         // When employee clocks in from ESS portal
         if (msg.type === 'EMPLOYEE_CLOCKED_IN') {
@@ -408,7 +457,7 @@ export default function AdminDashboardPage() {
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Berikut ringkasan aktivitas tenaga kerja dan permohonan yang memerlukan persetujuan hari ini, 24 Maret 2025.
+              Berikut ringkasan aktivitas tenaga kerja dan permohonan yang memerlukan persetujuan hari ini, {todayFormatted}.
             </p>
           </div>
 
@@ -428,7 +477,7 @@ export default function AdminDashboardPage() {
 
               {isMonthDropdownOpen && (
                 <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-20">
-                  {['Maret 2025', 'Februari 2025', 'Januari 2025'].map((m) => (
+                  {monthOptions.map((m) => (
                     <button
                       key={m}
                       onClick={() => {
@@ -487,10 +536,10 @@ export default function AdminDashboardPage() {
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                   <TrendingUp className="w-3 h-3" />
-                  +14 Baru
+                  {metrics.permanentCount || 0} Tetap
                 </span>
                 <span className="text-[11px] font-medium text-slate-500">
-                  Retensi 98.2%
+                  {metrics.contractCount || 0} Kontrak • {metrics.probationCount || 0} Probation
                 </span>
               </div>
             </div>
@@ -588,7 +637,7 @@ export default function AdminDashboardPage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">
-                  ESTIMASI PAYROLL MARET
+                  ESTIMASI PAYROLL {selectedMonth.toUpperCase()}
                 </span>
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                   <CreditCard className="w-4 h-4" />
@@ -599,15 +648,15 @@ export default function AdminDashboardPage() {
                 <span className="text-3xl font-extrabold text-[#0F172A] tracking-tight">
                   {metrics.estimatedPayroll}
                 </span>
-                <span className="text-xs font-medium text-slate-400">Miliar</span>
+                <span className="text-xs font-medium text-slate-400">/ Periode</span>
               </div>
 
               <div className="mt-3 flex items-center gap-2 text-[10px] font-medium text-slate-500">
                 <span className="inline-flex items-center gap-1 text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
                   <Clock className="w-3 h-3 text-blue-600" />
-                  Cut-off: 25 Mar
+                  Cut-off: 25 {currentMonthShort} {currentYear}
                 </span>
-                <span>Besok pkl 23:59</span>
+                <span>Pkl 23:59 WIB</span>
               </div>
             </div>
 
@@ -814,7 +863,7 @@ export default function AdminDashboardPage() {
                 href="/admin/leave"
                 className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
               >
-                <span>Lihat Semua 12 Permohonan Menunggu</span>
+                <span>Lihat Semua {requests.length} Permohonan Menunggu</span>
                 <span className="text-sm">→</span>
               </Link>
             </div>
@@ -836,7 +885,7 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
                 <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/60">
-                  5 Divisi
+                  {departments.length} Departemen
                 </span>
               </div>
 
