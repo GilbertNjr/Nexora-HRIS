@@ -28,6 +28,7 @@ import {
   UserPlus,
   RefreshCw,
   Loader2,
+  Download,
 } from 'lucide-react';
 
 export interface EmployeeItem {
@@ -229,6 +230,15 @@ export default function EmployeesPage() {
     }
 
     setIsAddModalOpen(false);
+    // Broadcast real-time update to Admin Dashboard
+    try {
+      const bc = new BroadcastChannel('nexora_live_sync');
+      bc.postMessage({ type: 'EMPLOYEES_UPDATED' });
+      bc.close();
+    } catch {
+      // ignore
+    }
+
     // Reset Form
     setFormData({
       firstName: '',
@@ -265,6 +275,10 @@ export default function EmployeesPage() {
         },
         body: JSON.stringify(editEmployee),
       });
+
+      const bc = new BroadcastChannel('nexora_live_sync');
+      bc.postMessage({ type: 'EMPLOYEES_UPDATED' });
+      bc.close();
     } catch {
       // ignore
     }
@@ -285,6 +299,10 @@ export default function EmployeesPage() {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+
+      const bc = new BroadcastChannel('nexora_live_sync');
+      bc.postMessage({ type: 'EMPLOYEES_UPDATED' });
+      bc.close();
     } catch {
       // ignore
     }
@@ -372,15 +390,27 @@ export default function EmployeesPage() {
             </div>
           </div>
 
-          {/* Add Employee CTA */}
-          <button
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-semibold shadow-sm shadow-blue-500/20 transition-all flex-shrink-0"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Tambah Karyawan</span>
-          </button>
+          {/* Actions CTA: Export CSV & Add Employee */}
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <a
+              href="/api/v1/employees/export"
+              download
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.99] text-slate-700 text-xs font-semibold shadow-2xs transition-all"
+              title="Ekspor Seluruh Data Karyawan ke CSV / Excel"
+            >
+              <Download className="w-4 h-4 text-slate-500" />
+              <span>Ekspor CSV</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-semibold shadow-sm shadow-blue-500/20 transition-all"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Tambah Karyawan</span>
+            </button>
+          </div>
         </div>
 
         {/* Master Employee Table matching reference design */}

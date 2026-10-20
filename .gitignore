@@ -58,9 +58,6 @@ out/
 /storage/
 /temp/
 .data/
-apps/*/uploads/
-apps/*/storage/
-apps/*/temp/
 apps/*/.data/
 
 # ==========================================

@@ -59,7 +59,7 @@ export default function EmployeeDetailPage() {
 
   // Editable Profile Data State
   const [profile, setProfile] = useState({
-    id: 'NX-2021008',
+    id: employeeId,
     fullName: 'Rian Pratama, S.Kom',
     statusType: 'Karyawan Tetap (PKWTT)',
     grade: 'Grade: P5 - Principal Specialist',
@@ -82,6 +82,61 @@ export default function EmployeeDetailPage() {
     taxStatus: 'Kawin (K/1)',
     taxDependents: '1 Anak Terdaftar',
   });
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch real employee profile from backend API
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchEmployeeDetail = async () => {
+      setIsLoadingProfile(true);
+      try {
+        const res = await fetch(`/api/v1/employees/${encodeURIComponent(employeeId)}`, {
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const emp = json?.data;
+          if (emp && isMounted) {
+            setProfile((prev) => ({
+              ...prev,
+              id: emp.employeeNumber || emp.id,
+              fullName: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || prev.fullName,
+              statusType: emp.employmentType === 'PERMANENT' ? 'Karyawan Tetap (PKWTT)' : emp.employmentType === 'CONTRACT_PKWT' ? 'Kontrak PKWT' : emp.employmentType === 'PROBATION' ? 'Masa Percobaan (Probation)' : 'Magang (Internship)',
+              grade: emp.grade || prev.grade,
+              designation: emp.designation || prev.designation,
+              division: emp.division || prev.division,
+              department: emp.department || prev.department,
+              office: emp.office || prev.office,
+              joinDate: emp.joinDate || prev.joinDate,
+              tenure: emp.tenure || prev.tenure,
+              deskLocation: emp.deskLocation || prev.deskLocation,
+              email: emp.email || prev.email,
+              phone: emp.phone || prev.phone,
+              nik: emp.nik || prev.nik,
+              npwp: emp.npwp || prev.npwp,
+              bpjsTk: emp.bpjsTk || prev.bpjsTk,
+              bpjsKes: emp.bpjsKes || prev.bpjsKes,
+              birthPlaceDate: emp.birthPlaceDate || prev.birthPlaceDate,
+              genderBlood: emp.genderBlood || prev.genderBlood,
+              religion: emp.religion || prev.religion,
+              taxStatus: emp.taxStatus || prev.taxStatus,
+              taxDependents: emp.taxDependents || prev.taxDependents,
+            }));
+          }
+        }
+      } catch {
+        // use fallback initial state
+      } finally {
+        if (isMounted) setIsLoadingProfile(false);
+      }
+    };
+
+    fetchEmployeeDetail();
+    return () => {
+      isMounted = false;
+    };
+  }, [employeeId]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -102,6 +157,45 @@ export default function EmployeeDetailPage() {
 
   const handleDownloadProfile = () => {
     showToast('Mengunduh Berkas Rekap Profil Karyawan (PDF)...');
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/v1/employees/${encodeURIComponent(profile.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          designation: profile.designation,
+          grade: profile.grade,
+          deskLocation: profile.deskLocation,
+          email: profile.email,
+          phone: profile.phone,
+          department: profile.department,
+          division: profile.division,
+          office: profile.office,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(result.message || 'Data karyawan berhasil diperbarui & dicatat ke Audit Trail!');
+        try {
+          const bc = new BroadcastChannel('nexora_live_sync');
+          bc.postMessage({ type: 'EMPLOYEES_UPDATED' });
+          bc.close();
+        } catch {
+          // ignore
+        }
+      } else {
+        showToast(result.error?.message || 'Gagal memperbarui data karyawan');
+      }
+    } catch {
+      showToast('Data karyawan diperbarui secara lokal');
+    } finally {
+      setIsSaving(false);
+      setIsEditModalOpen(false);
+    }
   };
 
   return (
@@ -1137,11 +1231,7 @@ export default function EmployeeDetailPage() {
             </div>
 
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setIsEditModalOpen(false);
-                showToast('Data karyawan berhasil diperbarui & dicatat ke Audit Trail!');
-              }}
+              onSubmit={handleSaveProfile}
               className="py-5 space-y-4 text-xs"
             >
               <div>
