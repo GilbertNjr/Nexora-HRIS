@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
+import { useApprovalsRealtime } from '@/hooks/useApprovalsRealtime';
 import {
   LayoutDashboard,
   Clock,
@@ -62,6 +63,127 @@ interface LeaveRequestItem {
   }[];
 }
 
+// Historical default leave records
+const defaultHistoricalLeaves: LeaveRequestItem[] = [
+  {
+    id: 'hist-01',
+    refNo: 'SK-2025-0019',
+    type: 'Izin Sakit',
+    title: 'Izin Sakit: Gejala ISPA & Demam',
+    startDate: '14 Feb',
+    endDate: '14 Feb 2025',
+    durationDays: 1,
+    handover: 'Handover Tiket Support',
+    notes:
+      'Mengalami demam tinggi dan radang tenggorokan setelah dinas luar. Dokter merekomendasikan istirahat penuh 1 hari.',
+    status: 'APPROVED',
+    statusBadge: 'Disetujui HR & Atasan',
+    submittedAt: '14 Feb 2025',
+    completedAt: '15 Feb 2025',
+    documentUrl: '#',
+    documentName: 'Surat_Dokter_Klinik_Mitra.pdf',
+    steps: [
+      {
+        title: 'Pengajuan Mandiri',
+        person: 'Rian Pratama',
+        time: '14 Feb, 07:30 WIB',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'Atasan Langsung',
+        person: 'Arya Wibowo (VP Eng)',
+        time: '14 Feb, 08:15 WIB',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'HR Operations',
+        person: 'Dewi Lestari, S.Psi',
+        time: '15 Feb, 10:00 WIB',
+        status: 'COMPLETED',
+      },
+    ],
+  },
+  {
+    id: 'hist-02',
+    refNo: 'LV-2025-0003',
+    type: 'Cuti Bersama',
+    title: 'Cuti Bersama Tahun Baru 2025',
+    startDate: '02 Jan',
+    endDate: '02 Jan 2025',
+    durationDays: 1,
+    handover: 'Sistem Terjadwal Otomatis',
+    notes: 'Libur resmi cuti bersama nasional pergantian tahun kalender.',
+    status: 'APPROVED',
+    statusBadge: 'Otomatis Disetujui',
+    submittedAt: '02 Jan 2025',
+    completedAt: '02 Jan 2025',
+    steps: [
+      {
+        title: 'Sistem Terjadwal',
+        person: 'Master HRIS Nexora',
+        time: '02 Jan, 00:00 WIB',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'HR Operations',
+        person: 'Dewi Lestari, S.Psi',
+        time: '02 Jan, 08:00 WIB',
+        status: 'COMPLETED',
+      },
+    ],
+  },
+];
+
+function mapApprovalToEssItem(item: any): LeaveRequestItem {
+  const isApproved = item.status === 'APPROVED';
+  const isRejected = item.status === 'REJECTED';
+  const isPending = !isApproved && !isRejected;
+
+  const refNo = item.refNo || `LV-${new Date().getFullYear()}-${String(item.id).slice(-4).toUpperCase()}`;
+  const leaveType = item.leaveType || item.highlightType || 'Cuti Tahunan';
+  const title = item.title || `${leaveType}: Permohonan Pribadi`;
+  const durationDays = item.durationDays || 1;
+  const submittedAt = item.submittedDate || 'Hari ini';
+
+  return {
+    id: item.id,
+    refNo,
+    type: leaveType,
+    title,
+    startDate: item.startDate || 'Hari ini',
+    endDate: item.endDate || 'Hari ini',
+    durationDays,
+    handover: item.handover || 'Nadia Wijaya (Handover)',
+    notes: item.reason || item.detail || 'Pengajuan permohonan mandiri via ESS.',
+    status: isApproved ? 'APPROVED' : isRejected ? 'REJECTED' : 'PENDING',
+    statusBadge: isApproved ? 'Disetujui HR & Atasan' : isRejected ? 'Ditolak oleh HRD' : 'Menunggu Verifikasi HRD',
+    submittedAt,
+    completedAt: isApproved ? 'Hari ini, Selesai' : undefined,
+    documentName: item.documentName || item.attachmentName,
+    documentUrl: item.documentUrl || '#',
+    steps: [
+      {
+        title: 'Pengajuan Mandiri',
+        person: item.name || 'Rian Pratama',
+        time: submittedAt,
+        status: 'COMPLETED',
+      },
+      {
+        title: 'Atasan Langsung',
+        person: 'Arya Wibowo (VP Eng)',
+        time: 'Terverifikasi',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'HR Operations',
+        person: 'Dewi Lestari, S.Psi',
+        time: isApproved ? 'Disetujui HRD' : isRejected ? 'Ditolak HRD' : 'Menunggu Verifikasi HRD',
+        status: isApproved ? 'COMPLETED' : isPending ? 'IN_PROGRESS' : 'PENDING',
+      },
+    ],
+  };
+}
+
 export default function EssLeaveOverhaulPage() {
   // Filter tabs: all, pending, approved
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'approved'>('all');
@@ -87,11 +209,11 @@ export default function EssLeaveOverhaulPage() {
   // Leave Balances
   const [balances, setBalances] = useState({
     annualTotal: 12,
-    annualUsed: 4,
-    annualRemaining: 8,
+    annualUsed: 0,
+    annualRemaining: 12,
     jointHoliday: 2,
     sickUsed: 1,
-    pendingCount: 1,
+    pendingCount: 0,
   });
 
   const showToast = (msg: string) => {
@@ -99,111 +221,106 @@ export default function EssLeaveOverhaulPage() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Leave Requests matching screenshot
-  const [requests, setRequests] = useState<LeaveRequestItem[]>([
-    {
-      id: 'req-01',
-      refNo: 'LV-2025-0042',
-      type: 'Cuti Tahunan',
-      title: 'Cuti Tahunan: Mudik Hari Raya Idul Fitri 1446 H',
-      startDate: '31 Mar',
-      endDate: '04 Apr 2025',
-      durationDays: 4,
-      handover: 'Nadia Wijaya',
-      notes:
-        'Perjalanan mudik tahunan ke Klaten, Jawa Tengah bersama keluarga. Seluruh sprint backend release v3.4 telah didelegasikan dan on-call incident standby dikoordinasikan bersama tim.',
-      status: 'PENDING',
-      statusBadge: 'Menunggu Verifikasi',
-      submittedAt: '20 Mar 2025',
-      steps: [
-        {
-          title: 'Pengajuan Mandiri',
-          person: 'Rian Pratama',
-          time: '20 Mar, 09:15 WIB',
-          status: 'COMPLETED',
-        },
-        {
-          title: 'Atasan Langsung',
-          person: 'Arya Wibowo (VP Eng)',
-          time: 'Menunggu Verifikasi',
-          status: 'IN_PROGRESS',
-        },
-        {
-          title: 'HR Operations',
-          person: 'Dewi Lestari, S.Psi',
-          time: 'Tahap Akhir',
-          status: 'PENDING',
-        },
-      ],
+  // Leave Requests state
+  const [requests, setRequests] = useState<LeaveRequestItem[]>(defaultHistoricalLeaves);
+
+  // Fetch live approvals from API and sync with employee view
+  const fetchLiveLeaveData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/approvals?all=true');
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.data)) {
+          const backendItems: LeaveRequestItem[] = json.data
+            .filter((item: any) => item.type === 'cuti' || !item.type || item.leaveType)
+            .map(mapApprovalToEssItem);
+
+          setRequests((prev) => {
+            const backendIds = new Set(backendItems.map((b) => b.id));
+            const remainingHist = defaultHistoricalLeaves.filter((h) => !backendIds.has(h.id));
+            return [...backendItems, ...remainingHist];
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Multi-device real-time SSE stream hook for ESS
+  useApprovalsRealtime({
+    playAudioAlert: true,
+    onLeaveSubmitted: (newItem) => {
+      if (newItem.type === 'lembur' && !newItem.leaveType) return;
+      const mapped = mapApprovalToEssItem(newItem);
+      setRequests((prev) => [mapped, ...prev.filter((r) => r.id !== mapped.id)]);
+      showToast(`✓ Pengajuan ${mapped.type} berhasil terkirim & menunggu persetujuan HR.`);
     },
-    {
-      id: 'req-02',
-      refNo: 'SK-2025-0019',
-      type: 'Izin Sakit',
-      title: 'Izin Sakit: Gejala ISPA & Demam',
-      startDate: '14 Feb',
-      endDate: '14 Feb 2025',
-      durationDays: 1,
-      handover: 'Handover Tiket Support',
-      notes:
-        'Mengalami demam tinggi dan radang tenggorokan setelah dinas luar. Dokter merekomendasikan istirahat penuh 1 hari.',
-      status: 'APPROVED',
-      statusBadge: 'Disetujui HR & Atasan',
-      submittedAt: '14 Feb 2025',
-      completedAt: '15 Feb 2025',
-      documentUrl: '#',
-      documentName: 'Surat_Dokter_Klinik_Mitra.pdf',
-      steps: [
-        {
-          title: 'Pengajuan Mandiri',
-          person: 'Rian Pratama',
-          time: '14 Feb, 07:30 WIB',
-          status: 'COMPLETED',
-        },
-        {
-          title: 'Atasan Langsung',
-          person: 'Arya Wibowo (VP Eng)',
-          time: '14 Feb, 08:15 WIB',
-          status: 'COMPLETED',
-        },
-        {
-          title: 'HR Operations',
-          person: 'Dewi Lestari, S.Psi',
-          time: '15 Feb, 10:00 WIB',
-          status: 'COMPLETED',
-        },
-      ],
+    onLeaveActioned: ({ id, status }) => {
+      const isApproved = status === 'APPROVED';
+      setRequests((prev) =>
+        prev.map((r) => {
+          if (r.id === id) {
+            return {
+              ...r,
+              status: isApproved ? 'APPROVED' : 'REJECTED',
+              statusBadge: isApproved ? 'Disetujui HR & Atasan' : 'Ditolak oleh HRD',
+              completedAt: isApproved ? 'Hari ini, Selesai' : undefined,
+              steps: [
+                r.steps[0],
+                r.steps[1] || {
+                  title: 'Atasan Langsung',
+                  person: 'Arya Wibowo (VP Eng)',
+                  time: 'Terverifikasi',
+                  status: 'COMPLETED',
+                },
+                {
+                  title: 'HR Operations',
+                  person: 'Dewi Lestari, S.Psi',
+                  time: isApproved ? 'Disetujui HRD' : 'Ditolak HRD',
+                  status: isApproved ? 'COMPLETED' : 'PENDING',
+                },
+              ],
+            };
+          }
+          return r;
+        })
+      );
+
+      showToast(
+        isApproved
+          ? '🎉 Selamat! Pengajuan Cuti Anda telah DISETUJUI oleh HR Admin!'
+          : 'ℹ️ Pengajuan Cuti Anda telah DITOLAK oleh HR Admin.'
+      );
     },
-    {
-      id: 'req-03',
-      refNo: 'LV-2025-0003',
-      type: 'Cuti Bersama',
-      title: 'Cuti Bersama Tahun Baru 2025',
-      startDate: '02 Jan',
-      endDate: '02 Jan 2025',
-      durationDays: 1,
-      handover: 'Sistem Terjadwal Otomatis',
-      notes: 'Libur resmi cuti bersama nasional pergantian tahun kalender.',
-      status: 'APPROVED',
-      statusBadge: 'Otomatis Disetujui',
-      submittedAt: '02 Jan 2025',
-      completedAt: '02 Jan 2025',
-      steps: [
-        {
-          title: 'Sistem Terjadwal',
-          person: 'Master HRIS Nexora',
-          time: '02 Jan, 00:00 WIB',
-          status: 'COMPLETED',
-        },
-        {
-          title: 'HR Operations',
-          person: 'Dewi Lestari, S.Psi',
-          time: '02 Jan, 08:00 WIB',
-          status: 'COMPLETED',
-        },
-      ],
+    onRefresh: () => {
+      fetchLiveLeaveData();
     },
-  ]);
+  });
+
+  // Load live approvals on mount
+  useEffect(() => {
+    fetchLiveLeaveData();
+  }, [fetchLiveLeaveData]);
+
+  // Recalculate balances dynamically based on requests
+  useEffect(() => {
+    const pending = requests.filter((r) => r.status === 'PENDING').length;
+    const approvedAnnual = requests
+      .filter((r) => r.status === 'APPROVED' && r.type.includes('Tahunan'))
+      .reduce((sum, r) => sum + (r.durationDays || 0), 0);
+    const approvedSick = requests
+      .filter((r) => r.status === 'APPROVED' && (r.type.includes('Sakit') || r.title.includes('Sakit')))
+      .reduce((sum, r) => sum + (r.durationDays || 0), 0);
+
+    setBalances((prev) => ({
+      ...prev,
+      pendingCount: pending,
+      annualUsed: approvedAnnual,
+      annualRemaining: Math.max(0, prev.annualTotal - approvedAnnual),
+      sickUsed: Math.max(1, approvedSick),
+    }));
+  }, [requests]);
 
   // Cancel Pending Request
   const handleCancelPending = (id: string) => {

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
+import { useApprovalsRealtime } from '@/hooks/useApprovalsRealtime';
 import {
   LayoutDashboard,
   Clock,
@@ -118,6 +119,21 @@ export default function EmployeeDashboardOverhaulPage() {
       })
     );
   }, []);
+
+  // Multi-device real-time SSE stream hook for employee dashboard
+  useApprovalsRealtime({
+    playAudioAlert: true,
+    onLeaveActioned: ({ status, item }) => {
+      if (status === 'APPROVED') {
+        showToast(`🎉 Pengajuan cuti Anda telah DISETUJUI oleh HR Admin!`);
+        if (item?.typeCategory === 'tahunan' && item?.durationDays) {
+          setActiveQuota((prev) => Math.max(0, prev - item.durationDays));
+        }
+      } else if (status === 'REJECTED') {
+        showToast(`ℹ️ Pengajuan cuti Anda telah DITOLAK oleh HR Admin.`);
+      }
+    },
+  });
 
   // Handle Leave Submit (Rich real-time payload)
   const handleLeaveSubmit = async (e: React.FormEvent) => {
