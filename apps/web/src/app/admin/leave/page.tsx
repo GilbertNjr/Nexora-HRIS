@@ -113,105 +113,8 @@ export default function AdminLeavePage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Base Dataset
-  const [requests, setRequests] = useState<LeaveRequest[]>([
-    {
-      id: 'req-01',
-      name: 'Budi Santoso, M.T.',
-      nik: 'NX-201944',
-      role: 'Staff DevOps & Security Engineer',
-      department: 'Departemen Sistem Inti',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
-      leaveType: 'Cuti Tahunan',
-      typeCategory: 'tahunan',
-      startDate: '21 Okt 2026',
-      endDate: '23 Okt 2026',
-      durationDays: 3,
-      remainingQuota: 9,
-      totalQuota: 12,
-      reason: 'Acara keluarga di kampung halaman & refreshing tahunan',
-      status: 'PENDING_HRD',
-      submittedDate: '24 Mar 2025, 08:30',
-    },
-    {
-      id: 'req-02',
-      name: 'Siti Rahma, S.Psi',
-      nik: 'NX-202105',
-      role: 'HR Talent & People Partner',
-      department: 'Human Resource',
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200',
-      leaveType: 'Cuti Sakit (Rawat Jalan)',
-      typeCategory: 'sakit',
-      startDate: '19 Okt 2026',
-      endDate: '19 Okt 2026',
-      durationDays: 1,
-      remainingQuota: 12,
-      totalQuota: 12,
-      reason: 'Demam tinggi dan istirahat dokter klinik medika',
-      documentName: 'Surat_Dokter_Klinik.pdf',
-      documentUrl: '#',
-      status: 'PENDING_HRD',
-      submittedDate: '24 Mar 2025, 07:15',
-    },
-    {
-      id: 'req-03',
-      name: 'Dimas Aditya',
-      nik: 'NX-202219',
-      role: 'Backend Engineer',
-      department: 'Technology & IT',
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
-      leaveType: 'Cuti Khusus (Menikah)',
-      typeCategory: 'khusus',
-      startDate: '07 Apr 2025',
-      endDate: '09 Apr 2025',
-      durationDays: 3,
-      remainingQuota: 12,
-      totalQuota: 12,
-      reason: 'Pernikahan pribadi di Bandung (Hak Cuti Khusus PKB)',
-      documentName: 'Undangan_Pernikahan.pdf',
-      documentUrl: '#',
-      status: 'PENDING_SPV',
-      submittedDate: '23 Mar 2025, 16:40',
-    },
-    {
-      id: 'req-04',
-      name: 'Dewi Lestari, S.Psi',
-      nik: 'NX-201804',
-      role: 'HR Operations Manager',
-      department: 'People Operations',
-      avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200',
-      leaveType: 'Cuti Tahunan',
-      typeCategory: 'tahunan',
-      startDate: '14 Apr 2025',
-      endDate: '16 Apr 2025',
-      durationDays: 3,
-      remainingQuota: 8,
-      totalQuota: 12,
-      reason: 'Istirahat cuti tahunan pertengahan tahun',
-      status: 'APPROVED',
-      submittedDate: '20 Mar 2025, 11:20',
-    },
-    {
-      id: 'req-05',
-      name: 'Ahmad Rizki',
-      nik: 'NX-202302',
-      role: 'Field Logistics Officer',
-      department: 'Logistik & Hub',
-      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200',
-      leaveType: 'Cuti Sakit (Rawat Jalan)',
-      typeCategory: 'sakit',
-      startDate: '24 Mar 2025',
-      endDate: '24 Mar 2025',
-      durationDays: 1,
-      remainingQuota: 10,
-      totalQuota: 12,
-      reason: 'Flu berat & radang tenggorokan',
-      documentName: 'Surat_Dokter_Puskesmas.pdf',
-      documentUrl: '#',
-      status: 'APPROVED',
-      submittedDate: '24 Mar 2025, 06:45',
-    },
-  ]);
+  // Base Dataset (Initialized empty until employee submits leave)
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
 
   // Fetch live leave requests from unified API
   const fetchLiveLeaveData = useCallback(async (isManualRefresh = false) => {
@@ -220,13 +123,11 @@ export default function AdminLeavePage() {
       const res = await fetch('/api/v1/approvals?all=true');
       if (res.ok) {
         const json = await res.json();
-        if (Array.isArray(json.data) && json.data.length > 0) {
+        if (Array.isArray(json.data)) {
           const cutiItems = json.data
             .filter((item: any) => item.type === 'cuti' || !item.type || item.leaveType)
             .map(mapApprovalToLeave);
-          if (cutiItems.length > 0) {
-            setRequests(cutiItems);
-          }
+          setRequests(cutiItems);
         }
       }
       if (isManualRefresh) {

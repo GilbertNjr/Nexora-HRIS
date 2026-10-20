@@ -117,52 +117,7 @@ export default function AdminDashboardPage() {
   };
 
   // Dynamic approval list state synchronized with employee data and current date
-  const [requests, setRequests] = useState<ApprovalRequest[]>([
-    {
-      id: 'req-01',
-      name: 'Budi Santoso, M.T.',
-      role: 'Staff DevOps & Security Engineer • Departemen Sistem Inti',
-      type: 'cuti',
-      title: `Pengajuan Cuti Tahunan (3 Hari: ${now.getDate() + 2} - ${now.getDate() + 4} ${currentMonthShort} ${currentYear})`,
-      highlightType: 'Cuti Tahunan',
-      detail: `3 Hari: ${now.getDate() + 2} - ${now.getDate() + 4} ${currentMonthShort} ${currentYear}`,
-      quotaMeta: 'Sisa Kuota: 9 Hari',
-      timestamp: 'Diajukan: 2 jam lalu',
-      avatarColor: 'from-blue-600 to-indigo-600',
-      initials: 'BS',
-      verifiedBadge: 'check',
-    },
-    {
-      id: 'req-02',
-      name: 'Siti Rahma, S.Psi',
-      role: 'HR Talent & People Partner • Human Resource',
-      type: 'cuti',
-      title: `Pengajuan Cuti Sakit — 1 Hari (${now.getDate()} ${currentMonthShort} ${currentYear})`,
-      highlightType: 'Cuti Sakit',
-      detail: `1 Hari (${now.getDate()} ${currentMonthShort} ${currentYear})`,
-      hasAttachment: true,
-      attachmentName: 'Surat_Dokter_Klinik.pdf (Terlampir)',
-      timestamp: 'Diajukan: 08:30 WIB',
-      avatarColor: 'from-amber-500 to-rose-500',
-      initials: 'SR',
-      verifiedBadge: 'alert',
-    },
-    {
-      id: 'req-03',
-      name: 'Maya Anggraini, S.Ds',
-      role: 'UI/UX Product Designer • Technology & Product',
-      type: 'lembur',
-      title: 'Klaim Lembur Rilis Aplikasi (4 Jam • Deployment Server Core)',
-      highlightType: 'Lembur Akhir Pekan',
-      detail: `4 Jam • Deployment Server Core (${Math.max(1, now.getDate() - 1)} ${currentMonthShort} ${currentYear})`,
-      estimatedCost: 'Total Taksiran: Rp 360.000',
-      verifiedBy: 'Disetujui Tech Lead: Ya',
-      timestamp: 'Diajukan: Kemarin',
-      avatarColor: 'from-emerald-500 to-teal-700',
-      initials: 'MA',
-      verifiedBadge: 'bolt',
-    },
-  ]);
+  const [requests, setRequests] = useState<ApprovalRequest[]>([]);
 
   // Dynamic Metrics State
   const [metrics, setMetrics] = useState({
@@ -175,9 +130,9 @@ export default function AdminDashboardPage() {
     onTimeCount: 6,
     lateCount: 0,
     leaveCount: 0,
-    pendingApprovals: 3,
-    pendingLeave: 2,
-    pendingOvertime: 1,
+    pendingApprovals: 0,
+    pendingLeave: 0,
+    pendingOvertime: 0,
     estimatedPayroll: 'Rp 118.5 Jt',
   });
 

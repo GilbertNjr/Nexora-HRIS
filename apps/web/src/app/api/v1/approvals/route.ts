@@ -43,113 +43,7 @@ export interface ApprovalItem {
   submittedDate?: string;
 }
 
-const defaultApprovals: ApprovalItem[] = [
-  {
-    id: 'req-01',
-    name: 'Budi Santoso, M.T.',
-    nik: 'NX-201944',
-    role: 'Staff DevOps & Security Engineer • Departemen Sistem Inti',
-    department: 'Departemen Sistem Inti',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
-    type: 'cuti',
-    leaveType: 'Cuti Tahunan',
-    typeCategory: 'tahunan',
-    title: 'Pengajuan Cuti Tahunan (3 Hari: 21 - 23 Okt 2026)',
-    highlightType: 'Cuti Tahunan',
-    detail: '3 Hari: 21 - 23 Okt 2026',
-    startDate: '21 Okt 2026',
-    endDate: '23 Okt 2026',
-    durationDays: 3,
-    remainingQuota: 9,
-    totalQuota: 12,
-    reason: 'Acara keluarga di kampung halaman & refreshing tahunan',
-    quotaMeta: 'Sisa Kuota: 9 Hari',
-    timestamp: 'Diajukan: 2 jam lalu',
-    avatarColor: 'from-blue-600 to-indigo-600',
-    initials: 'BS',
-    verifiedBadge: 'check',
-    status: 'PENDING',
-    submittedDate: 'Hari ini, 08:30 WIB',
-  },
-  {
-    id: 'req-02',
-    name: 'Siti Rahma, S.Psi',
-    nik: 'NX-202105',
-    role: 'HR Talent & People Partner • Human Resource',
-    department: 'Human Resource',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200',
-    type: 'cuti',
-    leaveType: 'Cuti Sakit',
-    typeCategory: 'sakit',
-    title: 'Pengajuan Cuti Sakit (1 Hari (19 Okt 2026))',
-    highlightType: 'Cuti Sakit',
-    detail: '1 Hari (19 Okt 2026)',
-    startDate: '19 Okt 2026',
-    endDate: '19 Okt 2026',
-    durationDays: 1,
-    remainingQuota: 12,
-    totalQuota: 12,
-    reason: 'Demam tinggi dan istirahat dokter klinik medika',
-    hasAttachment: true,
-    attachmentName: 'Surat_Dokter_Klinik.pdf (Terlampir)',
-    documentName: 'Surat_Dokter_Klinik.pdf',
-    documentUrl: '#',
-    timestamp: 'Diajukan: 08:30 WIB',
-    avatarColor: 'from-amber-500 to-rose-500',
-    initials: 'SR',
-    verifiedBadge: 'alert',
-    status: 'PENDING',
-    submittedDate: 'Hari ini, 08:30 WIB',
-  },
-  {
-    id: 'req-03',
-    name: 'Maya Anggraini, S.Ds',
-    nik: 'NX-202219',
-    role: 'UI/UX Product Designer • Technology & Product',
-    department: 'Technology & Product',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-    type: 'lembur',
-    highlightType: 'Lembur Akhir Pekan',
-    title: 'Pengajuan Lembur Akhir Pekan (4 Jam • Deployment Server Core (18 Okt 2026))',
-    detail: '4 Jam • Deployment Server Core (18 Okt 2026)',
-    durationDays: 1,
-    estimatedCost: 'Total Taksiran: Rp 360.000',
-    verifiedBy: 'Disetujui Tech Lead: Ya',
-    timestamp: 'Diajukan: Kemarin',
-    avatarColor: 'from-emerald-500 to-teal-700',
-    initials: 'MA',
-    verifiedBadge: 'bolt',
-    status: 'PENDING',
-    submittedDate: 'Kemarin, 17:00 WIB',
-  },
-  {
-    id: 'req-04',
-    name: 'Dewi Lestari, S.Psi',
-    nik: 'NX-201804',
-    role: 'HR Operations Manager • Human Resource',
-    department: 'Human Resource',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200',
-    type: 'cuti',
-    leaveType: 'Cuti Tahunan',
-    typeCategory: 'tahunan',
-    title: 'Pengajuan Cuti Tahunan (3 Hari)',
-    highlightType: 'Cuti Tahunan',
-    detail: '3 Hari: 14 - 16 Apr 2025',
-    startDate: '14 Apr 2025',
-    endDate: '16 Apr 2025',
-    durationDays: 3,
-    remainingQuota: 8,
-    totalQuota: 12,
-    reason: 'Istirahat cuti tahunan pertengahan tahun',
-    quotaMeta: 'Sisa Kuota: 8 Hari',
-    timestamp: 'Diajukan: 3 hari lalu',
-    avatarColor: 'from-purple-600 to-pink-600',
-    initials: 'DL',
-    verifiedBadge: 'check',
-    status: 'APPROVED',
-    submittedDate: '10 Apr 2025, 14:20 WIB',
-  },
-];
+const defaultApprovals: ApprovalItem[] = [];
 
 function ensureStorage(): void {
   try {
@@ -166,14 +60,12 @@ function getStoredApprovals(): ApprovalItem[] {
     ensureStorage();
     if (fs.existsSync(APPROVALS_FILE)) {
       const data = JSON.parse(fs.readFileSync(APPROVALS_FILE, 'utf-8'));
-      if (Array.isArray(data) && data.length > 0) return data;
+      if (Array.isArray(data)) return data;
     }
   } catch {
     // fallback
   }
-  // Initialize file with default data if empty
-  saveStoredApprovals(defaultApprovals);
-  return defaultApprovals;
+  return [];
 }
 
 function saveStoredApprovals(data: ApprovalItem[]): void {
