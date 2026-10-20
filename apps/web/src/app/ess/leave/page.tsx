@@ -6,6 +6,7 @@ import { NotificationBellDropdown } from '@/components/notifications/Notificatio
 import { useApprovalsRealtime } from '@/hooks/useApprovalsRealtime';
 import {
   LayoutDashboard,
+  User,
   Clock,
   CalendarDays,
   CreditCard,
@@ -508,6 +509,15 @@ export default function EssLeaveOverhaulPage() {
               <span>Beranda Saya</span>
             </Link>
 
+            {/* Profil Saya */}
+            <Link
+              href="/ess/profile"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
+            >
+              <User className="w-4 h-4 text-slate-400" />
+              <span>Profil Saya</span>
+            </Link>
+
             <Link
               href="/ess/attendance"
               className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
@@ -644,7 +654,7 @@ export default function EssLeaveOverhaulPage() {
             <NotificationBellDropdown portal="ess" />
 
             <Link
-              href="/admin/profile"
+              href="/ess/profile"
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">

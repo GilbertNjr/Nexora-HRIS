@@ -77,7 +77,7 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
       {/* Top Header */}
       <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <Link href="/ess" className="flex items-center gap-2.5">
+          <Link href="/karyawan" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-xs flex-shrink-0">
               {companyLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -128,9 +128,9 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
       <div className="hidden md:flex bg-white border-b border-slate-200 px-6 sticky top-16 z-30 shadow-xs">
         <div className="max-w-4xl mx-auto w-full flex items-center gap-8">
           <Link
-            href="/ess"
+            href="/karyawan"
             className={`py-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-              pathname === '/ess'
+              pathname === '/karyawan'
                 ? 'text-blue-700 border-blue-600'
                 : 'text-slate-600 hover:text-blue-600 border-transparent'
             }`}
@@ -140,9 +140,21 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
           </Link>
 
           <Link
-            href="/ess/attendance"
+            href="/karyawan/profile"
             className={`py-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-              pathname === '/ess/attendance'
+              pathname === '/karyawan/profile'
+                ? 'text-blue-700 border-blue-600'
+                : 'text-slate-600 hover:text-blue-600 border-transparent'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>Profil Saya</span>
+          </Link>
+
+          <Link
+            href="/karyawan/attendance"
+            className={`py-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
+              pathname === '/karyawan/attendance'
                 ? 'text-blue-700 border-blue-600'
                 : 'text-slate-600 hover:text-blue-600 border-transparent'
             }`}
@@ -152,9 +164,9 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
           </Link>
 
           <Link
-            href="/ess/leave"
+            href="/karyawan/leave"
             className={`py-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-              pathname === '/ess/leave'
+              pathname === '/karyawan/leave'
                 ? 'text-blue-700 border-blue-600'
                 : 'text-slate-600 hover:text-blue-600 border-transparent'
             }`}
@@ -164,9 +176,9 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
           </Link>
 
           <Link
-            href="/ess/payroll"
+            href="/karyawan/payroll"
             className={`py-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-              pathname === '/ess/payroll'
+              pathname === '/karyawan/payroll'
                 ? 'text-blue-700 border-blue-600'
                 : 'text-slate-600 hover:text-blue-600 border-transparent'
             }`}
@@ -183,36 +195,45 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 z-50 flex items-center justify-around px-2 shadow-lg">
         <Link
-          href="/ess"
+          href="/karyawan"
           className={`flex flex-col items-center gap-1 ${
-            pathname === '/ess' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
+            pathname === '/karyawan' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
           }`}
         >
           <LayoutDashboard className="w-5 h-5" />
           <span className="text-[10px]">Beranda</span>
         </Link>
         <Link
-          href="/ess/attendance"
+          href="/karyawan/profile"
           className={`flex flex-col items-center gap-1 ${
-            pathname === '/ess/attendance' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
+            pathname === '/karyawan/profile' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
+          }`}
+        >
+          <User className="w-5 h-5" />
+          <span className="text-[10px]">Profil</span>
+        </Link>
+        <Link
+          href="/karyawan/attendance"
+          className={`flex flex-col items-center gap-1 ${
+            pathname === '/karyawan/attendance' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
           }`}
         >
           <Clock className="w-5 h-5" />
           <span className="text-[10px]">Presensi</span>
         </Link>
         <Link
-          href="/ess/leave"
+          href="/karyawan/leave"
           className={`flex flex-col items-center gap-1 ${
-            pathname === '/ess/leave' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
+            pathname === '/karyawan/leave' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
           }`}
         >
           <CalendarDays className="w-5 h-5" />
           <span className="text-[10px]">Cuti</span>
         </Link>
         <Link
-          href="/ess/payroll"
+          href="/karyawan/payroll"
           className={`flex flex-col items-center gap-1 ${
-            pathname === '/ess/payroll' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
+            pathname === '/karyawan/payroll' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
           }`}
         >
           <FileText className="w-5 h-5" />

@@ -430,6 +430,16 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
               <span>{formattedDate}</span>
             </div>
 
+            {/* Quick Switch to Portal Karyawan */}
+            <Link
+              href="/karyawan"
+              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-blue-700 text-xs font-semibold shadow-2xs transition-all active:scale-95"
+              title="Buka Portal Mandiri Karyawan"
+            >
+              <Users className="w-3.5 h-3.5 text-blue-600" />
+              <span>Portal Karyawan</span>
+            </Link>
+
             {/* Quick Action Button */}
             <Link
               href="/admin/quick-entry"
