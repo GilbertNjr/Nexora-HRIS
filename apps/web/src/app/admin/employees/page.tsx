@@ -86,13 +86,25 @@ export default function EmployeesPage() {
 
   // 1. Fetch live from backend API or sync with persistent storage
   useEffect(() => {
-    // Check persistent storage first
+    // Check persistent storage first (ignore legacy mock data)
     try {
       const stored = localStorage.getItem('nexora_employees_db');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setEmployees(parsed);
+        if (Array.isArray(parsed)) {
+          const hasLegacyMock = parsed.some(
+            (p) =>
+              p.employeeNumber === 'NX-2021008' ||
+              p.employeeNumber === 'NX-2026001' ||
+              p.fullName === 'Kevin Pratama' ||
+              p.fullName === 'Rian Pratama, S.Kom'
+          );
+          if (hasLegacyMock) {
+            localStorage.setItem('nexora_employees_db', JSON.stringify([]));
+            setEmployees([]);
+          } else {
+            setEmployees(parsed);
+          }
         }
       }
     } catch {
@@ -111,10 +123,10 @@ export default function EmployeesPage() {
         if (res.ok) {
           const resData = await res.json();
           const items = resData?.data?.items || resData?.data || [];
-          if (Array.isArray(items) && items.length > 0) {
+          if (Array.isArray(items)) {
             const mapped: EmployeeItem[] = items.map((emp: any) => ({
               id: emp.id,
-              employeeNumber: emp.employeeNumber || `NIK-${emp.id.slice(0, 6)}`,
+              employeeNumber: emp.employeeNumber || `NIK-${String(emp.id).slice(0, 6)}`,
               fullName: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
               firstName: emp.firstName || '',
               lastName: emp.lastName || '',
@@ -195,7 +207,7 @@ export default function EmployeesPage() {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
 
-      await fetch('/api/v1/employees', {
+      const res = await fetch('/api/v1/employees', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,6 +227,14 @@ export default function EmployeesPage() {
           accountHolder: formData.accountHolderName || `${formData.firstName} ${formData.lastName}`.trim(),
         }),
       });
+
+      if (res.ok) {
+        const resJson = await res.json();
+        if (resJson.data?.employeeNumber) {
+          newEmp.employeeNumber = resJson.data.employeeNumber;
+          newEmp.id = resJson.data.id || newEmp.id;
+        }
+      }
     } catch {
       // saved resiliently
     } finally {
@@ -295,7 +315,7 @@ export default function EmployeesPage() {
     try {
       localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
       const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
-      await fetch(`/api/v1/employees/${deleteCandidate.id}`, {
+      await fetch(`/api/v1/employees/${deleteCandidate.id}?permanent=true`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

@@ -47,227 +47,8 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const STORAGE_DIR = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(process.cwd(), '.data');
 const STORAGE_FILE = path.join(STORAGE_DIR, 'nexora_employees.json');
 
-// Default initial data for production & demo stability
-const DEFAULT_EMPLOYEES: EmployeeRecord[] = [
-  {
-    id: 'NX-2021008',
-    employeeNumber: 'NX-2021008',
-    fullName: 'Rian Pratama, S.Kom',
-    firstName: 'Rian',
-    lastName: 'Pratama, S.Kom',
-    email: 'rian.pratama@nexora.co.id',
-    phone: '+62 812-9845-1120',
-    department: 'Departemen Sistem Inti (Core Engine)',
-    designation: 'Lead Backend Architect',
-    division: 'Divisi Rekayasa & Arsitektur Cloud',
-    grade: 'Grade: P5 - Principal Specialist',
-    office: 'Head Office Jakarta',
-    deskLocation: 'Lantai 7, Node #B-12',
-    employmentType: 'PERMANENT',
-    employmentStatus: 'ACTIVE',
-    joinDate: '2021-01-14',
-    tenure: '4 Tahun 2 Bulan',
-    nik: '3174051408920003',
-    npwp: '82.491.332.8-014.000',
-    bpjsTk: '21094481029',
-    bpjsKes: '0002881920194',
-    birthPlaceDate: 'Jakarta, 14 Agustus 1992 (32 Tahun)',
-    genderBlood: 'Laki-Laki / O (+)',
-    religion: 'Islam',
-    taxStatus: 'Kawin (K/1)',
-    taxDependents: '1 Anak Terdaftar',
-    avatarUrl: '/avatars/rian-pratama.jpg',
-    bankName: 'BCA',
-    accountNumber: '8002918291',
-    accountHolder: 'Rian Pratama',
-    basicSalary: 28500000,
-    transportAllowance: 2500000,
-    mealAllowance: 1800000,
-    createdAt: '2021-01-14T08:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'NX-2022015',
-    employeeNumber: 'NX-2022015',
-    fullName: 'Siti Rahma, S.Psi',
-    firstName: 'Siti',
-    lastName: 'Rahma, S.Psi',
-    email: 'siti.rahma@nexora.co.id',
-    phone: '+62 813-8821-4450',
-    department: 'Human Resource Department',
-    designation: 'HR Talent & People Partner',
-    division: 'Divisi Sumber Daya Manusia',
-    grade: 'Grade: M2 - Senior Specialist',
-    office: 'Head Office Jakarta',
-    deskLocation: 'Lantai 5, HR Hub #A-04',
-    employmentType: 'PERMANENT',
-    employmentStatus: 'ACTIVE',
-    joinDate: '2022-03-01',
-    tenure: '3 Tahun 1 Bulan',
-    nik: '3276015504950001',
-    npwp: '71.234.567.8-012.000',
-    bpjsTk: '22019948102',
-    bpjsKes: '0001992837461',
-    birthPlaceDate: 'Bandung, 15 April 1995 (29 Tahun)',
-    genderBlood: 'Perempuan / A (+)',
-    religion: 'Islam',
-    taxStatus: 'Lajang (TK/0)',
-    taxDependents: 'Tidak Ada',
-    avatarUrl: '/avatars/siti-rahma.jpg',
-    bankName: 'Bank Mandiri',
-    accountNumber: '137001928374',
-    accountHolder: 'Siti Rahma',
-    basicSalary: 16500000,
-    transportAllowance: 1500000,
-    mealAllowance: 1500000,
-    createdAt: '2022-03-01T08:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'NX-2023042',
-    employeeNumber: 'NX-2023042',
-    fullName: 'Budi Santoso, M.T.',
-    firstName: 'Budi',
-    lastName: 'Santoso, M.T.',
-    email: 'budi.santoso@nexora.co.id',
-    phone: '+62 811-3456-7890',
-    department: 'Departemen Sistem Inti (Core Engine)',
-    designation: 'Staff DevOps & Security Engineer',
-    division: 'Divisi Infrastruktur & Keamanan',
-    grade: 'Grade: P4 - Senior Specialist',
-    office: 'Head Office Jakarta',
-    deskLocation: 'Lantai 7, Node #B-15',
-    employmentType: 'PERMANENT',
-    employmentStatus: 'ACTIVE',
-    joinDate: '2023-10-10',
-    tenure: '1 Tahun 5 Bulan',
-    nik: '3175021010930005',
-    npwp: '89.332.112.4-015.000',
-    bpjsTk: '23018827361',
-    bpjsKes: '0003445521992',
-    birthPlaceDate: 'Surabaya, 10 Oktober 1993 (31 Tahun)',
-    genderBlood: 'Laki-Laki / B (+)',
-    religion: 'Islam',
-    taxStatus: 'Kawin (K/0)',
-    taxDependents: 'Tidak Ada',
-    bankName: 'BNI',
-    accountNumber: '0491827364',
-    accountHolder: 'Budi Santoso',
-    basicSalary: 22000000,
-    transportAllowance: 2000000,
-    mealAllowance: 1800000,
-    createdAt: '2023-10-10T08:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'NX-2024089',
-    employeeNumber: 'NX-2024089',
-    fullName: 'Maya Anggraini, S.Ds',
-    firstName: 'Maya',
-    lastName: 'Anggraini, S.Ds',
-    email: 'maya.anggraini@nexora.co.id',
-    phone: '+62 856-7788-9900',
-    department: 'Technology & Product',
-    designation: 'UI/UX Product Designer',
-    division: 'Divisi Desain & Pengalaman Pengguna',
-    grade: 'Grade: P3 - Specialist',
-    office: 'BSD Campus Tangerang',
-    deskLocation: 'Lantai 3, Studio #C-02',
-    employmentType: 'CONTRACT_PKWT',
-    employmentStatus: 'ACTIVE',
-    joinDate: '2024-02-15',
-    tenure: '1 Tahun 1 Bulan',
-    nik: '3674035502980004',
-    npwp: '95.123.456.7-411.000',
-    bpjsTk: '24017726354',
-    bpjsKes: '0004556677889',
-    birthPlaceDate: 'Yogyakarta, 15 Februari 1998 (26 Tahun)',
-    genderBlood: 'Perempuan / AB (+)',
-    religion: 'Katolik',
-    taxStatus: 'Lajang (TK/0)',
-    taxDependents: 'Tidak Ada',
-    bankName: 'BCA',
-    accountNumber: '6041928374',
-    accountHolder: 'Maya Anggraini',
-    basicSalary: 14500000,
-    transportAllowance: 1500000,
-    mealAllowance: 1500000,
-    createdAt: '2024-02-15T08:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'NX-2024102',
-    employeeNumber: 'NX-2024102',
-    fullName: 'Hendra Gunawan, S.E.',
-    firstName: 'Hendra',
-    lastName: 'Gunawan, S.E.',
-    email: 'hendra.gunawan@nexora.co.id',
-    phone: '+62 812-4455-6677',
-    department: 'Finance & Accounting',
-    designation: 'Finance & Payroll Specialist',
-    division: 'Divisi Keuangan & Akuntansi',
-    grade: 'Grade: M1 - Specialist',
-    office: 'Head Office Jakarta',
-    deskLocation: 'Lantai 6, FinHub #D-08',
-    employmentType: 'CONTRACT_PKWT',
-    employmentStatus: 'ACTIVE',
-    joinDate: '2024-05-01',
-    tenure: '10 Bulan',
-    nik: '3171010105940002',
-    npwp: '66.789.012.3-013.000',
-    bpjsTk: '24019938475',
-    bpjsKes: '0005667788990',
-    birthPlaceDate: 'Semarang, 01 Mei 1994 (30 Tahun)',
-    genderBlood: 'Laki-Laki / O (+)',
-    religion: 'Kristen Protestan',
-    taxStatus: 'Kawin (K/2)',
-    taxDependents: '2 Anak Terdaftar',
-    bankName: 'BRI',
-    accountNumber: '034101928374502',
-    accountHolder: 'Hendra Gunawan',
-    basicSalary: 15000000,
-    transportAllowance: 1500000,
-    mealAllowance: 1500000,
-    createdAt: '2024-05-01T08:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'NX-2026001',
-    employeeNumber: 'NX-2026001',
-    fullName: 'Kevin Pratama',
-    firstName: 'Kevin',
-    lastName: 'Pratama',
-    email: 'kevin.pratama@nexora.co.id',
-    phone: '+62 878-1122-3344',
-    department: 'Departemen Sistem Inti (Core Engine)',
-    designation: 'Junior Software Engineer',
-    division: 'Divisi Rekayasa & Arsitektur Cloud',
-    grade: 'Grade: P1 - Associate',
-    office: 'Head Office Jakarta',
-    deskLocation: 'Lantai 7, Node #B-20',
-    employmentType: 'PROBATION',
-    employmentStatus: 'ACTIVE',
-    joinDate: '2026-01-10',
-    tenure: '3 Bulan',
-    nik: '3173081001030001',
-    npwp: '99.888.777.6-018.000',
-    bpjsTk: '26011122334',
-    bpjsKes: '0006778899001',
-    birthPlaceDate: 'Jakarta, 10 Januari 2003 (21 Tahun)',
-    genderBlood: 'Laki-Laki / A (+)',
-    religion: 'Buddha',
-    taxStatus: 'Lajang (TK/0)',
-    taxDependents: 'Tidak Ada',
-    bankName: 'BCA',
-    accountNumber: '5221928374',
-    accountHolder: 'Kevin Pratama',
-    basicSalary: 8500000,
-    transportAllowance: 1000000,
-    mealAllowance: 1200000,
-    createdAt: '2026-01-10T08:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-];
+// Default initial data for production & clean state (starts empty)
+const DEFAULT_EMPLOYEES: EmployeeRecord[] = [];
 
 function calculateTenure(joinDateStr: string): string {
   try {
@@ -292,12 +73,7 @@ function ensureStorage(): void {
       fs.mkdirSync(STORAGE_DIR, { recursive: true });
     }
     if (!fs.existsSync(STORAGE_FILE)) {
-      fs.writeFileSync(STORAGE_FILE, JSON.stringify(DEFAULT_EMPLOYEES, null, 2), 'utf-8');
-    } else {
-      const content = fs.readFileSync(STORAGE_FILE, 'utf-8').trim();
-      if (!content || content === '[]') {
-        fs.writeFileSync(STORAGE_FILE, JSON.stringify(DEFAULT_EMPLOYEES, null, 2), 'utf-8');
-      }
+      fs.writeFileSync(STORAGE_FILE, JSON.stringify([], null, 2), 'utf-8');
     }
   } catch {
     // ignore
@@ -317,11 +93,11 @@ export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
          LEFT JOIN departments d ON e.department_id = d.id
          LEFT JOIN designations des ON e.designation_id = des.id
          LEFT JOIN users u ON e.user_id = u.id
-         WHERE e.deleted_at IS NULL
+         WHERE e.deleted_at IS NULL AND e.employment_status != 'TERMINATED'
          ORDER BY e.created_at ASC`
       );
 
-      if (Array.isArray(rows) && rows.length > 0) {
+      if (Array.isArray(rows)) {
         return rows.map((r: any) => {
           const joinDateStr = r.join_date ? new Date(r.join_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
           return {
@@ -370,7 +146,7 @@ export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
     if (fs.existsSync(STORAGE_FILE)) {
       const content = fs.readFileSync(STORAGE_FILE, 'utf-8');
       const list = JSON.parse(content);
-      if (Array.isArray(list) && list.length > 0) {
+      if (Array.isArray(list)) {
         return list;
       }
     }
@@ -454,12 +230,13 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
       const desigId = desigs[0]?.id;
 
       if (companyId && deptId && desigId) {
-        await sql.query(
+        const insertRes = await sql.query(
           `INSERT INTO employees 
-           (employee_number, first_name, last_name, phone, employment_type, employment_status, join_date, avatar_url, company_id, department_id, designation_id, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5::"EmploymentType", $6::"EmploymentStatus", $7::date, $8, $9, $10, $11, NOW(), NOW())
+           (id, employee_number, first_name, last_name, phone, employment_type, employment_status, join_date, avatar_url, company_id, department_id, designation_id, created_at, updated_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::"EmploymentType", $6::"EmploymentStatus", $7::date, $8, $9, $10, $11, NOW(), NOW())
            ON CONFLICT (employee_number) DO UPDATE
-           SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, phone = EXCLUDED.phone, avatar_url = EXCLUDED.avatar_url`,
+           SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, phone = EXCLUDED.phone, avatar_url = EXCLUDED.avatar_url
+           RETURNING id`,
           [
             record.employeeNumber,
             record.firstName,
@@ -474,6 +251,9 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
             desigId,
           ]
         );
+        if (insertRes && insertRes[0]?.id) {
+          record.id = insertRes[0].id;
+        }
       }
     } catch (err: any) {
       console.warn('[DB] Neon insert error:', err?.message);
@@ -558,12 +338,19 @@ export async function deleteEmployeeFromDb(idOrNik: string, hardDelete = false):
   if (DATABASE_URL) {
     try {
       const sql = neon(DATABASE_URL);
-      await sql.query(
-        "UPDATE employees SET deleted_at = NOW(), employment_status = 'TERMINATED' WHERE id::text = $1 OR employee_number = $1",
-        [idOrNik]
-      );
+      if (hardDelete) {
+        await sql.query(
+          "DELETE FROM employees WHERE id::text = $1 OR employee_number = $1",
+          [idOrNik]
+        );
+      } else {
+        await sql.query(
+          "UPDATE employees SET deleted_at = NOW(), employment_status = 'TERMINATED' WHERE id::text = $1 OR employee_number = $1",
+          [idOrNik]
+        );
+      }
     } catch (err: any) {
-      console.warn('[DB] Neon soft delete error:', err?.message);
+      console.warn('[DB] Neon delete error:', err?.message);
     }
   }
 

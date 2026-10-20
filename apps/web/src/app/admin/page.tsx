@@ -121,53 +121,26 @@ export default function AdminDashboardPage() {
 
   // Dynamic Metrics State
   const [metrics, setMetrics] = useState({
-    totalEmployees: 6,
-    activeEmployees: 6,
-    permanentCount: 4,
-    contractCount: 2,
+    totalEmployees: 0,
+    activeEmployees: 0,
+    permanentCount: 0,
+    contractCount: 0,
     probationCount: 0,
-    attendanceRate: 98.2,
-    onTimeCount: 6,
+    attendanceRate: 100,
+    onTimeCount: 0,
     lateCount: 0,
     leaveCount: 0,
     pendingApprovals: 0,
     pendingLeave: 0,
     pendingOvertime: 0,
-    estimatedPayroll: 'Rp 118.5 Jt',
+    estimatedPayroll: 'Rp 0',
   });
 
   // Department distribution dataset (Dynamic from database)
-  const [departments, setDepartments] = useState([
-    { name: 'Departemen Sistem Inti (Core Engine)', count: 3, percentage: 50, barColor: 'bg-blue-600' },
-    { name: 'Human Resource Department', count: 1, percentage: 17, barColor: 'bg-indigo-600' },
-    { name: 'Technology & Product', count: 1, percentage: 17, barColor: 'bg-sky-500' },
-    { name: 'Finance & Accounting', count: 1, percentage: 17, barColor: 'bg-blue-400' },
-  ]);
+  const [departments, setDepartments] = useState<any[]>([]);
 
   // System audit activities (Dynamic from employee directory)
-  const [recentActivities, setRecentActivities] = useState([
-    {
-      id: 'act-01',
-      title: 'Data Pegawai: Rian Pratama, S.Kom',
-      description: 'Lead Backend Architect (Departemen Sistem Inti) • NIK: NX-2021008 • Karyawan Tetap (PKWTT)',
-      time: 'Sinkronisasi Aktif',
-      dotColor: 'bg-blue-600',
-    },
-    {
-      id: 'act-02',
-      title: 'Data Pegawai: Siti Rahma, S.Psi',
-      description: 'HR Talent & People Partner (Human Resource) • NIK: NX-2022015 • Karyawan Tetap (PKWTT)',
-      time: 'Sinkronisasi Aktif',
-      dotColor: 'bg-emerald-500',
-    },
-    {
-      id: 'act-03',
-      title: 'Data Pegawai: Budi Santoso, M.T.',
-      description: 'Staff DevOps & Security Engineer • NIK: NX-2023042 • Karyawan Tetap (PKWTT)',
-      time: 'Sinkronisasi Aktif',
-      dotColor: 'bg-purple-600',
-    },
-  ]);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   // Fetch live metrics from unified APIs
   const fetchLiveMetrics = React.useCallback(async () => {
@@ -176,10 +149,11 @@ export default function AdminDashboardPage() {
       const empRes = await fetch('/api/v1/employees?limit=1');
       if (empRes.ok) {
         const json = await empRes.json();
-        if (json.data?.meta?.total) {
+        if (json.data?.meta?.total !== undefined) {
           setMetrics((prev) => ({
             ...prev,
             totalEmployees: json.data.meta.total,
+            activeEmployees: json.data.meta.total,
           }));
         }
       }
@@ -844,7 +818,12 @@ export default function AdminDashboardPage() {
 
               {/* Progress Bars */}
               <div className="mt-4 space-y-3.5">
-                {departments.map((dept, idx) => (
+                {departments.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-2">
+                    Belum ada data distribusi departemen.
+                  </p>
+                ) : (
+                  departments.map((dept, idx) => (
                   <div key={idx}>
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
                       <span className="text-slate-800">{dept.name}</span>
@@ -860,7 +839,7 @@ export default function AdminDashboardPage() {
                       />
                     </div>
                   </div>
-                ))}
+                )))}
               </div>
             </div>
 
@@ -880,7 +859,12 @@ export default function AdminDashboardPage() {
 
               {/* Activity Timeline List */}
               <div className="mt-4 space-y-4">
-                {recentActivities.map((act) => (
+                {recentActivities.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-2">
+                    Belum ada riwayat aktivitas pegawai.
+                  </p>
+                ) : (
+                  recentActivities.map((act) => (
                   <div key={act.id} className="flex items-start gap-3">
                     <div className={`w-2 h-2 rounded-full ${act.dotColor} mt-1.5 flex-shrink-0`} />
                     <div className="min-w-0">
@@ -895,7 +879,7 @@ export default function AdminDashboardPage() {
                       </span>
                     </div>
                   </div>
-                ))}
+                )))}
               </div>
             </div>
           </div>
