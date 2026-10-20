@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import { downloadExecutiveRecapPDF } from '@/utils/generateExecutiveRecapPDF';
+import { useApprovalsRealtime } from '@/hooks/useApprovalsRealtime';
 import {
   Users,
   CalendarCheck,
@@ -190,58 +191,88 @@ export default function AdminDashboardPage() {
     },
   ];
 
+  // Fetch live metrics from unified APIs
+  const fetchLiveMetrics = React.useCallback(async () => {
+    try {
+      // Employee headcount
+      const empRes = await fetch('/api/v1/employees?limit=1');
+      if (empRes.ok) {
+        const json = await empRes.json();
+        if (json.data?.meta?.total) {
+          setMetrics((prev) => ({
+            ...prev,
+            totalEmployees: json.data.meta.total,
+          }));
+        }
+      }
+
+      // Attendance stats
+      const attRes = await fetch('/api/v1/attendance');
+      if (attRes.ok) {
+        const json = await attRes.json();
+        if (json.data) {
+          setMetrics((prev) => ({
+            ...prev,
+            onTimeCount: json.data.onTimeCount || prev.onTimeCount,
+            lateCount: json.data.lateCount || prev.lateCount,
+            attendanceRate: json.data.attendanceRate || prev.attendanceRate,
+          }));
+        }
+      }
+
+      // Approvals list (Real-time sync)
+      const appRes = await fetch('/api/v1/approvals');
+      if (appRes.ok) {
+        const json = await appRes.json();
+        if (Array.isArray(json.data)) {
+          setRequests(json.data);
+          setMetrics((prev) => ({
+            ...prev,
+            pendingApprovals: json.data.length,
+            pendingLeave: json.data.filter((r: any) => r.type === 'cuti').length,
+            pendingOvertime: json.data.filter((r: any) => r.type === 'lembur').length,
+          }));
+        }
+      }
+    } catch (err) {
+      // Keep resilient fallback
+    }
+  }, []);
+
+  // Multi-device real-time SSE stream hook
+  useApprovalsRealtime({
+    playAudioAlert: true,
+    onLeaveSubmitted: (newItem) => {
+      setRequests((prev) => [newItem, ...prev.filter((r) => r.id !== newItem.id)]);
+      setMetrics((prev) => ({
+        ...prev,
+        pendingApprovals: prev.pendingApprovals + 1,
+        pendingLeave: newItem.type === 'cuti' ? prev.pendingLeave + 1 : prev.pendingLeave,
+        pendingOvertime: newItem.type === 'lembur' ? prev.pendingOvertime + 1 : prev.pendingOvertime,
+      }));
+      showToast(
+        `🔔 Pengajuan Real-Time Baru: ${newItem.name} (${newItem.role?.split('•')[0]?.trim() || 'Karyawan'}) mengajukan ${
+          newItem.highlightType || newItem.title
+        }!`
+      );
+    },
+    onLeaveActioned: ({ id }) => {
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+      setMetrics((prev) => ({
+        ...prev,
+        pendingApprovals: Math.max(0, prev.pendingApprovals - 1),
+      }));
+    },
+    onRefresh: () => {
+      fetchLiveMetrics();
+    },
+  });
+
   // Live real-time sync with Employee Dashboard & REST APIs
   useEffect(() => {
-    // 1. Fetch live metrics from unified APIs
-    const fetchLiveMetrics = async () => {
-      try {
-        // Employee headcount
-        const empRes = await fetch('/api/v1/employees?limit=1');
-        if (empRes.ok) {
-          const json = await empRes.json();
-          if (json.data?.meta?.total) {
-            setMetrics((prev) => ({
-              ...prev,
-              totalEmployees: json.data.meta.total,
-            }));
-          }
-        }
-
-        // Attendance stats
-        const attRes = await fetch('/api/v1/attendance');
-        if (attRes.ok) {
-          const json = await attRes.json();
-          if (json.data) {
-            setMetrics((prev) => ({
-              ...prev,
-              onTimeCount: json.data.onTimeCount || prev.onTimeCount,
-              lateCount: json.data.lateCount || prev.lateCount,
-              attendanceRate: json.data.attendanceRate || prev.attendanceRate,
-            }));
-          }
-        }
-
-        // Approvals list
-        const appRes = await fetch('/api/v1/approvals');
-        if (appRes.ok) {
-          const json = await appRes.json();
-          if (Array.isArray(json.data) && json.data.length > 0) {
-            setRequests(json.data);
-            setMetrics((prev) => ({
-              ...prev,
-              pendingApprovals: json.data.length,
-            }));
-          }
-        }
-      } catch (err) {
-        // Keep resilient fallback
-      }
-    };
-
     fetchLiveMetrics();
-    const interval = setInterval(fetchLiveMetrics, 8000);
 
-    // 2. BroadcastChannel for instant (<5ms) cross-tab live synchronization
+    // BroadcastChannel for instant (<5ms) cross-tab live synchronization for attendance
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('nexora_live_sync');
@@ -270,29 +301,15 @@ export default function AdminDashboardPage() {
             })!`
           );
         }
-
-        // When employee submits new leave or overtime request
-        if (msg.type === 'NEW_APPROVAL_REQUEST' && msg.request) {
-          setRequests((prev) => [msg.request, ...prev.filter((r) => r.id !== msg.request.id)]);
-          setMetrics((prev) => ({
-            ...prev,
-            pendingApprovals: prev.pendingApprovals + 1,
-          }));
-
-          showToast(
-            `🔔 Pengajuan Real-Time Baru: ${msg.employeeName} mengajukan "${msg.request.title}"!`
-          );
-        }
       };
     } catch {
       // ignore
     }
 
     return () => {
-      clearInterval(interval);
       if (channel) channel.close();
     };
-  }, []);
+  }, [fetchLiveMetrics]);
 
   // Show Toast
   const showToast = (msg: string) => {

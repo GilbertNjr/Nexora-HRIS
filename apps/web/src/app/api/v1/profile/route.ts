@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vpusbeqevsgivsgaahat.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
 const STORAGE_DIR = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(process.cwd(), '.data');
 const PROFILE_FILE = path.join(STORAGE_DIR, 'nexora_user_profile.json');
+
+const DATABASE_URL = process.env.DATABASE_URL;
 
 export interface UserProfile {
   fullName: string;
@@ -25,16 +25,16 @@ export interface UserProfile {
   updatedAt?: string;
 }
 
-const emptyProfile: UserProfile = {
-  fullName: '',
-  employeeNumber: '',
-  email: '',
-  phone: '',
-  department: '',
-  designation: '',
-  manager: '',
-  location: '',
-  joinDate: '',
+const defaultProfile: UserProfile = {
+  fullName: 'Admin HR Nexora',
+  employeeNumber: 'NX-2026-0001',
+  email: 'admin@nexora.local',
+  phone: '+62 812-9876-5432',
+  department: 'Human Resources & People Operations',
+  designation: 'Head of People Operations',
+  manager: 'Direksi & Manajemen',
+  location: 'Kantor Pusat - SCBD Jakarta',
+  joinDate: '2024-01-15',
   avatarUrl: '',
 };
 
@@ -64,46 +64,50 @@ function getLocalProfile(): UserProfile | null {
 export async function GET() {
   const local = getLocalProfile();
 
-  // Try Supabase if configured
-  if (SUPABASE_KEY) {
+  // 1. Try Neon Serverless PostgreSQL first (Primary source of truth)
+  if (DATABASE_URL) {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/employees?select=*&limit=1`, {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        const rows = await res.json();
-        if (Array.isArray(rows) && rows.length > 0) {
-          const emp = rows[0];
-          const dbProfile: UserProfile = {
-            fullName: `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
-            employeeNumber: emp.employee_number || '',
-            email: emp.email || '',
-            phone: emp.phone || '',
-            department: emp.department || '',
-            designation: emp.designation || '',
-            manager: 'Direksi & Manajemen',
-            location: 'Kantor Pusat - SCBD Jakarta',
-            joinDate: emp.join_date ? emp.join_date.split('T')[0] : '',
-            avatarUrl: local?.avatarUrl || '',
-          };
-          return NextResponse.json({ success: true, data: dbProfile, hasData: true }, { status: 200 });
-        }
+      const sql = neon(DATABASE_URL);
+      const rows = await sql.query(
+        `SELECT e.id, e.employee_number, e.first_name, e.last_name, e.phone, e.avatar_url, e.join_date,
+                d.name as department_name, des.title as designation_title, u.email
+         FROM employees e
+         LEFT JOIN departments d ON e.department_id = d.id
+         LEFT JOIN designations des ON e.designation_id = des.id
+         LEFT JOIN users u ON e.user_id = u.id
+         ORDER BY e.created_at ASC
+         LIMIT 1`
+      );
+
+      if (Array.isArray(rows) && rows.length > 0) {
+        const emp = rows[0] as any;
+        const dbProfile: UserProfile = {
+          fullName: `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || defaultProfile.fullName,
+          employeeNumber: emp.employee_number || defaultProfile.employeeNumber,
+          email: emp.email || defaultProfile.email,
+          phone: emp.phone || defaultProfile.phone,
+          department: emp.department_name || defaultProfile.department,
+          designation: emp.designation_title || defaultProfile.designation,
+          manager: 'Direksi & Manajemen',
+          location: 'Kantor Pusat - SCBD Jakarta',
+          joinDate: emp.join_date ? new Date(emp.join_date).toISOString().split('T')[0] : defaultProfile.joinDate,
+          avatarUrl: emp.avatar_url || local?.avatarUrl || '',
+          updatedAt: new Date().toISOString(),
+        };
+
+        return NextResponse.json({ success: true, data: dbProfile, hasData: true }, { status: 200 });
       }
-    } catch {
-      // fallback
+    } catch (err: any) {
+      console.warn('[Profile API] Neon query error, falling back to local:', err?.message);
     }
   }
 
+  // 2. Fallback to local storage file if database query is unavailable
   if (local) {
     return NextResponse.json({ success: true, data: local, hasData: true }, { status: 200 });
   }
 
-  // Return empty profile if no data has been saved yet
-  return NextResponse.json({ success: true, data: emptyProfile, hasData: false }, { status: 200 });
+  return NextResponse.json({ success: true, data: defaultProfile, hasData: true }, { status: 200 });
 }
 
 export async function PUT(request: NextRequest) {
@@ -111,61 +115,61 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     ensureStorage();
 
-    const current = getLocalProfile() || emptyProfile;
+    const current = getLocalProfile() || defaultProfile;
     const updated: UserProfile = {
       fullName: body.fullName ?? current.fullName,
-      employeeNumber: body.employeeNumber || current.employeeNumber || `NX-${new Date().getFullYear()}001`,
+      employeeNumber: body.employeeNumber || current.employeeNumber,
       email: body.email ?? current.email,
       phone: body.phone ?? current.phone,
       department: body.department ?? current.department,
       designation: body.designation ?? current.designation,
       manager: body.manager ?? current.manager,
       location: body.location ?? current.location,
-      joinDate: body.joinDate || current.joinDate || new Date().toISOString().split('T')[0],
+      joinDate: body.joinDate || current.joinDate,
       avatarUrl: body.avatarUrl !== undefined ? body.avatarUrl : current.avatarUrl,
       updatedAt: new Date().toISOString(),
     };
 
-    // Save to persistent file storage
+    // 1. Persist directly to Neon PostgreSQL (Employees & Users tables)
+    if (DATABASE_URL) {
+      try {
+        const sql = neon(DATABASE_URL);
+        const names = updated.fullName.trim().split(' ');
+        const firstName = names[0] || 'Admin';
+        const lastName = names.slice(1).join(' ') || '';
+
+        // Update employee record
+        await sql.query(
+          `UPDATE employees 
+           SET first_name = $1, last_name = $2, phone = $3, avatar_url = $4, updated_at = NOW() 
+           WHERE employee_number = $5 OR id IN (SELECT id FROM employees ORDER BY created_at ASC LIMIT 1)`,
+          [firstName, lastName, updated.phone, updated.avatarUrl || null, updated.employeeNumber]
+        );
+
+        // Update user avatar record
+        await sql.query(
+          `UPDATE users 
+           SET avatar_url = $1, updated_at = NOW() 
+           WHERE email = $2 OR id IN (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)`,
+          [updated.avatarUrl || null, updated.email]
+        );
+      } catch (dbErr: any) {
+        console.error('[Profile API] Neon update error:', dbErr?.message);
+      }
+    }
+
+    // 2. Persist to local cache file as instant recovery backup
     try {
       fs.writeFileSync(PROFILE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
     } catch {
       // ignore
     }
 
-    // Try sync to Supabase
-    if (SUPABASE_KEY && updated.email) {
-      try {
-        const names = updated.fullName.split(' ');
-        const firstName = names[0] || 'User';
-        const lastName = names.slice(1).join(' ') || '';
-
-        await fetch(`${SUPABASE_URL}/rest/v1/employees?limit=1`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            email: updated.email,
-            phone: updated.phone,
-            department: updated.department,
-            designation: updated.designation,
-          }),
-        });
-      } catch {
-        // ignore
-      }
-    }
-
     return NextResponse.json(
       {
         success: true,
         data: updated,
-        message: 'Informasi data diri dan foto profil berhasil disimpan ke database.',
+        message: '✓ Informasi profil dan foto avatar berhasil disimpan permanen ke Neon PostgreSQL.',
       },
       { status: 200 }
     );

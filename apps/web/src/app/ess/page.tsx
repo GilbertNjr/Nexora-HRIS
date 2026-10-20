@@ -81,6 +81,8 @@ export default function EmployeeDashboardOverhaulPage() {
   const [overtimeDate, setOvertimeDate] = useState('2025-03-24');
   const [overtimeHours, setOvertimeHours] = useState('3');
   const [overtimeReason, setOvertimeReason] = useState('Maintenance Database Core & Deployment Hotfix');
+  const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
+  const [activeQuota, setActiveQuota] = useState(8);
 
   // Backend Team Attendance
   const [teamMembers] = useState([
@@ -117,31 +119,91 @@ export default function EmployeeDashboardOverhaulPage() {
     );
   }, []);
 
-  // Handle Leave Submit
-  const handleLeaveSubmit = (e: React.FormEvent) => {
+  // Handle Leave Submit (Rich real-time payload)
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLeaveModalOpen(false);
-    showToast('✓ Pengajuan Cuti berhasil dikirimkan ke HRD dan terhubung secara real-time!');
+
+    if (!leaveStartDate || !leaveEndDate) {
+      showToast('⚠️ Silakan tentukan tanggal mulai dan tanggal selesai cuti!');
+      return;
+    }
+
+    const start = new Date(leaveStartDate);
+    const end = new Date(leaveEndDate);
+
+    if (end < start) {
+      showToast('⚠️ Tanggal selesai cuti tidak boleh mendahului tanggal mulai!');
+      return;
+    }
+
+    const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    if (leaveCategory.includes('Tahunan') && diffDays > activeQuota) {
+      showToast(`⚠️ Saldo kuota tidak mencukupi! Anda meminta ${diffDays} hari, sisa kuota: ${activeQuota} hari.`);
+      return;
+    }
+
+    setIsSubmittingLeave(true);
 
     try {
-      fetch('/api/v1/approvals', {
+      const remainingAfter = leaveCategory.includes('Tahunan') ? Math.max(0, activeQuota - diffDays) : activeQuota;
+
+      const payload = {
+        name: 'Rian Pratama, S.Kom',
+        nik: 'NX-2021008',
+        role: 'Lead Backend Architect • Technology',
+        department: 'Technology & Engineering',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        type: 'cuti',
+        leaveType: leaveCategory,
+        typeCategory: leaveCategory.toLowerCase().includes('sakit')
+          ? 'sakit'
+          : leaveCategory.toLowerCase().includes('khusus') || leaveCategory.toLowerCase().includes('menikah')
+          ? 'khusus'
+          : 'tahunan',
+        title: `Pengajuan ${leaveCategory} (${diffDays} Hari: ${leaveStartDate} s/d ${leaveEndDate})`,
+        highlightType: leaveCategory,
+        detail: `${diffDays} Hari: ${leaveStartDate} s/d ${leaveEndDate}`,
+        startDate: leaveStartDate,
+        endDate: leaveEndDate,
+        durationDays: diffDays,
+        remainingQuota: remainingAfter,
+        totalQuota: 12,
+        reason: leaveReason || 'Keperluan Pribadi & Urusan Keluarga',
+        quotaMeta: `Sisa Kuota: ${remainingAfter} Hari`,
+        hasAttachment: leaveCategory.toLowerCase().includes('sakit'),
+        attachmentName: leaveCategory.toLowerCase().includes('sakit') ? 'Surat_Keterangan_Sakit.pdf' : undefined,
+        documentName: leaveCategory.toLowerCase().includes('sakit') ? 'Surat_Keterangan_Sakit.pdf' : undefined,
+      };
+
+      const res = await fetch('/api/v1/approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Rian Pratama, S.Kom',
-          role: 'Lead Backend Architect',
-          type: 'cuti',
-          title: `Pengajuan ${leaveCategory}`,
-          highlightType: leaveCategory,
-          detail: `Tanggal: ${leaveStartDate} s/d ${leaveEndDate}`,
-          quotaMeta: `Alasan: ${leaveReason || 'Keperluan Pribadi'}`,
-        }),
-      }).catch(() => {});
+        body: JSON.stringify(payload),
+      });
 
-      const ch = new BroadcastChannel('nexora_live_sync');
-      ch.postMessage({ type: 'APPROVAL_SUBMITTED' });
-      ch.close();
-    } catch {}
+      const resData = await res.json();
+      const createdItem = resData?.data || payload;
+
+      if (leaveCategory.includes('Tahunan')) {
+        setActiveQuota(remainingAfter);
+      }
+
+      // Instant local tab sync
+      try {
+        const ch = new BroadcastChannel('nexora_live_sync');
+        ch.postMessage({ type: 'NEW_APPROVAL_REQUEST', request: createdItem });
+        ch.close();
+      } catch {}
+
+      setIsLeaveModalOpen(false);
+      setLeaveReason('');
+      showToast('✓ Pengajuan Cuti berhasil dikirim ke HRD dan terhubung secara real-time!');
+    } catch {
+      showToast('❌ Terjadi gangguan saat mengirim pengajuan cuti.');
+    } finally {
+      setIsSubmittingLeave(false);
+    }
   };
 
   // Handle Overtime Submit
@@ -916,7 +978,7 @@ export default function EmployeeDashboardOverhaulPage() {
                   <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
                     Pengajuan Izin / Cuti Karyawan
                   </h3>
-                  <p className="text-[11px] text-slate-400">Sisa Hak Cuti: 8 Hari Aktif</p>
+                  <p className="text-[11px] text-slate-400">Sisa Hak Cuti: {activeQuota} Hari Aktif</p>
                 </div>
               </div>
               <button
@@ -990,9 +1052,11 @@ export default function EmployeeDashboardOverhaulPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                  disabled={isSubmittingLeave}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-60"
                 >
-                  Kirim Pengajuan
+                  {isSubmittingLeave && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmittingLeave ? 'Mengirim...' : 'Kirim Pengajuan'}</span>
                 </button>
               </div>
             </form>

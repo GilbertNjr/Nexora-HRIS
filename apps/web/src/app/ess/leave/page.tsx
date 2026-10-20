@@ -284,23 +284,35 @@ export default function EssLeaveOverhaulPage() {
       }));
 
       // Broadcast and notify HR Admin
+      const remainingAfter = Math.max(0, balances.annualRemaining - (formType === 'Cuti Tahunan' ? diffDays : 0));
       await fetch('/api/v1/approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'Rian Pratama, S.Kom',
-          role: 'Lead Backend Architect',
+          nik: 'NX-2021008',
+          role: 'Lead Backend Architect • Technology',
+          department: 'Technology & Engineering',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
           type: 'cuti',
+          leaveType: formType,
+          typeCategory: formType.toLowerCase().includes('sakit') ? 'sakit' : 'tahunan',
           title: newReq.title,
           highlightType: newReq.type,
           detail: `${diffDays} Hari (${formStartDate} s/d ${formEndDate})`,
-          quotaMeta: `Handover: ${newReq.handover}`,
+          startDate: formStartDate,
+          endDate: formEndDate,
+          durationDays: diffDays,
+          remainingQuota: remainingAfter,
+          totalQuota: 12,
+          reason: newReq.notes || newReq.title || 'Keperluan Pribadi',
+          quotaMeta: `Sisa Kuota: ${remainingAfter} Hari`,
         }),
       }).catch(() => {});
 
       try {
         const ch = new BroadcastChannel('nexora_live_sync');
-        ch.postMessage({ type: 'APPROVAL_SUBMITTED' });
+        ch.postMessage({ type: 'NEW_APPROVAL_REQUEST', request: newReq });
         ch.close();
       } catch {}
 
