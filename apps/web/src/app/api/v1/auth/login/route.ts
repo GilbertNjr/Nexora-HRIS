@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
-import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/app/api/v1/audit/route';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
