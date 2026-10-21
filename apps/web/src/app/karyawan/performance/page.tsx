@@ -51,6 +51,7 @@ import {
   Edit3,
   BookmarkCheck,
   ArrowRight,
+  Activity,
   UserCheck,
   PanelLeft,
   PanelLeftClose,

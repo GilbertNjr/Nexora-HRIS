@@ -41,6 +41,7 @@ import {
   Laptop,
   Briefcase,
   FileCheck,
+  Loader2,
   PanelLeft,
   PanelLeftClose,
 } from 'lucide-react';

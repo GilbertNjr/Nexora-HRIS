@@ -35,6 +35,7 @@ import {
   Share2,
   KeyRound,
   MinusCircle,
+  PlusCircle,
   Fingerprint,
   PanelLeft,
   PanelLeftClose,
