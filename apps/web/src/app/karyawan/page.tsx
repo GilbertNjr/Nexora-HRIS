@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
-import { useApprovalsRealtime } from '@/hooks/useApprovalsRealtime';
+import { useApprovalsRealtime, playNotificationSound } from '@/hooks/useApprovalsRealtime';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   LayoutDashboard,
@@ -32,6 +32,7 @@ import {
   Check,
   X,
   Building2,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Sparkles,
@@ -73,6 +74,43 @@ export default function EmployeeDashboardOverhaulPage() {
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDownloadingDoc, setIsDownloadingDoc] = useState<string | null>(null);
+
+  // Dynamic Real-time HR Announcements
+  interface HrAnnouncementItem {
+    id: string;
+    badge: string;
+    docNumber: string;
+    title: string;
+    summary: string;
+    content: string;
+    buttonText: string;
+    priority: 'URGENT' | 'IMPORTANT' | 'INFO';
+    publishedAt: string;
+    author: string;
+    isEmergency?: boolean;
+    attachmentUrl?: string;
+  }
+
+  const [announcements, setAnnouncements] = useState<HrAnnouncementItem[]>([
+    {
+      id: 'ann-1',
+      badge: 'PENGUMUMAN HRD',
+      docNumber: 'No. 018/HR-NOTIF/III/2025',
+      title: 'Penyesuaian Jam Operasional Ramadhan 1446 H',
+      summary:
+        'Selama bulan suci Ramadhan, jam kepulangan karyawan dimajukan menjadi pukul 16:30 WIB. Jam istirahat dipadatkan menjadi 30 menit demi efisiensi bersama.',
+      content:
+        'Berdasarkan Keputusan Direksi Nomor SE/018/DIR-HR/III/2025 mengenai Penyesuaian Jam Kerja Bulan Ramadhan 1446 H:\n\n1. Jam Kerja Reguler: 08:30 WIB s/d 16:30 WIB (Senin s/d Kamis), 08:30 WIB s/d 17:00 WIB (Jumat).\n2. Waktu Istirahat: 12:00 s/d 12:30 WIB (Senin - Kamis), 11:45 s/d 13:00 WIB (Jumat Sholat Jumat).\n3. Presensi tetap wajib melalui Liveness Biometric Face Scan pada Portal ESS.\n4. Karyawan yang bertugas WFH wajib standby pada jam kerja efektif dan mengikuti daily standup pukul 08:45 WIB.',
+      buttonText: 'Lihat SE Direksi',
+      priority: 'IMPORTANT',
+      publishedAt: '24 Maret 2025, 08:00 WIB',
+      author: 'Dewan Direksi & HR Operations',
+      isEmergency: false,
+    },
+  ]);
+  const [activeAnnouncementIdx, setActiveAnnouncementIdx] = useState(0);
+  const [isAnnouncementGlowing, setIsAnnouncementGlowing] = useState(false);
+  const [isAnnouncementLiveConnected, setIsAnnouncementLiveConnected] = useState(false);
 
   // Live Date & Greeting
   const [currentDateStr, setCurrentDateStr] = useState('Senin, 24 Maret 2025');
@@ -133,6 +171,77 @@ export default function EmployeeDashboardOverhaulPage() {
         year: 'numeric',
       })
     );
+  }, []);
+
+  // Real-time Announcements: initial fetch, BroadcastChannel, and SSE live stream
+  useEffect(() => {
+    let isMounted = true;
+
+    // Initial fetch from persistent API storage
+    const fetchAnnouncements = async () => {
+      try {
+        const res = await fetch('/api/v1/announcements');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0 && isMounted) {
+            setAnnouncements(json.data);
+          }
+        }
+      } catch {}
+    };
+    fetchAnnouncements();
+
+    // 1. BroadcastChannel for instant same-browser cross-tab sync
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('nexora_live_sync');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'ANNOUNCEMENT_PUBLISHED' && event.data?.payload) {
+          const newAnn = event.data.payload as HrAnnouncementItem;
+          setAnnouncements((prev) => {
+            const filtered = prev.filter((a) => a.id !== newAnn.id);
+            return [newAnn, ...filtered];
+          });
+          setActiveAnnouncementIdx(0);
+          setIsAnnouncementGlowing(true);
+          playNotificationSound();
+          showToast(`📣 Pengumuman HR Baru: "${newAnn.title}"`);
+          setTimeout(() => setIsAnnouncementGlowing(false), 8000);
+        }
+      };
+    } catch {}
+
+    // 2. Server-Sent Events (SSE) for multi-device sync (e.g. Admin on PC, Employee on phone)
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/v1/employees/stream');
+      es.addEventListener('connected', () => {
+        if (isMounted) setIsAnnouncementLiveConnected(true);
+      });
+      es.addEventListener('ANNOUNCEMENT_PUBLISHED', (event: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          const newAnn = parsed.payload as HrAnnouncementItem;
+          if (newAnn && newAnn.title) {
+            setAnnouncements((prev) => {
+              const filtered = prev.filter((a) => a.id !== newAnn.id);
+              return [newAnn, ...filtered];
+            });
+            setActiveAnnouncementIdx(0);
+            setIsAnnouncementGlowing(true);
+            playNotificationSound();
+            showToast(`📣 [LIVE HR] ${newAnn.title}`);
+            setTimeout(() => setIsAnnouncementGlowing(false), 8000);
+          }
+        } catch {}
+      });
+    } catch {}
+
+    return () => {
+      isMounted = false;
+      if (bc) bc.close();
+      if (es) es.close();
+    };
   }, []);
 
   // Multi-device real-time SSE stream hook for employee dashboard
@@ -572,45 +681,110 @@ export default function EmployeeDashboardOverhaulPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* LEFT COLUMN (8 COLS) */}
             <div className="lg:col-span-8 space-y-6">
-              {/* CARD 1: PENGUMUMAN HRD (Ramadhan Working Hours) matching screenshot */}
-              <div className="rounded-3xl p-6 sm:p-7 bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white shadow-md relative overflow-hidden">
-                {/* Decorative background pattern */}
-                <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none flex items-center justify-end pr-6">
-                  <Building2 className="w-44 h-44 text-white" />
-                </div>
-
-                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                  <div className="space-y-2 max-w-xl">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="p-1.5 rounded-xl bg-white/10 text-white inline-flex items-center justify-center">
-                        <Megaphone className="w-4 h-4" />
-                      </span>
-                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/30 text-blue-100 border border-white/20 uppercase tracking-wider">
-                        PENGUMUMAN HRD
-                      </span>
-                      <span className="text-[11px] text-blue-200 font-medium">
-                        No. 018/HR-NOTIF/III/2025
-                      </span>
+              {/* CARD 1: PENGUMUMAN HRD - Real-time Live & Dynamic */}
+              {(() => {
+                const currentAnnouncement =
+                  announcements[activeAnnouncementIdx] || announcements[0];
+                return (
+                  <div
+                    className={`rounded-3xl p-6 sm:p-7 text-white shadow-md relative overflow-hidden transition-all duration-500 ${
+                      isAnnouncementGlowing
+                        ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-white shadow-[0_0_35px_rgba(251,191,36,0.6)] scale-[1.01]'
+                        : ''
+                    } ${
+                      currentAnnouncement?.priority === 'URGENT'
+                        ? 'bg-gradient-to-r from-rose-900 via-rose-800 to-indigo-950'
+                        : 'bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900'
+                    }`}
+                  >
+                    {/* Decorative background pattern */}
+                    <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none flex items-center justify-end pr-6">
+                      <Building2 className="w-44 h-44 text-white" />
                     </div>
 
-                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white pt-1">
-                      Penyesuaian Jam Operasional Ramadhan 1446 H
-                    </h3>
+                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                      <div className="space-y-2 max-w-xl">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="p-1.5 rounded-xl bg-white/10 text-white inline-flex items-center justify-center">
+                            <Megaphone className="w-4 h-4" />
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/30 text-blue-100 border border-white/20 uppercase tracking-wider">
+                            {currentAnnouncement?.badge || 'PENGUMUMAN HRD'}
+                          </span>
+                          <span className="text-[11px] text-blue-200 font-medium">
+                            {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/III/2025'}
+                          </span>
 
-                    <p className="text-xs text-blue-100/90 leading-relaxed">
-                      Selama bulan suci Ramadhan, jam kepulangan karyawan dimajukan menjadi pukul <strong>16:30 WIB</strong>. Jam istirahat dipadatkan menjadi 30 menit demi efisiensi bersama.
-                    </p>
+                          {/* Live SSE / Broadcast Indicator */}
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 text-[10px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            <span>Live HR Sync</span>
+                          </span>
+
+                          {isAnnouncementGlowing && (
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase tracking-wider animate-bounce">
+                              ✨ Pengumuman Baru
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white pt-1">
+                          {currentAnnouncement?.title || 'Penyesuaian Jam Operasional Ramadhan 1446 H'}
+                        </h3>
+
+                        <p className="text-xs text-blue-100/90 leading-relaxed">
+                          {currentAnnouncement?.summary ||
+                            'Selama bulan suci Ramadhan, jam kepulangan karyawan dimajukan menjadi pukul 16:30 WIB. Jam istirahat dipadatkan menjadi 30 menit demi efisiensi bersama.'}
+                        </p>
+
+                        {/* Navigation dots / arrows if multiple announcements exist */}
+                        {announcements.length > 1 && (
+                          <div className="flex items-center gap-2 pt-1 text-[11px] text-blue-200">
+                            <span className="text-[10px] font-medium opacity-80">
+                              {activeAnnouncementIdx + 1} dari {announcements.length} Pengumuman
+                            </span>
+                            <div className="inline-flex items-center gap-1 bg-white/10 rounded-lg p-0.5 border border-white/15">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActiveAnnouncementIdx((prev) =>
+                                    prev === 0 ? announcements.length - 1 : prev - 1
+                                  )
+                                }
+                                className="p-1 hover:bg-white/20 rounded text-white transition-colors"
+                                title="Pengumuman sebelumnya"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActiveAnnouncementIdx((prev) =>
+                                    (prev + 1) % announcements.length
+                                  )
+                                }
+                                className="p-1 hover:bg-white/20 rounded text-white transition-colors"
+                                title="Pengumuman berikutnya"
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsAnnouncementModalOpen(true)}
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0 self-start sm:self-center"
+                      >
+                        <span>{currentAnnouncement?.buttonText || 'Lihat SE Direksi'}</span>
+                      </button>
+                    </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsAnnouncementModalOpen(true)}
-                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0 self-start sm:self-center"
-                  >
-                    <span>Lihat SE Direksi</span>
-                  </button>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* CARD 2: JADWAL & KOMITMEN KERJA PEKAN INI matching screenshot */}
               <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-5">
@@ -1078,58 +1252,80 @@ export default function EmployeeDashboardOverhaulPage() {
         </div>
       )}
 
-      {/* MODAL 3: LIHAT SE DIREKSI (Ramadhan Hours) */}
-      {isAnnouncementModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Megaphone className="w-5 h-5" />
+      {/* MODAL 3: LIHAT SE DIREKSI (Dynamic Content) */}
+      {isAnnouncementModalOpen && (() => {
+        const currentAnnouncement =
+          announcements[activeAnnouncementIdx] || announcements[0];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+            <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Megaphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                      {currentAnnouncement?.title || 'Surat Edaran Direksi'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Nomor: {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/III/2025'}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAnnouncementModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3 text-xs text-slate-700 leading-relaxed">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pb-2 border-b border-slate-200/60">
+                  <span>Diterbitkan: <strong>{currentAnnouncement?.publishedAt}</strong></span>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold text-[10px]">
+                    {currentAnnouncement?.badge || 'PENGUMUMAN HRD'}
+                  </span>
+                </div>
+
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
-                    Surat Edaran Direksi: Ramadhan 1446 H
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Nomor: 018/HR-NOTIF/III/2025</p>
+                  <p className="font-bold text-slate-900 pb-1">Ringkasan Eksekutif:</p>
+                  <p className="text-slate-700">{currentAnnouncement?.summary}</p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/60">
+                  <p className="font-bold text-slate-900 pb-1">Ketentuan & Dokumen Lengkap:</p>
+                  <div className="whitespace-pre-line text-slate-600 leading-relaxed">
+                    {currentAnnouncement?.content}
+                  </div>
+                </div>
+
+                <div className="pt-2 text-[11px] text-slate-500 border-t border-slate-200/60 flex items-center justify-between">
+                  <span>Otorisator: <strong>{currentAnnouncement?.author || 'Dewan Direksi'}</strong></span>
+                  <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Terverifikasi Sistem HR
+                  </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsAnnouncementModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2 text-xs text-slate-700 leading-relaxed">
-              <p className="font-bold text-slate-900">
-                Ketentuan Jam Kerja Selama Bulan Suci Ramadhan:
-              </p>
-              <ul className="list-disc pl-5 space-y-1 text-slate-600">
-                <li>Hari Senin - Kamis: Pukul 08:30 - 16:30 WIB (Istirahat: 12:00 - 12:30 WIB)</li>
-                <li>Hari Jumat: Pukul 08:30 - 16:30 WIB (Istirahat Shalat Jumat: 11:45 - 12:45 WIB)</li>
-                <li>Kebijakan Hybrid Working: Tetap berlaku 3 hari WFO dan 2 hari WFH per pekan.</li>
-                <li>Ketepatan Waktu: Presensi tap-in tetap dibuka mulai pukul 07:00 WIB.</li>
-              </ul>
-              <p className="text-[11px] text-slate-500 pt-1">
-                Ditetapkan di Jakarta oleh Dewan Direksi PT Nexora Solusi Nusantara.
-              </p>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setIsAnnouncementModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all active:scale-95"
-              >
-                Tutup Dokumen
-              </button>
+              <div className="pt-2 flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">
+                  PT Nexora Solusi Nusantara
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsAnnouncementModalOpen(false)}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                >
+                  Tutup Dokumen
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL 4: UBAH PREFERENSI WFH */}
       {isWfhPreferenceModalOpen && (

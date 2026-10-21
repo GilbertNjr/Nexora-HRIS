@@ -30,6 +30,8 @@ import {
   UserPlus,
   Send,
   Building2,
+  Megaphone,
+  Loader2,
 } from 'lucide-react';
 
 interface ApprovalRequest {
@@ -80,6 +82,71 @@ export default function AdminDashboardPage() {
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
   const [isDownloadingRecap, setIsDownloadingRecap] = useState(false);
+
+  // Broadcast HR Announcement State
+  const [isBroadcastAnnouncementModalOpen, setIsBroadcastAnnouncementModalOpen] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastBadge, setBroadcastBadge] = useState('PENGUMUMAN HRD');
+  const [broadcastDocNumber, setBroadcastDocNumber] = useState('');
+  const [broadcastPriority, setBroadcastPriority] = useState<'IMPORTANT' | 'URGENT' | 'INFO'>('IMPORTANT');
+  const [broadcastSummary, setBroadcastSummary] = useState('');
+  const [broadcastContent, setBroadcastContent] = useState('');
+  const [broadcastButtonText, setBroadcastButtonText] = useState('Lihat SE Direksi');
+  const [isSubmittingBroadcast, setIsSubmittingBroadcast] = useState(false);
+
+  const handleBroadcastAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastTitle.trim() || !broadcastSummary.trim()) {
+      showToast('⚠️ Judul dan ringkasan pengumuman wajib diisi!');
+      return;
+    }
+
+    setIsSubmittingBroadcast(true);
+    try {
+      const payload = {
+        title: broadcastTitle.trim(),
+        badge: broadcastBadge,
+        docNumber: broadcastDocNumber.trim() || undefined,
+        priority: broadcastPriority,
+        summary: broadcastSummary.trim(),
+        content: broadcastContent.trim() || broadcastSummary.trim(),
+        buttonText: broadcastButtonText.trim() || 'Lihat Pengumuman',
+        author: 'Dewi Lestari, S.Psi (HR Operations Manager)',
+      };
+
+      const res = await fetch('/api/v1/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Post to local BroadcastChannel for zero-latency multi-tab sync
+        try {
+          const bc = new BroadcastChannel('nexora_live_sync');
+          bc.postMessage({
+            type: 'ANNOUNCEMENT_PUBLISHED',
+            payload: data.data,
+          });
+          bc.close();
+        } catch {}
+
+        showToast('🎉 Pengumuman HR berhasil disiarkan secara real-time ke semua dashboard karyawan!');
+        setIsBroadcastAnnouncementModalOpen(false);
+        setBroadcastTitle('');
+        setBroadcastSummary('');
+        setBroadcastContent('');
+        setBroadcastDocNumber('');
+      } else {
+        showToast('⚠️ Gagal menyiarkan pengumuman. Silakan coba kembali.');
+      }
+    } catch {
+      showToast('⚠️ Terjadi kesalahan koneksi.');
+    } finally {
+      setIsSubmittingBroadcast(false);
+    }
+  };
 
   // Direct Executive PDF Download Handler
   const handleDownloadExecutiveRecap = () => {
@@ -453,6 +520,22 @@ export default function AdminDashboardPage() {
             >
               <Download className={`w-3.5 h-3.5 ${isDownloadingRecap ? 'animate-bounce' : ''}`} />
               <span>{isDownloadingRecap ? 'Mengunduh PDF...' : 'Unduh Rekap Eksekutif (PDF)'}</span>
+            </button>
+
+            {/* Live HR Broadcast Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const autoDoc = `No. ${Math.floor(Math.random() * 900) + 100}/HR-NOTIF/${new Intl.DateTimeFormat('id-ID', { month: 'numeric' }).format(now)}/${now.getFullYear()}`;
+                setBroadcastDocNumber(autoDoc);
+                setIsBroadcastAnnouncementModalOpen(true);
+              }}
+              className="h-10 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-sm transition-all transform active:scale-95 cursor-pointer border border-amber-400"
+              title="Siarkan pengumuman penting HR ke seluruh dashboard karyawan secara live"
+            >
+              <Megaphone className="w-3.5 h-3.5 text-slate-950" />
+              <span>Siarkan Pengumuman HRD</span>
             </button>
           </div>
         </div>
@@ -1053,6 +1136,174 @@ export default function AdminDashboardPage() {
                 ✓ Setujui Permohonan Cuti
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* BROADCAST HR ANNOUNCEMENT MODAL (REAL-TIME SINKRONISASI) */}
+      {/* ========================================================= */}
+      {isBroadcastAnnouncementModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Siarkan Pengumuman HRD Live
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Otomatis muncul seketika di dashboard seluruh karyawan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBroadcastAnnouncementModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBroadcastAnnouncement} className="space-y-4 pt-3 text-xs">
+              {/* Prioritas & Badge */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Label Kategori
+                  </label>
+                  <select
+                    value={broadcastBadge}
+                    onChange={(e) => setBroadcastBadge(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-blue-600"
+                  >
+                    <option value="PENGUMUMAN HRD">PENGUMUMAN HRD</option>
+                    <option value="SURAT EDARAN">SURAT EDARAN</option>
+                    <option value="KEBIJAKAN KANTOR">KEBIJAKAN KANTOR</option>
+                    <option value="URGENT BROADCAST">URGENT BROADCAST</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Tingkat Urgensi
+                  </label>
+                  <select
+                    value={broadcastPriority}
+                    onChange={(e) => setBroadcastPriority(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-blue-600"
+                  >
+                    <option value="IMPORTANT">Penting (Biru Indigo)</option>
+                    <option value="URGENT">Mendesak / Urgent (Merah)</option>
+                    <option value="INFO">Informasi Biasa</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* No Dokumen */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Nomor Dokumen / SK
+                </label>
+                <input
+                  type="text"
+                  value={broadcastDocNumber}
+                  onChange={(e) => setBroadcastDocNumber(e.target.value)}
+                  placeholder="Contoh: No. 019/HR-NOTIF/III/2025"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-blue-600"
+                />
+              </div>
+
+              {/* Judul Pengumuman */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Judul Pengumuman <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  placeholder="Contoh: Penyesuaian Jam Operasional Libur Nasional"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 focus:outline-blue-600"
+                />
+              </div>
+
+              {/* Ringkasan Singkat (Muncul di banner utama) */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Ringkasan Banner Utama (Maksimal 2 Kalimat) <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  value={broadcastSummary}
+                  onChange={(e) => setBroadcastSummary(e.target.value)}
+                  placeholder="Kalimat ringkas yang langsung terbaca karyawan di banner dashboard utama..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-blue-600"
+                />
+              </div>
+
+              {/* Ketentuan Lengkap (Muncul saat tombol diklik) */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Detail Ketentuan & Isi Lengkap (Surat Edaran)
+                </label>
+                <textarea
+                  rows={4}
+                  value={broadcastContent}
+                  onChange={(e) => setBroadcastContent(e.target.value)}
+                  placeholder="Isi lengkap ketetapan manajemen, poin-poin aturan, atau lampiran operasional..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-blue-600"
+                />
+              </div>
+
+              {/* Teks Tombol */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Teks Tombol Aksi Karyawan
+                </label>
+                <input
+                  type="text"
+                  value={broadcastButtonText}
+                  onChange={(e) => setBroadcastButtonText(e.target.value)}
+                  placeholder="Lihat SE Direksi"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-blue-600"
+                />
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsBroadcastAnnouncementModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingBroadcast}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 disabled:opacity-60"
+                >
+                  {isSubmittingBroadcast ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyiarkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Megaphone className="w-3.5 h-3.5" />
+                      <span>Siarkan Sekarang</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

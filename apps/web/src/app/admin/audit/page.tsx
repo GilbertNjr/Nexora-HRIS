@@ -29,7 +29,7 @@ import {
 
 export interface AuditLogEntry {
   id: string;
-  module: 'AUTH' | 'EMPLOYEE' | 'ATTENDANCE' | 'LEAVE' | 'PAYROLL';
+  module: 'AUTH' | 'EMPLOYEE' | 'ATTENDANCE' | 'LEAVE' | 'PAYROLL' | 'ANNOUNCEMENTS';
   action: string;
   recordId: string;
   userName: string;
@@ -242,6 +242,8 @@ export default function AdminAuditPage() {
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'PAYROLL':
         return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'ANNOUNCEMENTS':
+        return 'bg-amber-50 text-amber-800 border-amber-200';
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200';
     }

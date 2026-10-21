@@ -22,7 +22,8 @@ export type EmployeeEventType =
   | 'EMPLOYEE_UPDATED'
   | 'EMPLOYEE_DELETED'
   | 'COMPANY_UPDATED'
-  | 'ATTENDANCE_RECORDED';
+  | 'ATTENDANCE_RECORDED'
+  | 'ANNOUNCEMENT_PUBLISHED';
 
 export function broadcastEmployeeEvent(eventType: EmployeeEventType, payload: any) {
   try {

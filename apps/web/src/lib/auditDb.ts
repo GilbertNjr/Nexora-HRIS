@@ -3,7 +3,7 @@ import path from 'path';
 
 export interface AuditLogEntry {
   id: string;
-  module: 'AUTH' | 'EMPLOYEE' | 'ATTENDANCE' | 'LEAVE' | 'PAYROLL';
+  module: 'AUTH' | 'EMPLOYEE' | 'ATTENDANCE' | 'LEAVE' | 'PAYROLL' | 'ANNOUNCEMENTS';
   action: string;
   recordId: string;
   userName: string;
