@@ -166,23 +166,19 @@ export default function UserProfilePage() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const persistentAvatar = localStorage.getItem('nexora_persistent_avatar');
-        const cached = localStorage.getItem('nexora_user_profile');
+        const cached = localStorage.getItem('nexora_admin_profile');
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
             setProfileData((prev) => ({
               ...prev,
               ...parsed,
-              avatarUrl: persistentAvatar || parsed.avatarUrl || prev.avatarUrl,
             }));
           } catch {}
-        } else if (persistentAvatar) {
-          setProfileData((prev) => ({ ...prev, avatarUrl: persistentAvatar }));
         }
 
-        // Fetch from API
-        const res = await fetch('/api/v1/profile');
+        // Fetch from API with role=admin
+        const res = await fetch('/api/v1/profile?role=admin');
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.hasData && json.data) {
@@ -190,26 +186,10 @@ export default function UserProfilePage() {
               const merged = {
                 ...prev,
                 ...json.data,
-                avatarUrl: json.data.avatarUrl || persistentAvatar || prev.avatarUrl || '',
               };
-              localStorage.setItem('nexora_user_profile', JSON.stringify(merged));
+              localStorage.setItem('nexora_admin_profile', JSON.stringify(merged));
               return merged;
             });
-          } else if (!cached) {
-            // Default session email fallback if available
-            const sessionUser = localStorage.getItem('nexora_user');
-            if (sessionUser) {
-              try {
-                const u = JSON.parse(sessionUser);
-                if (u.email) {
-                  setProfileData((prev) => ({
-                    ...prev,
-                    email: u.email,
-                    employeeNumber: `NX-${new Date().getFullYear()}001`,
-                  }));
-                }
-              } catch {}
-            }
           }
         }
       } catch {
@@ -226,34 +206,31 @@ export default function UserProfilePage() {
     if (e) e.preventDefault();
     try {
       setIsSaving(true);
-      // 1. Local backup
-      localStorage.setItem('nexora_user_profile', JSON.stringify(profileData));
-      if (profileData.avatarUrl) {
-        localStorage.setItem('nexora_persistent_avatar', profileData.avatarUrl);
-      } else {
-        localStorage.removeItem('nexora_persistent_avatar');
-      }
+      // 1. Local backup for Admin
+      const toSave = { ...profileData, role: 'admin' };
+      localStorage.setItem('nexora_admin_profile', JSON.stringify(toSave));
 
-      // 2. Sync to backend API / database
+      // 2. Sync to backend API / database with role=admin
       const res = await fetch('/api/v1/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profileData),
+        body: JSON.stringify(toSave),
       });
 
-      // 3. Broadcast to layout topbar
+      // 3. Broadcast to layout topbar with role: 'ADMIN'
       try {
         const channel = new BroadcastChannel('nexora_live_sync');
         channel.postMessage({
           type: 'PROFILE_UPDATED',
-          profile: profileData,
+          role: 'ADMIN',
+          profile: toSave,
         });
         channel.close();
       } catch {}
 
       const json = await res.json();
       if (res.ok && json.success) {
-        showToast('✓ Data profil dan foto berhasil disimpan ke database!');
+        showToast('✓ Data profil Admin HR berhasil disimpan ke database!');
       } else {
         showToast(json.error?.message || 'Data disimpan secara lokal.');
       }

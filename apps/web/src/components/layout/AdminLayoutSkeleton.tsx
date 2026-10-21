@@ -80,34 +80,39 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
       })
       .catch(() => {});
 
-    // Load user profile for topbar pill
+    // Load Admin user profile for topbar pill
     try {
-      const persistentAvatar = localStorage.getItem('nexora_persistent_avatar');
-      const cachedProfile = localStorage.getItem('nexora_user_profile');
-      if (cachedProfile) {
-        const parsed = JSON.parse(cachedProfile);
+      const cachedAdminProfile = localStorage.getItem('nexora_admin_profile');
+      if (cachedAdminProfile) {
+        const parsed = JSON.parse(cachedAdminProfile);
         setUserProfile({
-          fullName: parsed.fullName || '',
-          designation: parsed.designation || '',
-          avatarUrl: persistentAvatar || parsed.avatarUrl || '',
+          fullName: parsed.fullName || 'Dewi Lestari, S.Psi',
+          designation: parsed.designation || 'HR Administrator',
+          avatarUrl: parsed.avatarUrl || '',
         });
-      } else if (persistentAvatar) {
-        setUserProfile((prev) => ({ ...prev, avatarUrl: persistentAvatar }));
+      } else {
+        setUserProfile({
+          fullName: 'Dewi Lestari, S.Psi',
+          designation: 'HR Administrator',
+          avatarUrl: '',
+        });
       }
     } catch {
       // ignore
     }
 
-    fetch('/api/v1/profile')
+    fetch('/api/v1/profile?role=admin')
       .then((res) => res.json())
       .then((json) => {
         if (json?.success && json?.hasData && json.data) {
-          const persistentAvatar = localStorage.getItem('nexora_persistent_avatar');
           setUserProfile({
-            fullName: json.data.fullName || '',
-            designation: json.data.designation || '',
-            avatarUrl: json.data.avatarUrl || persistentAvatar || '',
+            fullName: json.data.fullName || 'Dewi Lestari, S.Psi',
+            designation: json.data.designation || 'HR Administrator',
+            avatarUrl: json.data.avatarUrl || '',
           });
+          try {
+            localStorage.setItem('nexora_admin_profile', JSON.stringify(json.data));
+          } catch {}
         }
       })
       .catch(() => {});
@@ -122,7 +127,7 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
           setCompanyLogo(msg.logoUrl || '');
           if (msg.companyName) setCompanyName(msg.companyName);
         }
-        if (msg?.type === 'PROFILE_UPDATED' && msg.profile) {
+        if (msg?.type === 'PROFILE_UPDATED' && msg.profile && (msg.role === 'ADMIN' || msg.portal === 'admin')) {
           setUserProfile({
             fullName: msg.profile.fullName || '',
             designation: msg.profile.designation || '',

@@ -48,9 +48,11 @@ import {
 } from 'lucide-react';
 import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function EmployeeDashboardOverhaulPage() {
   const router = useRouter();
+  const { user: currentUser } = useCurrentUser();
   const { isCollapsed: isSidebarCollapsed, toggle: toggleSidebar, isMobileOpen, openMobile, closeMobile } = useSidebarCollapse();
 
   // Search state
@@ -342,24 +344,29 @@ export default function EmployeeDashboardOverhaulPage() {
 
             {/* User Profile Pill matching screenshot */}
             <Link
-              href="/ess/profile"
+              href="/karyawan/profile"
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
               title="Profil Pengguna Saya"
             >
-              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">
-                RP
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden">
+                {currentUser.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
+                ) : (
+                  currentUser.initials || 'RP'
+                )}
               </div>
               <div className="hidden sm:flex flex-col text-left leading-tight">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
-                    Rian Pratama, S.Kom
+                    {currentUser.fullName || 'Rian Pratama, S.Kom'}
                   </span>
                   <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-[9px] font-bold text-slate-600">
                     Karyawan (ESS)
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                  Lead Backend Architect • NX-2021008
+                  {currentUser.designation || 'Lead Backend Architect'} • {currentUser.employeeNumber || 'NX-2021008'}
                 </span>
               </div>
             </Link>

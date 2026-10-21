@@ -3,13 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import { neon } from '@neondatabase/serverless';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
+import { getEmployeesFromDb, updateEmployeeInDb, saveEmployeeToDb } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const STORAGE_DIR = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(process.cwd(), '.data');
-const PROFILE_FILE = path.join(STORAGE_DIR, 'nexora_user_profile.json');
+const EMPLOYEE_PROFILE_FILE = path.join(STORAGE_DIR, 'nexora_employee_profile.json');
+const ADMIN_PROFILE_FILE = path.join(STORAGE_DIR, 'nexora_admin_profile.json');
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -25,19 +28,35 @@ export interface UserProfile {
   joinDate: string;
   avatarUrl: string;
   updatedAt?: string;
+  role?: 'EMPLOYEE' | 'ADMIN';
 }
 
-const defaultProfile: UserProfile = {
+const defaultEmployeeProfile: UserProfile = {
   fullName: 'Rian Pratama, S.Kom',
   employeeNumber: 'NX-2021008',
   email: 'rian.pratama@nexora.co.id',
-  phone: '+62 812-8899-7711',
-  department: 'Technology & Core Systems',
+  phone: '+62 812-9845-1120',
+  department: 'Technology & Core Engineering',
   designation: 'Lead Backend Architect',
-  manager: 'Hendra Wijaya, M.Sc (VP of Engineering)',
-  location: 'SCBD Headquarter, Gedung Pasifik Lt. 7, Jakarta',
+  manager: 'Arya Wibowo, M.Sc (VP Eng.)',
+  location: 'HQ Pacific Tower SCBD Lt. 7',
   joinDate: '2021-01-12',
   avatarUrl: '',
+  role: 'EMPLOYEE',
+};
+
+const defaultAdminProfile: UserProfile = {
+  fullName: 'Dewi Lestari, S.Psi',
+  employeeNumber: 'NX-ADMIN-001',
+  email: 'admin@nexora.co.id',
+  phone: '+62 811-9988-7766',
+  department: 'Human Capital & People Operations',
+  designation: 'HR Administrator',
+  manager: 'Direktur SDM & Operasional',
+  location: 'SCBD Headquarter, Lantai 32',
+  joinDate: '2020-03-01',
+  avatarUrl: '',
+  role: 'ADMIN',
 };
 
 function ensureStorage(): void {
@@ -48,82 +67,67 @@ function ensureStorage(): void {
   } catch {}
 }
 
-function getLocalProfile(): UserProfile | null {
+function getStoredProfile(filePath: string, fallback: UserProfile): UserProfile {
   try {
     ensureStorage();
-    if (fs.existsSync(PROFILE_FILE)) {
-      const data = JSON.parse(fs.readFileSync(PROFILE_FILE, 'utf-8'));
-      return data;
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      return { ...fallback, ...data };
     }
   } catch {}
-  return null;
+  return fallback;
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const roleParam = searchParams.get('role')?.toLowerCase().trim();
   const emailParam = searchParams.get('email')?.toLowerCase().trim();
   const empNoParam = searchParams.get('employeeNumber')?.trim();
 
-  const local = getLocalProfile();
+  const isAdmin =
+    roleParam === 'admin' ||
+    roleParam === 'hr_admin' ||
+    emailParam === 'admin@nexora.local' ||
+    emailParam === 'admin@nexora.co.id' ||
+    (empNoParam && empNoParam.toLowerCase().includes('admin'));
 
-  // 1. Try Neon Serverless PostgreSQL first (Primary source of truth)
-  if (DATABASE_URL) {
-    try {
-      const sql = neon(DATABASE_URL);
-      let queryStr = `
-        SELECT e.id, e.employee_number, e.first_name, e.last_name, e.phone, e.avatar_url, e.join_date,
-               d.name as department_name, des.title as designation_title, u.email
-        FROM employees e
-        LEFT JOIN departments d ON e.department_id = d.id
-        LEFT JOIN designations des ON e.designation_id = des.id
-        LEFT JOIN users u ON e.user_id = u.id
-      `;
-      let params: any[] = [];
+  if (isAdmin) {
+    const adminData = getStoredProfile(ADMIN_PROFILE_FILE, defaultAdminProfile);
+    return NextResponse.json({ success: true, data: adminData, hasData: true }, { status: 200 });
+  }
 
-      if (emailParam && empNoParam) {
-        queryStr += ` WHERE LOWER(u.email) = $1 OR e.employee_number = $2 LIMIT 1`;
-        params = [emailParam, empNoParam];
-      } else if (emailParam) {
-        queryStr += ` WHERE LOWER(u.email) = $1 LIMIT 1`;
-        params = [emailParam];
-      } else if (empNoParam) {
-        queryStr += ` WHERE e.employee_number = $1 LIMIT 1`;
-        params = [empNoParam];
-      } else {
-        queryStr += ` ORDER BY e.created_at ASC LIMIT 1`;
-      }
+  // Employee Profile: check master employee database first for 100% data consistency!
+  try {
+    const targetIdOrNik = empNoParam || 'NX-2021008';
+    const allEmps = await getEmployeesFromDb();
+    const matched = allEmps.find(
+      (e) =>
+        e.employeeNumber?.toLowerCase() === targetIdOrNik.toLowerCase() ||
+        (emailParam && e.email?.toLowerCase() === emailParam.toLowerCase())
+    );
 
-      const rows = await sql.query(queryStr, params);
-
-      if (Array.isArray(rows) && rows.length > 0) {
-        const emp = rows[0] as any;
-        const dbProfile: UserProfile = {
-          fullName: `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || defaultProfile.fullName,
-          employeeNumber: emp.employee_number || defaultProfile.employeeNumber,
-          email: emp.email || defaultProfile.email,
-          phone: emp.phone || defaultProfile.phone,
-          department: emp.department_name || defaultProfile.department,
-          designation: emp.designation_title || defaultProfile.designation,
-          manager: 'Direksi & Manajemen',
-          location: 'Kantor Pusat - SCBD Jakarta',
-          joinDate: emp.join_date ? new Date(emp.join_date).toISOString().split('T')[0] : defaultProfile.joinDate,
-          avatarUrl: emp.avatar_url || local?.avatarUrl || '',
-          updatedAt: new Date().toISOString(),
-        };
-
-        return NextResponse.json({ success: true, data: dbProfile, hasData: true }, { status: 200 });
-      }
-    } catch (err: any) {
-      console.warn('[Profile API] Neon query error, falling back to local:', err?.message);
+    if (matched) {
+      const merged: UserProfile = {
+        fullName: matched.fullName || defaultEmployeeProfile.fullName,
+        employeeNumber: matched.employeeNumber || defaultEmployeeProfile.employeeNumber,
+        email: matched.email || defaultEmployeeProfile.email,
+        phone: matched.phone || defaultEmployeeProfile.phone,
+        department: matched.department || defaultEmployeeProfile.department,
+        designation: matched.designation || defaultEmployeeProfile.designation,
+        manager: matched.managerName || defaultEmployeeProfile.manager,
+        location: matched.office || defaultEmployeeProfile.location,
+        joinDate: matched.joinDate || defaultEmployeeProfile.joinDate,
+        avatarUrl: matched.avatarUrl || '',
+        updatedAt: matched.updatedAt || new Date().toISOString(),
+        role: 'EMPLOYEE',
+      };
+      return NextResponse.json({ success: true, data: merged, hasData: true }, { status: 200 });
     }
-  }
+  } catch {}
 
-  // 2. Fallback to local storage file if database query is unavailable
-  if (local) {
-    return NextResponse.json({ success: true, data: local, hasData: true }, { status: 200 });
-  }
-
-  return NextResponse.json({ success: true, data: defaultProfile, hasData: true }, { status: 200 });
+  // Fallback to local stored employee profile
+  const empData = getStoredProfile(EMPLOYEE_PROFILE_FILE, defaultEmployeeProfile);
+  return NextResponse.json({ success: true, data: empData, hasData: true }, { status: 200 });
 }
 
 export async function PUT(request: NextRequest) {
@@ -131,8 +135,44 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     ensureStorage();
 
-    const current = getLocalProfile() || defaultProfile;
-    const updated: UserProfile = {
+    const roleParam = body.role?.toLowerCase?.();
+    const isAdmin =
+      roleParam === 'admin' ||
+      roleParam === 'hr_admin' ||
+      body.email?.includes('admin') ||
+      body.employeeNumber?.toLowerCase()?.includes('admin');
+
+    if (isAdmin) {
+      // 1. Save Admin Profile separately
+      const current = getStoredProfile(ADMIN_PROFILE_FILE, defaultAdminProfile);
+      const updatedAdmin: UserProfile = {
+        fullName: body.fullName ?? current.fullName,
+        employeeNumber: body.employeeNumber || current.employeeNumber,
+        email: body.email ?? current.email,
+        phone: body.phone ?? current.phone,
+        department: body.department ?? current.department,
+        designation: body.designation ?? current.designation,
+        manager: body.manager ?? current.manager,
+        location: body.location ?? current.location,
+        joinDate: body.joinDate ?? current.joinDate,
+        avatarUrl: body.avatarUrl !== undefined ? body.avatarUrl : current.avatarUrl,
+        updatedAt: new Date().toISOString(),
+        role: 'ADMIN',
+      };
+
+      try {
+        fs.writeFileSync(ADMIN_PROFILE_FILE, JSON.stringify(updatedAdmin, null, 2), 'utf-8');
+      } catch {}
+
+      return NextResponse.json(
+        { success: true, data: updatedAdmin, message: 'Profil Admin HR berhasil diperbarui.' },
+        { status: 200 }
+      );
+    }
+
+    // 2. Save Employee Profile without touching Admin profile!
+    const current = getStoredProfile(EMPLOYEE_PROFILE_FILE, defaultEmployeeProfile);
+    const updatedEmployee: UserProfile = {
       fullName: body.fullName ?? current.fullName,
       employeeNumber: body.employeeNumber || current.employeeNumber,
       email: body.email ?? current.email,
@@ -144,77 +184,101 @@ export async function PUT(request: NextRequest) {
       joinDate: body.joinDate ?? current.joinDate,
       avatarUrl: body.avatarUrl !== undefined ? body.avatarUrl : current.avatarUrl,
       updatedAt: new Date().toISOString(),
+      role: 'EMPLOYEE',
     };
 
-    // 1. Sync to Neon PostgreSQL with precise identity targeting (No blind overwrites!)
+    // A. Persist to employee cache file
+    try {
+      fs.writeFileSync(EMPLOYEE_PROFILE_FILE, JSON.stringify(updatedEmployee, null, 2), 'utf-8');
+    } catch {}
+
+    // B. Persist directly into master Employee Database so HR Admin sees it!
+    const names = updatedEmployee.fullName.trim().split(' ');
+    const firstName = names[0] || 'Karyawan';
+    const lastName = names.slice(1).join(' ') || '';
+
+    let savedRecord = await updateEmployeeInDb(updatedEmployee.employeeNumber, {
+      fullName: updatedEmployee.fullName,
+      firstName,
+      lastName,
+      email: updatedEmployee.email,
+      phone: updatedEmployee.phone,
+      department: updatedEmployee.department,
+      designation: updatedEmployee.designation,
+      avatarUrl: updatedEmployee.avatarUrl,
+    });
+
+    if (!savedRecord) {
+      // Create record if not found in db so it permanently appears in admin directory
+      savedRecord = await saveEmployeeToDb({
+        id: updatedEmployee.employeeNumber,
+        employeeNumber: updatedEmployee.employeeNumber,
+        fullName: updatedEmployee.fullName,
+        firstName,
+        lastName,
+        email: updatedEmployee.email,
+        phone: updatedEmployee.phone,
+        department: updatedEmployee.department,
+        designation: updatedEmployee.designation,
+        employmentType: 'PERMANENT',
+        employmentStatus: 'ACTIVE',
+        joinDate: updatedEmployee.joinDate,
+        avatarUrl: updatedEmployee.avatarUrl,
+      });
+    }
+
+    // C. Sync to PostgreSQL Neon if configured
     if (DATABASE_URL) {
       try {
         const sql = neon(DATABASE_URL);
-        const names = updated.fullName.trim().split(' ');
-        const firstName = names[0] || 'Karyawan';
-        const lastName = names.slice(1).join(' ') || '';
-
-        // Update employee record targeting specific employeeNumber
         await sql.query(
           `UPDATE employees 
            SET first_name = $1, last_name = $2, phone = $3, avatar_url = $4, updated_at = NOW() 
            WHERE employee_number = $5`,
-          [firstName, lastName, updated.phone, updated.avatarUrl || null, updated.employeeNumber]
+          [firstName, lastName, updatedEmployee.phone, updatedEmployee.avatarUrl || null, updatedEmployee.employeeNumber]
         );
-
-        // Update user avatar record targeting specific user email
-        await sql.query(
-          `UPDATE users 
-           SET avatar_url = $1, updated_at = NOW() 
-           WHERE LOWER(email) = LOWER($2)`,
-          [updated.avatarUrl || null, updated.email]
-        );
-      } catch (dbErr: any) {
-        console.error('[Profile API] Neon update error:', dbErr?.message);
-      }
+      } catch {}
     }
 
-    // 2. Persist to local cache file
-    try {
-      fs.writeFileSync(PROFILE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
-    } catch {}
-
-    // 3. Transparently audit profile updates in real-time
+    // D. Log to HR Admin Audit System
     const now = new Date();
-    const timestampStr =
-      now.toLocaleDateString('id-ID', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).split('/').reverse().join('-') +
-      ' ' +
-      now.toLocaleTimeString('id-ID') +
-      ' WIB';
-
     const auditLog: AuditLogEntry = {
       id: `aud-${Date.now()}`,
       module: 'EMPLOYEE',
       action: 'PROFILE_UPDATED',
-      recordId: updated.employeeNumber,
-      userName: updated.fullName,
-      userEmail: updated.email,
-      userNik: updated.employeeNumber,
+      recordId: updatedEmployee.employeeNumber,
+      userName: updatedEmployee.fullName,
+      userEmail: updatedEmployee.email,
+      userNik: updatedEmployee.employeeNumber,
       ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
       userAgent: request.headers.get('user-agent') || 'Portal Karyawan (Web)',
-      timestamp: timestampStr,
+      timestamp:
+        now.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-') +
+        ' ' +
+        now.toLocaleTimeString('id-ID') +
+        ' WIB',
       oldData: { fullName: current.fullName, phone: current.phone },
-      newData: { fullName: updated.fullName, phone: updated.phone, avatarUpdated: updated.avatarUrl !== current.avatarUrl },
+      newData: {
+        fullName: updatedEmployee.fullName,
+        phone: updatedEmployee.phone,
+        department: updatedEmployee.department,
+        designation: updatedEmployee.designation,
+      },
     };
 
-    const currentLogs = getStoredAuditLogs();
-    saveStoredAuditLogs([auditLog, ...currentLogs.slice(0, 99)]);
+    saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
     broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+
+    // E. Broadcast Real-Time Employee Event so HR Admin screen updates live!
+    if (savedRecord) {
+      broadcastEmployeeEvent('EMPLOYEE_UPDATED', savedRecord);
+    }
 
     return NextResponse.json(
       {
         success: true,
-        data: updated,
-        message: 'Profil pribadi Anda berhasil diperbarui dan disinkronkan ke master data perusahaan.',
+        data: updatedEmployee,
+        message: 'Profil karyawan berhasil diperbarui, tersimpan ke basis data & dicatat dalam audit HR.',
       },
       { status: 200 }
     );
