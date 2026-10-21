@@ -432,35 +432,67 @@ export function EmployeeSidebar({
       }`}>
         <div className="flex items-center gap-2 text-blue-900 font-bold">
           <HelpCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
-          <span>Pusat Dukungan</span>
+          <span>Pusat Dukungan ESS</span>
         </div>
         <p className="text-[11px] text-slate-500 leading-relaxed">
-          Ada kendala data kehadiran atau klaim?
+          {activeMenu === 'attendance'
+            ? 'Kendala liveness camera, radius geofence, atau koreksi?'
+            : 'Ada kendala data kehadiran atau klaim?'}
         </p>
 
         <div className="pt-1 space-y-1 font-semibold text-[11px]">
-          <a
-            href="#sop"
-            onClick={(e) => {
-              e.preventDefault();
-              if (onOpenPkbModal) onOpenPkbModal();
-            }}
-            className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-          >
-            <span>SOP Kepegawaian</span>
-            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-          </a>
-          <a
-            href="#tiket"
-            onClick={(e) => {
-              e.preventDefault();
-              handleHelpdeskClick();
-            }}
-            className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-          >
-            <span>Tiket Helpdesk HR</span>
-            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-          </a>
+          {activeMenu === 'attendance' ? (
+            <>
+              <a
+                href="#sop"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onOpenPkbModal) onOpenPkbModal();
+                  else if (onShowToast) onShowToast('SOP Presensi Biometrik: Pastikan pencahayaan cukup dan izinkan akses kamera.');
+                }}
+                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+              >
+                <span>SOP Presensi Biometrik</span>
+                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+              </a>
+              <a
+                href="#chat-pic"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onShowToast) onShowToast('Menghubungkan ke PIC Absensi HR: Diana S. (Ext. 405 / WA Business HR)');
+                }}
+                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+              >
+                <span>Chat PIC Absensi (Diana S.)</span>
+                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+              </a>
+            </>
+          ) : (
+            <>
+              <a
+                href="#sop"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onOpenPkbModal) onOpenPkbModal();
+                }}
+                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+              >
+                <span>SOP Kepegawaian</span>
+                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+              </a>
+              <a
+                href="#tiket"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleHelpdeskClick();
+                }}
+                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+              >
+                <span>Tiket Helpdesk HR</span>
+                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+              </a>
+            </>
+          )}
         </div>
       </div>
     </aside>

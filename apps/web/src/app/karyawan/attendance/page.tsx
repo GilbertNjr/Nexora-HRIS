@@ -101,6 +101,38 @@ export default function EmployeeAttendancePage() {
   // Camera video ref for simulated or real webcam
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLiveCameraActive, setIsLiveCameraActive] = useState(false);
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
+
+  const toggleRealCamera = async () => {
+    if (isLiveCameraActive && webcamStream) {
+      webcamStream.getTracks().forEach((track) => track.stop());
+      setWebcamStream(null);
+      setIsLiveCameraActive(false);
+      showToast('Kamera fisik dinonaktifkan (kembali ke simulasi biometrik)');
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: 640, height: 480 },
+        });
+        setWebcamStream(stream);
+        setIsLiveCameraActive(true);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        showToast('✓ Kamera fisik terhubung ke NX-Biometric Engine');
+      } catch {
+        showToast('Akses kamera tidak diizinkan atau tidak tersedia, menggunakan simulasi AI.');
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [webcamStream]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -325,7 +357,7 @@ export default function EmployeeAttendancePage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
+                placeholder="Cari menu, slip gaji, riwayat presensi..."
                 className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
               />
             </div>
@@ -333,12 +365,9 @@ export default function EmployeeAttendancePage() {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
-            <div className="hidden lg:flex items-center gap-2 text-xs text-slate-600">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-slate-700 font-semibold">
               <Calendar className="w-4 h-4 text-slate-400" />
-              <div className="flex flex-col text-[11px] leading-tight text-left">
-                <span className="font-bold text-slate-800">Senin, 24</span>
-                <span className="text-slate-500 font-medium">Maret 2025</span>
-              </div>
+              <span>Senin, 24 Maret 2025</span>
             </div>
 
             <NotificationBellDropdown portal="ess" />
@@ -377,8 +406,8 @@ export default function EmployeeAttendancePage() {
           </div>
         </header>
 
-        {/* PAGE CONTENT CONTAINER (Ample pb-36 padding to ensure nothing is EVER cut off!) */}
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto pb-36">
+        {/* PAGE CONTENT CONTAINER (Ample pb-48 padding to ensure nothing is EVER cut off!) */}
+        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto pb-48">
           {/* HEADER SECTION matching user screenshot */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-1">
             <div className="space-y-1.5">
@@ -392,7 +421,7 @@ export default function EmployeeAttendancePage() {
                   <span>Portal Karyawan (ESS)</span>
                 </Link>
                 <span>/</span>
-                <span className="text-slate-800 font-bold">Presensi &amp; Absensi Mandiri</span>
+                <span className="text-blue-700 font-bold">Presensi &amp; Absensi Mandiri</span>
               </div>
 
               {/* Title exact match */}
@@ -595,8 +624,18 @@ export default function EmployeeAttendancePage() {
                 <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
                   <button
                     type="button"
-                    disabled
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs cursor-default"
+                    onClick={() => {
+                      if (isCheckedIn) {
+                        showToast(`Anda telah melakukan Check-In (${checkInTimeStr} - Tepat Waktu).`);
+                      } else {
+                        handleTriggerSelfieScan();
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isCheckedIn
+                        ? 'bg-slate-100 hover:bg-slate-200/80 text-slate-500'
+                        : 'bg-[#1E3A8A] hover:bg-[#172554] text-white shadow-xs'
+                    }`}
                   >
                     <LogIn className="w-3.5 h-3.5" />
                     <span>Check-In</span>
@@ -617,7 +656,18 @@ export default function EmployeeAttendancePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
                 {/* 1. LIVENESS CAMERA BOX */}
                 <div className="flex flex-col space-y-2">
-                  <div className="relative rounded-2xl bg-[#0B132B] p-5 text-white shadow-inner flex flex-col justify-between overflow-hidden min-h-[340px] border border-slate-800">
+                  <div className="relative rounded-2xl bg-[#0B132B] p-4 text-white shadow-inner flex flex-col justify-between overflow-hidden min-h-[260px] sm:min-h-[275px] border border-slate-800">
+                    {/* Live Webcam video element when turned on */}
+                    {isLiveCameraActive && (
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="absolute inset-0 w-full h-full object-cover opacity-60 z-0"
+                      />
+                    )}
+
                     {/* Top Status inside camera feed */}
                     <div className="flex items-center justify-between text-xs z-10">
                       <div className="flex items-center gap-2">
@@ -629,31 +679,36 @@ export default function EmployeeAttendancePage() {
                           Liveness Detection Aktif
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                      <button
+                        type="button"
+                        onClick={toggleRealCamera}
+                        title={isLiveCameraActive ? 'Gunakan Simulasi Biometrik' : 'Aktifkan Kamera Webcam Fisik'}
+                        className="flex items-center gap-1 text-[10px] text-slate-300 font-mono px-2 py-0.5 rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 transition-colors cursor-pointer"
+                      >
                         <Camera className="w-3 h-3 text-emerald-400" />
-                        <span>HD 1080p • 30fps</span>
-                      </div>
+                        <span>{isLiveCameraActive ? 'Webcam Aktif' : 'HD 1080p • 30fps'}</span>
+                      </button>
                     </div>
 
                     {/* Center: Face Biometric Target Reticle */}
-                    <div className="relative my-auto flex items-center justify-center py-6">
+                    <div className="relative my-auto flex items-center justify-center py-2 sm:py-3 z-10">
                       {/* Scanning Ring with animation */}
-                      <div className="w-40 h-48 rounded-full border-2 border-dashed border-emerald-500/50 flex items-center justify-center relative animate-pulse">
+                      <div className="w-36 h-42 sm:w-40 sm:h-46 rounded-full border-2 border-dashed border-emerald-500/50 flex items-center justify-center relative animate-pulse">
                         {/* Radar sweep beam effect */}
                         <div className="absolute inset-0 rounded-full border-t-2 border-emerald-400/90 animate-spin" />
 
                         {/* Silhouette Face with Facial Mesh Markers */}
-                        <div className="w-32 h-40 rounded-full bg-emerald-950/30 border border-emerald-400/30 flex flex-col items-center justify-center relative p-3">
+                        <div className="w-28 h-34 sm:w-32 sm:h-38 rounded-full bg-emerald-950/30 border border-emerald-400/30 flex flex-col items-center justify-center relative p-2">
                           {/* Face Icon with Reticle points */}
-                          <div className="w-16 h-16 rounded-full border border-emerald-400/60 flex items-center justify-center relative mb-1">
+                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-emerald-400/60 flex items-center justify-center relative mb-1">
                             {/* Eye markers */}
-                            <div className="w-2 h-2 rounded-full bg-emerald-400 absolute left-3 top-5 animate-ping" />
-                            <div className="w-2 h-2 rounded-full bg-emerald-400 absolute right-3 top-5 animate-ping" />
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 absolute top-8" />
-                            <div className="w-4 h-1 rounded-full bg-emerald-400 absolute bottom-3" />
+                            <div className="w-2 h-2 rounded-full bg-emerald-400 absolute left-2.5 top-4 animate-ping" />
+                            <div className="w-2 h-2 rounded-full bg-emerald-400 absolute right-2.5 top-4 animate-ping" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 absolute top-7" />
+                            <div className="w-3.5 h-1 rounded-full bg-emerald-400 absolute bottom-2.5" />
                           </div>
                           {/* Chin line */}
-                          <div className="w-8 h-0.5 bg-emerald-500/60 rounded-full mt-1" />
+                          <div className="w-7 h-0.5 bg-emerald-500/60 rounded-full mt-0.5" />
                         </div>
 
                         {/* Corner Target Brackets */}
@@ -684,7 +739,7 @@ export default function EmployeeAttendancePage() {
                   </div>
 
                   {/* Sub text under camera box */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 pt-0.5">
                     <span className="flex items-center gap-1 text-emerald-700 font-semibold">
                       <Check className="w-3.5 h-3.5 text-emerald-600" />
                       Pencahayaan memadai &amp; wajah tegak lurus
@@ -806,12 +861,12 @@ export default function EmployeeAttendancePage() {
                 </div>
               </div>
 
-              {/* ACTION BUTTON (PREVIOUSLY CUT OFF, NOW FULLY PROMINENT & UNCLIPPED!) */}
+              {/* ACTION BUTTON: SOLID CORPORATE BLUE (#1E3A8A) - FULLY VISIBLE & NEVER CLIPPED */}
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={handleTriggerSelfieScan}
-                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-extrabold text-sm shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2.5 transition-all transform active:scale-[0.99] cursor-pointer"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-[#1E3A8A] hover:bg-[#172554] text-white font-bold text-sm shadow-md shadow-blue-950/20 flex items-center justify-center gap-2.5 transition-all transform active:scale-[0.99] cursor-pointer"
                 >
                   <Camera className="w-5 h-5 text-white" />
                   <span>Ambil Foto Selfie &amp; Verifikasi Presensi</span>
