@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 import { getEmployeesFromDb } from '@/lib/db';
 
@@ -23,6 +24,9 @@ export interface AttendanceItem {
   location: string;
   coordinates: string;
   device: string;
+  photoUrl?: string;
+  workLocation?: string;
+  notes?: string;
 }
 
 interface AttendanceData {
@@ -170,6 +174,9 @@ export async function POST(request: NextRequest) {
       location: body.location || 'SCBD Treasury Tower Lt. 32 (HQ Jakarta)',
       coordinates: body.coordinates || '-6.2255, 106.8089',
       device: body.device || 'Portal Karyawan ESS (Web)',
+      photoUrl: body.photoUrl || body.selfieUrl || undefined,
+      workLocation: body.workLocation || 'WFO',
+      notes: body.notes || undefined,
     };
 
     // Update counters
@@ -209,6 +216,7 @@ export async function POST(request: NextRequest) {
       };
       saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
       broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+      broadcastEmployeeEvent('ATTENDANCE_RECORDED', newRecord);
     } catch {}
 
     const attendanceRate = Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1));
