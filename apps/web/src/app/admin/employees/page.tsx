@@ -134,20 +134,8 @@ export default function EmployeesPage() {
       const stored = localStorage.getItem('nexora_employees_db');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          const hasLegacyMock = parsed.some(
-            (p) =>
-              p.employeeNumber === 'NX-2021008' ||
-              p.employeeNumber === 'NX-2026001' ||
-              p.fullName === 'Kevin Pratama' ||
-              p.fullName === 'Rian Pratama, S.Kom'
-          );
-          if (hasLegacyMock) {
-            localStorage.setItem('nexora_employees_db', JSON.stringify([]));
-            setEmployees([]);
-          } else {
-            setEmployees(parsed);
-          }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEmployees(parsed);
         }
       }
     } catch {
