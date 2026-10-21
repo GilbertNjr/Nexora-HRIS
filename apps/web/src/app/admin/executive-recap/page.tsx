@@ -693,7 +693,7 @@ export default function ExecutiveRecapExportPage() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {/* Metric 1 */}
-                      <div className="p-2.5 rounded-lg border-l-2 border-blue-600 bg-slate-50/70 border border-slate-100">
+                      <div className="p-2.5 rounded-lg border border-slate-100 border-l-2 border-l-blue-600 bg-slate-50/70">
                         <p className="text-[10px] text-slate-500 font-medium">Total Staf Aktif</p>
                         <p className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
                           1,248
@@ -702,7 +702,7 @@ export default function ExecutiveRecapExportPage() {
                       </div>
 
                       {/* Metric 2 */}
-                      <div className="p-2.5 rounded-lg border-l-2 border-emerald-500 bg-slate-50/70 border border-slate-100">
+                      <div className="p-2.5 rounded-lg border border-slate-100 border-l-2 border-l-emerald-500 bg-slate-50/70">
                         <p className="text-[10px] text-slate-500 font-medium">Tingkat Kehadiran</p>
                         <p className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
                           96.4%
@@ -711,7 +711,7 @@ export default function ExecutiveRecapExportPage() {
                       </div>
 
                       {/* Metric 3 */}
-                      <div className="p-2.5 rounded-lg border-l-2 border-sky-500 bg-slate-50/70 border border-slate-100">
+                      <div className="p-2.5 rounded-lg border border-slate-100 border-l-2 border-l-sky-500 bg-slate-50/70">
                         <p className="text-[10px] text-slate-500 font-medium">Realisasi Payroll</p>
                         <p className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
                           Rp 3.84 M
@@ -720,7 +720,7 @@ export default function ExecutiveRecapExportPage() {
                       </div>
 
                       {/* Metric 4 */}
-                      <div className="p-2.5 rounded-lg border-l-2 border-purple-500 bg-slate-50/70 border border-slate-100">
+                      <div className="p-2.5 rounded-lg border border-slate-100 border-l-2 border-l-purple-500 bg-slate-50/70">
                         <p className="text-[10px] text-slate-500 font-medium">Skor Rata-rata KPI</p>
                         <p className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
                           4.12 <span className="text-[10px] font-normal text-slate-500">/ 5.0</span>
