@@ -6,6 +6,7 @@ const STORAGE_KEY = 'nexora_employee_sidebar_collapsed';
 
 export function useSidebarCollapse() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
 
   useEffect(() => {
     try {
@@ -41,11 +42,20 @@ export function useSidebarCollapse() {
     } catch {}
   }, []);
 
+  const openMobile = useCallback(() => setIsMobileOpen(true), []);
+  const closeMobile = useCallback(() => setIsMobileOpen(false), []);
+  const toggleMobile = useCallback(() => setIsMobileOpen((prev) => !prev), []);
+
   return {
     isSidebarCollapsed,
     toggleSidebar,
     setCollapsed,
     isCollapsed: isSidebarCollapsed,
     toggle: toggleSidebar,
+    isMobileOpen,
+    setIsMobileOpen,
+    openMobile,
+    closeMobile,
+    toggleMobile,
   };
 }

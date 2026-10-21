@@ -55,6 +55,7 @@ import {
   Timer,
   PanelLeft,
   PanelLeftClose,
+  Menu,
 } from 'lucide-react';
 import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
@@ -81,7 +82,13 @@ interface CorrectionItem {
 
 export default function EssAttendanceOverhaulPage() {
   const { user: currentUser } = useCurrentUser();
-  const { isSidebarCollapsed, toggleSidebar } = useSidebarCollapse();
+  const {
+    isSidebarCollapsed,
+    toggleSidebar,
+    isMobileOpen,
+    openMobile,
+    closeMobile,
+  } = useSidebarCollapse();
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -287,11 +294,13 @@ export default function EssAttendanceOverhaulPage() {
         </div>
       )}
 
-      {/* LEFT SIDEBAR with Collapse/Expand (Matching HR Admin) */}
+      {/* LEFT SIDEBAR with Collapse/Expand & Mobile Drawer */}
       <EmployeeSidebar
         activeMenu="attendance"
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={toggleSidebar}
+        isMobileOpen={isMobileOpen}
+        onCloseMobile={closeMobile}
         onShowToast={showToast}
       />
 
@@ -299,8 +308,18 @@ export default function EssAttendanceOverhaulPage() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOP HEADER BAR matching screenshot */}
         <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
-          {/* Left: Desktop Toggle Button & Search Input Box */}
+          {/* Left: Mobile Drawer Button, Desktop Toggle Button & Search Input Box */}
           <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-lg">
+            {/* Mobile Menu Drawer Toggle Button */}
+            <button
+              type="button"
+              onClick={openMobile}
+              className="md:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors flex-shrink-0"
+              title="Buka Menu Navigasi"
+            >
+              <Menu className="w-5 h-5 text-slate-600" />
+            </button>
+
             {/* Desktop Sidebar Toggle Button (Matching HR Admin) */}
             <button
               type="button"
