@@ -348,8 +348,17 @@ export default function EmployeeAttendancePage() {
               href="/karyawan/profile"
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">
-                {currentUser.initials}
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden">
+                {currentUser.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.fullName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  currentUser.initials
+                )}
               </div>
               <div className="hidden sm:flex flex-col text-left leading-tight">
                 <div className="flex items-center gap-1.5">

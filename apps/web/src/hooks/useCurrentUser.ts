@@ -44,25 +44,35 @@ function getInitials(name: string): string {
 function parseStoredUser(): CurrentUser {
   if (typeof window === 'undefined') return DEFAULT_USER;
   try {
-    const raw = localStorage.getItem('nexora_user');
-    if (!raw) return DEFAULT_USER;
-    const parsed = JSON.parse(raw);
+    const rawUser = localStorage.getItem('nexora_user');
+    const rawEmp = localStorage.getItem('nexora_employee_profile');
 
-    const fullName = parsed.fullName || parsed.name || DEFAULT_USER.fullName;
+    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+    const parsedEmp = rawEmp ? JSON.parse(rawEmp) : null;
+
+    // Merge employee profile updates over default user
+    const merged = {
+      ...DEFAULT_USER,
+      ...(parsedUser || {}),
+      ...(parsedEmp || {}),
+    };
+
+    const fullName = merged.fullName || merged.name || DEFAULT_USER.fullName;
     const nameParts = fullName.split(' ');
-    const firstName = parsed.firstName || nameParts[0] || 'Karyawan';
-    const lastName = parsed.lastName || nameParts.slice(1).join(' ') || '';
-    const employeeNumber = parsed.employeeNumber || parsed.nik || parsed.employee_number || DEFAULT_USER.employeeNumber;
-    const email = parsed.email || DEFAULT_USER.email;
-    const roles = Array.isArray(parsed.roles) ? parsed.roles : [parsed.primaryRole || 'EMPLOYEE'];
-    const primaryRole = parsed.primaryRole || roles[0] || 'EMPLOYEE';
-    const department = parsed.department || DEFAULT_USER.department;
-    const designation = parsed.designation || parsed.role || DEFAULT_USER.designation;
-    const avatarUrl = parsed.avatarUrl || parsed.avatar_url || DEFAULT_USER.avatarUrl;
+    const firstName = merged.firstName || nameParts[0] || 'Karyawan';
+    const lastName = merged.lastName || nameParts.slice(1).join(' ') || '';
+    const employeeNumber =
+      merged.employeeNumber || merged.nik || merged.employee_number || DEFAULT_USER.employeeNumber;
+    const email = merged.email || merged.emailCompany || DEFAULT_USER.email;
+    const roles = Array.isArray(merged.roles) ? merged.roles : [merged.primaryRole || 'EMPLOYEE'];
+    const primaryRole = merged.primaryRole || roles[0] || 'EMPLOYEE';
+    const department = merged.department || DEFAULT_USER.department;
+    const designation = merged.designation || merged.role || DEFAULT_USER.designation;
+    const avatarUrl = merged.avatarUrl || merged.avatar_url || DEFAULT_USER.avatarUrl;
     const initials = getInitials(fullName);
 
     return {
-      id: parsed.id || DEFAULT_USER.id,
+      id: merged.id || DEFAULT_USER.id,
       fullName,
       firstName,
       lastName,
@@ -95,7 +105,7 @@ export function useCurrentUser() {
 
     // Listen to changes in localStorage from other tabs or components
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'nexora_user') {
+      if (e.key === 'nexora_user' || e.key === 'nexora_employee_profile') {
         refreshUser();
       }
     };
@@ -107,7 +117,11 @@ export function useCurrentUser() {
     try {
       channel = new BroadcastChannel('nexora_live_sync');
       channel.onmessage = (event) => {
-        if (event.data?.type === 'USER_LOGGED_IN' || event.data?.type === 'PROFILE_UPDATED') {
+        if (
+          event.data?.type === 'USER_LOGGED_IN' ||
+          event.data?.type === 'PROFILE_UPDATED' ||
+          event.data?.type === 'EMPLOYEE_UPDATED'
+        ) {
           refreshUser();
         }
       };
