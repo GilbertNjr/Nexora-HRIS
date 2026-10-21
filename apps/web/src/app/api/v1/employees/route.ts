@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEmployeesFromDb, saveEmployeeToDb } from '@/lib/db';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 
 export const dynamic = 'force-dynamic';
@@ -201,6 +202,7 @@ export async function POST(request: NextRequest) {
       };
       saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
       broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+      broadcastEmployeeEvent('EMPLOYEE_CREATED', saved);
     } catch {}
 
     return NextResponse.json(

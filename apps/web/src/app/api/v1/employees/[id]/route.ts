@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEmployeeByIdFromDb, updateEmployeeInDb, deleteEmployeeFromDb } from '@/lib/db';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 
 export const dynamic = 'force-dynamic';
@@ -110,6 +111,7 @@ export async function PUT(
       };
       saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
       broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+      broadcastEmployeeEvent('EMPLOYEE_UPDATED', updated);
     } catch {}
 
     return NextResponse.json(
@@ -179,6 +181,7 @@ export async function DELETE(
       };
       saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
       broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+      broadcastEmployeeEvent('EMPLOYEE_DELETED', { id: params.id, permanent: hardDelete });
     } catch {}
 
     return NextResponse.json(

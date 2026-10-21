@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -148,6 +149,11 @@ export async function PUT(request: NextRequest) {
     } catch {
       // ignore
     }
+
+    // 3. Broadcast real-time update across all devices
+    try {
+      broadcastEmployeeEvent('COMPANY_UPDATED', updated);
+    } catch {}
 
     return NextResponse.json(
       {

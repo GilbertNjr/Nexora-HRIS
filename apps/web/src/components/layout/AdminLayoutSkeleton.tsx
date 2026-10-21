@@ -134,8 +134,23 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
       // ignore
     }
 
+    // Listen to real-time multi-device SSE for company updates across different devices
+    let sse: EventSource | null = null;
+    try {
+      sse = new EventSource('/api/v1/employees/stream');
+      sse.addEventListener('COMPANY_UPDATED', (event: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          const data = parsed.payload;
+          if (data?.logoUrl !== undefined) setCompanyLogo(data.logoUrl || '');
+          if (data?.commercialName) setCompanyName(data.commercialName);
+        } catch {}
+      });
+    } catch {}
+
     return () => {
       if (channel) channel.close();
+      if (sse) sse.close();
     };
   }, []);
 

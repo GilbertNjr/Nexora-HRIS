@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import { downloadExecutiveRecapPDF } from '@/utils/generateExecutiveRecapPDF';
 import { useApprovalsRealtime } from '@/hooks/useApprovalsRealtime';
+import { useEmployeesRealtime } from '@/hooks/useEmployeesRealtime';
 import {
   Users,
   CalendarCheck,
@@ -214,6 +215,25 @@ export default function AdminDashboardPage() {
         ...prev,
         pendingApprovals: Math.max(0, prev.pendingApprovals - 1),
       }));
+    },
+    onRefresh: () => {
+      fetchLiveMetrics();
+    },
+  });
+
+  // Multi-device real-time employee directory stream hook
+  useEmployeesRealtime({
+    onEmployeeCreated: (newEmp) => {
+      showToast(
+        `⚡ Karyawan Baru Terdaftar (Real-Time): ${newEmp.fullName} (${newEmp.department})`
+      );
+      fetchLiveMetrics();
+    },
+    onEmployeeUpdated: () => {
+      fetchLiveMetrics();
+    },
+    onEmployeeDeleted: () => {
+      fetchLiveMetrics();
     },
     onRefresh: () => {
       fetchLiveMetrics();

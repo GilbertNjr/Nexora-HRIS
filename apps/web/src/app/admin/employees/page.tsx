@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import { PartnerBankSelect } from '@/components/common/PartnerBankSelect';
+import { useEmployeesRealtime } from '@/hooks/useEmployeesRealtime';
 import {
   Search,
   Plus,
@@ -84,9 +85,51 @@ export default function EmployeesPage() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // 1. Fetch live from backend API or sync with persistent storage
+  // 1. Live backend fetch for employees
+  const fetchEmployees = React.useCallback(async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
+      const res = await fetch('/api/v1/employees?limit=100', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: 'no-store',
+      });
+
+      if (res.ok) {
+        const resData = await res.json();
+        const items = resData?.data?.items || resData?.data || [];
+        if (Array.isArray(items)) {
+          const mapped: EmployeeItem[] = items.map((emp: any) => ({
+            id: emp.id,
+            employeeNumber: emp.employeeNumber || `NIK-${String(emp.id).slice(0, 6)}`,
+            fullName: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+            firstName: emp.firstName || '',
+            lastName: emp.lastName || '',
+            email: emp.email || emp.user?.email || null,
+            phone: emp.phone || null,
+            department: emp.department?.name || emp.department || 'Teknologi Informasi',
+            designation: emp.designation?.title || emp.designation || 'Staff',
+            employmentType: emp.employmentType || 'PERMANENT',
+            employmentStatus: emp.employmentStatus || 'ACTIVE',
+            joinDate: emp.joinDate ? emp.joinDate.split('T')[0] : new Date().toISOString().split('T')[0],
+            bankName: emp.bankAccounts?.[0]?.bankName || emp.bankName,
+            accountNumber: emp.bankAccounts?.[0]?.accountNumber || emp.accountNumber,
+          }));
+
+          setEmployees(mapped);
+          try {
+            localStorage.setItem('nexora_employees_db', JSON.stringify(mapped));
+          } catch {}
+        }
+      }
+    } catch {
+      // network / offline fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // 2. Initial Mount Loader
   useEffect(() => {
-    // Check persistent storage first (ignore legacy mock data)
     try {
       const stored = localStorage.getItem('nexora_employees_db');
       if (stored) {
@@ -111,49 +154,28 @@ export default function EmployeesPage() {
       // ignore
     }
 
-    // Attempt live backend fetch if available
-    const fetchEmployees = async () => {
-      try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('nexora_token') : null;
-        const res = await fetch('/api/v1/employees?limit=100', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          cache: 'no-store',
-        });
-
-        if (res.ok) {
-          const resData = await res.json();
-          const items = resData?.data?.items || resData?.data || [];
-          if (Array.isArray(items)) {
-            const mapped: EmployeeItem[] = items.map((emp: any) => ({
-              id: emp.id,
-              employeeNumber: emp.employeeNumber || `NIK-${String(emp.id).slice(0, 6)}`,
-              fullName: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
-              firstName: emp.firstName || '',
-              lastName: emp.lastName || '',
-              email: emp.email || emp.user?.email || null,
-              phone: emp.phone || null,
-              department: emp.department?.name || emp.department || 'Teknologi Informasi',
-              designation: emp.designation?.title || emp.designation || 'Staff',
-              employmentType: emp.employmentType || 'PERMANENT',
-              employmentStatus: emp.employmentStatus || 'ACTIVE',
-              joinDate: emp.joinDate ? emp.joinDate.split('T')[0] : new Date().toISOString().split('T')[0],
-              bankName: emp.bankAccounts?.[0]?.bankName || emp.bankName,
-              accountNumber: emp.bankAccounts?.[0]?.accountNumber || emp.accountNumber,
-            }));
-
-            setEmployees(mapped);
-            localStorage.setItem('nexora_employees_db', JSON.stringify(mapped));
-          }
-        }
-      } catch {
-        // network / offline fallback
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchEmployees();
-  }, []);
+  }, [fetchEmployees]);
+
+  // 3. Multi-device Real-Time SSE Stream Hook (Cross-device sync without refresh!)
+  useEmployeesRealtime({
+    playAudioAlert: true,
+    onEmployeeCreated: (newEmp) => {
+      showToast(`⚡ Karyawan baru terdeteksi: ${newEmp.fullName || newEmp.firstName}`);
+      fetchEmployees();
+    },
+    onEmployeeUpdated: (updatedEmp) => {
+      showToast(`⚡ Data karyawan ${updatedEmp.fullName || updatedEmp.firstName} diperbarui secara real-time.`);
+      fetchEmployees();
+    },
+    onEmployeeDeleted: () => {
+      showToast('⚡ Data karyawan diperbarui (penghapusan terdeteksi).');
+      fetchEmployees();
+    },
+    onRefresh: () => {
+      fetchEmployees();
+    },
+  });
 
   // Filtered employees list
   const filteredEmployees = useMemo(() => {
