@@ -40,12 +40,16 @@ import {
   ShieldCheck,
   Laptop,
   Briefcase,
-  Loader2,
   FileCheck,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
+import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
+import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
 
 export default function EmployeeDashboardOverhaulPage() {
   const router = useRouter();
+  const { isCollapsed: isSidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapse();
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -270,180 +274,45 @@ export default function EmployeeDashboardOverhaulPage() {
         </div>
       )}
 
-      {/* LEFT SIDEBAR matching screenshot */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200/90 flex flex-col flex-shrink-0 justify-between p-4 sm:p-5 sticky top-0 md:h-screen z-30 shadow-2xs">
-        <div className="space-y-5">
-          {/* Logo Brand matching screenshot */}
-          <Link href="/ess" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-base shadow-sm shadow-blue-500/20 flex-shrink-0">
-              <span className="text-white font-black tracking-tight">❖</span>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-extrabold text-sm text-slate-900 tracking-tight leading-snug group-hover:text-blue-600 transition-colors">
-                Nexora <span className="text-blue-600 font-bold">HRIS</span>
-              </span>
-              <span className="text-[11px] font-semibold text-slate-400 leading-tight">
-                Portal Karyawan (ESS)
-              </span>
-            </div>
-          </Link>
-
-          {/* Active Session Pill matching screenshot */}
-          <div className="px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 text-[11px] font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Sesi Aktif: NX-2021008</span>
-          </div>
-
-          {/* SECTION 1: UTAMA */}
-          <div className="space-y-1">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
-              UTAMA
-            </p>
-
-            {/* Beranda Saya (ACTIVE matching screenshot) */}
-            <Link
-              href="/ess"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm shadow-blue-500/20 transition-all"
-            >
-              <LayoutDashboard className="w-4 h-4 text-white" />
-              <span>Beranda Saya</span>
-            </Link>
-
-            {/* Profil Saya */}
-            <Link
-              href="/ess/profile"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <User className="w-4 h-4 text-slate-400" />
-              <span>Profil Saya</span>
-            </Link>
-
-            {/* Presensi & Absensi */}
-            <Link
-              href="/ess/attendance"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <Clock className="w-4 h-4 text-slate-400" />
-              <span>Presensi & Absensi</span>
-            </Link>
-
-            {/* Cuti & Izin Saya */}
-            <Link
-              href="/ess/leave"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <CalendarDays className="w-4 h-4 text-slate-400" />
-              <span>Cuti & Izin Saya</span>
-            </Link>
-
-            {/* Slip Gaji & Kompensasi */}
-            <Link
-              href="/ess/payroll"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <CreditCard className="w-4 h-4 text-slate-400" />
-              <span>Slip Gaji & Kompensasi</span>
-            </Link>
-          </div>
-
-          {/* SECTION 2: KARIR & PENGEMBANGAN */}
-          <div className="space-y-1 pt-1">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
-              KARIR & PENGEMBANGAN
-            </p>
-
-            <Link
-              href="/ess/performance"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <TrendingUp className="w-4 h-4 text-slate-400" />
-              <span>Kinerja & KPI Pribadi</span>
-            </Link>
-
-            <Link
-              href="/ess/training"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <GraduationCap className="w-4 h-4 text-slate-400" />
-              <span>Pelatihan & Modul</span>
-            </Link>
-          </div>
-
-          {/* SECTION 3: DOKUMEN & BANTUAN */}
-          <div className="space-y-1 pt-1">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
-              DOKUMEN & BANTUAN
-            </p>
-
-            <Link
-              href="/ess/documents"
-              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <FolderArchive className="w-4 h-4 text-slate-400" />
-              <span>Arsip & Formulir</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => showToast('Kontak HR Helpdesk: Ext. 402 / helpdesk-hr@nexora.co.id')}
-              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <Headphones className="w-4 h-4 text-slate-400" />
-              <span>Bantuan & Kontak HR</span>
-            </button>
-          </div>
-        </div>
-
-        {/* BOTTOM CARD: PUSAT DUKUNGAN matching screenshot */}
-        <div className="mt-6 p-4 rounded-2xl bg-blue-50/60 border border-blue-200/70 text-xs space-y-2">
-          <div className="flex items-center gap-2 text-blue-900 font-bold">
-            <HelpCircle className="w-4 h-4 text-blue-600" />
-            <span>Pusat Dukungan</span>
-          </div>
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Ada kendala data kehadiran atau klaim?
-          </p>
-          <div className="pt-1 space-y-1 font-semibold text-[11px]">
-            <a
-              href="#sop"
-              onClick={(e) => {
-                e.preventDefault();
-                showToast('Membuka SOP Kepegawaian & Panduan ESS Nexora...');
-              }}
-              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-            >
-              <span>SOP Kepegawaian</span>
-              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-            </a>
-            <a
-              href="#tiket"
-              onClick={(e) => {
-                e.preventDefault();
-                showToast('Membuka Form Tiket Helpdesk HR...');
-              }}
-              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-            >
-              <span>Tiket Helpdesk HR</span>
-              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-            </a>
-          </div>
-        </div>
-      </aside>
+      {/* LEFT SIDEBAR with Collapse/Expand (Matching HR Admin) */}
+      <EmployeeSidebar
+        activeMenu="dashboard"
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+        onShowToast={showToast}
+      />
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOP HEADER BAR matching screenshot */}
         <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
-          {/* Search Input Box matching screenshot */}
-          <div className="relative w-72 sm:w-96 max-w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
-              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
-            />
+          {/* Left: Desktop Toggle Button & Search Input Box */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-lg">
+            {/* Desktop Sidebar Toggle Button (Matching HR Admin) */}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="hidden md:flex p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors flex-shrink-0"
+              title={isSidebarCollapsed ? 'Buka Sidebar' : 'Ciutkan Sidebar'}
+            >
+              {isSidebarCollapsed ? (
+                <PanelLeft className="w-5 h-5 text-slate-600" />
+              ) : (
+                <PanelLeftClose className="w-5 h-5 text-slate-600" />
+              )}
+            </button>
+
+            {/* Search Input Box matching screenshot */}
+            <div className="relative w-72 sm:w-96 max-w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
+                className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+              />
+            </div>
           </div>
 
           {/* Right Header Controls matching screenshot */}

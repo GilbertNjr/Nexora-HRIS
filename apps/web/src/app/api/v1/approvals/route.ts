@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { broadcastApprovalEvent } from '@/lib/approvalsSSE';
+import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -179,6 +181,32 @@ export async function POST(request: NextRequest) {
       fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify([newNotif, ...notifs].slice(0, 50), null, 2), 'utf-8');
     } catch {}
 
+    // 3. Dispatch real-time audit log
+    try {
+      const auditLog: AuditLogEntry = {
+        id: `aud-${Date.now()}`,
+        module: 'LEAVE',
+        action: 'LEAVE_REQUESTED',
+        recordId: newItem.id,
+        userName: newItem.name,
+        userEmail: `${newItem.nik || 'user'}@nexora.co.id`,
+        userNik: newItem.nik,
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Portal Karyawan (Web)',
+        timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+        oldData: null,
+        newData: {
+          leaveType: newItem.leaveType,
+          durationDays: newItem.durationDays,
+          startDate: newItem.startDate,
+          endDate: newItem.endDate,
+          reason: newItem.reason,
+        },
+      };
+      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
+      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    } catch {}
+
     return NextResponse.json(
       {
         success: true,
@@ -224,6 +252,30 @@ export async function PATCH(request: NextRequest) {
       status,
       item: approvals[index],
     });
+
+    // Dispatch audit log for leave decision
+    try {
+      const auditLog: AuditLogEntry = {
+        id: `aud-${Date.now()}`,
+        module: 'LEAVE',
+        action: status === 'APPROVED' ? 'LEAVE_APPROVAL_DECIDED' : 'LEAVE_REJECTED',
+        recordId: id,
+        userName: 'HR Administrator',
+        userEmail: 'admin@nexora.local',
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+        timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+        oldData: { status: 'PENDING' },
+        newData: {
+          status,
+          employee: approvals[index].name,
+          leaveType: approvals[index].leaveType,
+          durationDays: approvals[index].durationDays,
+        },
+      };
+      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
+      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    } catch {}
 
     return NextResponse.json(
       {

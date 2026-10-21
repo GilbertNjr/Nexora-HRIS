@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
+import { getEmployeesFromDb } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -114,9 +117,19 @@ function saveStoredAttendance(data: AttendanceData): void {
 
 export async function GET() {
   const data = getStoredAttendance();
+  try {
+    const emps = await getEmployeesFromDb();
+    if (Array.isArray(emps) && emps.length > 0) {
+      data.totalEmployees = emps.length;
+      if (data.presentCount > data.totalEmployees) {
+        data.presentCount = Math.max(1, Math.min(data.presentCount, data.totalEmployees));
+      }
+    }
+  } catch {}
+
   const attendanceRate = data.totalEmployees > 0
     ? Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1))
-    : 96.4;
+    : 100;
 
   return NextResponse.json(
     {
@@ -172,6 +185,31 @@ export async function POST(request: NextRequest) {
     // Prepend record
     data.records = [newRecord, ...data.records.slice(0, 49)];
     saveStoredAttendance(data);
+
+    // Broadcast audit log
+    try {
+      const auditLog: AuditLogEntry = {
+        id: `aud-${Date.now()}`,
+        module: 'ATTENDANCE',
+        action: newRecord.type === 'CLOCK_IN' ? 'CLOCK_IN_GEOFENCE_VERIFIED' : 'CLOCK_OUT_RECORDED',
+        recordId: newRecord.id,
+        userName: newRecord.employeeName,
+        userEmail: body.userEmail || `${newRecord.employeeId}@nexora.co.id`,
+        userNik: newRecord.employeeId,
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: newRecord.device,
+        timestamp: `${dateStr} ${timeStr}`,
+        oldData: null,
+        newData: {
+          type: newRecord.type,
+          status: newRecord.status,
+          location: newRecord.location,
+          coordinates: newRecord.coordinates,
+        },
+      };
+      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
+      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    } catch {}
 
     const attendanceRate = Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1));
 

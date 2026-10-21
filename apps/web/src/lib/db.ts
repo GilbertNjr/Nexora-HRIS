@@ -312,7 +312,14 @@ export async function updateEmployeeInDb(idOrNik: string, data: Partial<Employee
              avatar_url = COALESCE($4, avatar_url),
              updated_at = NOW()
          WHERE (id = $5::uuid) OR (employee_number = $6)`,
-        [data.firstName, data.lastName, data.phone, data.avatarUrl, isUuid ? idOrNik : null, existing[index].employeeNumber]
+        [
+          data.firstName ?? null,
+          data.lastName ?? null,
+          data.phone ?? null,
+          data.avatarUrl ?? null,
+          isUuid ? idOrNik : null,
+          existing[index].employeeNumber,
+        ]
       );
     } catch (err: any) {
       console.warn('[DB] Neon updateEmployee error:', err?.message);

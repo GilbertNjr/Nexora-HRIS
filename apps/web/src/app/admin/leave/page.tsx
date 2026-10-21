@@ -225,6 +225,11 @@ export default function AdminLeavePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: 'APPROVED' }),
       });
+      try {
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'APPROVED' });
+        bc.close();
+      } catch {}
     } catch {}
     showToast(`✓ Permohonan cuti ${name} telah berhasil disetujui & disinkronkan secara real-time!`, 'success');
   };
@@ -239,6 +244,11 @@ export default function AdminLeavePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: 'REJECTED' }),
       });
+      try {
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'REJECTED' });
+        bc.close();
+      } catch {}
     } catch {}
     showToast(`✕ Permohonan cuti ${name} telah ditolak & disinkronkan.`, 'info');
   };

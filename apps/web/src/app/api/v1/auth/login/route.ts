@@ -37,18 +37,26 @@ export async function POST(request: NextRequest) {
     let employeeNumber = isAdminAccount ? 'NX-ADMIN-001' : 'NX-2021008';
     let userEmail = identifier.includes('@') ? identifier : `${identifier}@nexora.co.id`;
 
+    let userId = isAdminAccount ? 'usr-admin-unified' : 'usr-emp-unified';
+    let department = isAdminAccount ? 'Human Capital & People Operations' : 'Technology & Engineering';
+    let designation = isAdminAccount ? 'HR Administrator' : 'Lead Backend Architect';
+    let avatarUrl = isAdminAccount ? '' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
+
     // Try verifying from Neon DB if available
     if (DATABASE_URL) {
       try {
         const sql = neon(DATABASE_URL);
         const rows = await sql.query(
-          `SELECT u.id, u.email, u.password_hash, u.status,
+          `SELECT u.id, u.email, u.password_hash, u.status, u.avatar_url as user_avatar,
                   r.name as role_name,
-                  e.first_name, e.last_name, e.employee_number
+                  e.first_name, e.last_name, e.employee_number, e.avatar_url as emp_avatar,
+                  d.name as department_name, des.title as designation_title
            FROM users u
            LEFT JOIN user_roles ur ON u.id = ur.user_id
            LEFT JOIN roles r ON ur.role_id = r.id
            LEFT JOIN employees e ON u.id = e.user_id
+           LEFT JOIN departments d ON e.department_id = d.id
+           LEFT JOIN designations des ON e.designation_id = des.id
            WHERE LOWER(u.email) = $1 OR LOWER(e.employee_number) = $1
            LIMIT 1`,
           [identifier]
@@ -56,12 +64,22 @@ export async function POST(request: NextRequest) {
 
         if (Array.isArray(rows) && rows.length > 0) {
           const row = rows[0] as any;
-          userEmail = row.email;
+          if (row.id) userId = row.id;
+          userEmail = row.email || userEmail;
           if (row.first_name || row.last_name) {
             fullName = `${row.first_name || ''} ${row.last_name || ''}`.trim();
           }
           if (row.employee_number) {
             employeeNumber = row.employee_number;
+          }
+          if (row.department_name) {
+            department = row.department_name;
+          }
+          if (row.designation_title) {
+            designation = row.designation_title;
+          }
+          if (row.emp_avatar || row.user_avatar) {
+            avatarUrl = row.emp_avatar || row.user_avatar;
           }
           if (row.role_name) {
             const rName = String(row.role_name).toUpperCase();
@@ -80,10 +98,13 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = {
-      id: isAdminAccount ? 'usr-admin-unified' : 'usr-emp-unified',
+      id: userId,
       email: userEmail,
       fullName,
       employeeNumber,
+      department,
+      designation,
+      avatarUrl,
       roles: [userRole],
       primaryRole: userRole,
     };

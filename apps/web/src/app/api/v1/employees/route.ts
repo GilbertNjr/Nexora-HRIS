@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEmployeesFromDb, saveEmployeeToDb } from '@/lib/db';
+import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -174,6 +176,32 @@ export async function POST(request: NextRequest) {
       transportAllowance: body.transportAllowance ? Number(body.transportAllowance) : 1500000,
       mealAllowance: body.mealAllowance ? Number(body.mealAllowance) : 1200000,
     });
+
+    try {
+      const now = new Date();
+      const auditLog: AuditLogEntry = {
+        id: `aud-${Date.now()}`,
+        module: 'EMPLOYEE',
+        action: 'EMPLOYEE_CREATED',
+        recordId: saved.id,
+        userName: 'HR Administrator',
+        userEmail: 'admin@nexora.local',
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+        timestamp: now.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+        oldData: null,
+        newData: {
+          employeeNumber: saved.employeeNumber,
+          fullName: saved.fullName,
+          email: saved.email,
+          department: saved.department,
+          designation: saved.designation,
+          employmentType: saved.employmentType,
+        },
+      };
+      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
+      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    } catch {}
 
     return NextResponse.json(
       {

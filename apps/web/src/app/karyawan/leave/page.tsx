@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import { useApprovalsRealtime } from '@/hooks/useApprovalsRealtime';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   LayoutDashboard,
   User,
@@ -38,7 +39,17 @@ import {
   ShieldCheck,
   Loader2,
   Plus,
+  Copy,
+  CheckCheck,
+  RotateCw,
+  HeartPulse,
+  MessageSquareQuote,
+  Zap,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
+import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
+import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
 
 interface LeaveRequestItem {
   id: string;
@@ -60,7 +71,7 @@ interface LeaveRequestItem {
     title: string;
     person: string;
     time?: string;
-    status: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING';
+    status: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING' | 'REJECTED';
   }[];
 }
 
@@ -126,6 +137,12 @@ const defaultHistoricalLeaves: LeaveRequestItem[] = [
         status: 'COMPLETED',
       },
       {
+        title: 'Atasan Langsung',
+        person: 'Arya Wibowo (VP Eng)',
+        time: '02 Jan, 00:00 WIB (Otomatis)',
+        status: 'COMPLETED',
+      },
+      {
         title: 'HR Operations',
         person: 'Dewi Lestari, S.Psi',
         time: '02 Jan, 08:00 WIB',
@@ -159,7 +176,7 @@ function mapApprovalToEssItem(item: any): LeaveRequestItem {
     status: isApproved ? 'APPROVED' : isRejected ? 'REJECTED' : 'PENDING',
     statusBadge: isApproved ? 'Disetujui HR & Atasan' : isRejected ? 'Ditolak oleh HRD' : 'Menunggu Verifikasi HRD',
     submittedAt,
-    completedAt: isApproved ? 'Hari ini, Selesai' : undefined,
+    completedAt: isApproved ? 'Hari ini, Selesai' : isRejected ? 'Hari ini, Ditolak' : undefined,
     documentName: item.documentName || item.attachmentName,
     documentUrl: item.documentUrl || '#',
     steps: [
@@ -179,13 +196,15 @@ function mapApprovalToEssItem(item: any): LeaveRequestItem {
         title: 'HR Operations',
         person: 'Dewi Lestari, S.Psi',
         time: isApproved ? 'Disetujui HRD' : isRejected ? 'Ditolak HRD' : 'Menunggu Verifikasi HRD',
-        status: isApproved ? 'COMPLETED' : isPending ? 'IN_PROGRESS' : 'PENDING',
+        status: isApproved ? 'COMPLETED' : isRejected ? 'REJECTED' : isPending ? 'IN_PROGRESS' : 'PENDING',
       },
     ],
   };
 }
 
 export default function EssLeaveOverhaulPage() {
+  const { user: currentUser } = useCurrentUser();
+  const { isSidebarCollapsed, toggleSidebar } = useSidebarCollapse();
   // Filter tabs: all, pending, approved
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,6 +216,12 @@ export default function EssLeaveOverhaulPage() {
   const [isPkbModalOpen, setIsPkbModalOpen] = useState(false);
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Real-time synchronization states
+  const [lastSyncedAt, setLastSyncedAt] = useState<string>('Baru saja');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
+  const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
   // Form State
   const [formType, setFormType] = useState('Cuti Tahunan');
@@ -222,12 +247,22 @@ export default function EssLeaveOverhaulPage() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const handleCopyRef = (refNo: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(refNo);
+      setCopiedRef(refNo);
+      showToast(`✓ No. Referensi ${refNo} berhasil disalin ke clipboard.`);
+      setTimeout(() => setCopiedRef(null), 2500);
+    }
+  };
+
   // Leave Requests state
   const [requests, setRequests] = useState<LeaveRequestItem[]>(defaultHistoricalLeaves);
 
   // Fetch live approvals from API and sync with employee view
-  const fetchLiveLeaveData = useCallback(async () => {
+  const fetchLiveLeaveData = useCallback(async (isManual = false) => {
     try {
+      if (isManual) setIsRefreshing(true);
       const res = await fetch('/api/v1/approvals?all=true');
       if (res.ok) {
         const json = await res.json();
@@ -242,9 +277,19 @@ export default function EssLeaveOverhaulPage() {
             return [...backendItems, ...remainingHist];
           });
         }
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+        setLastSyncedAt(timeStr);
+        if (isManual) {
+          showToast('✓ Data permohonan berhasil disinkronkan secara real-time.');
+        }
       }
     } catch {
       // ignore
+    } finally {
+      if (isManual) {
+        setTimeout(() => setIsRefreshing(false), 500);
+      }
     }
   }, []);
 
@@ -255,20 +300,30 @@ export default function EssLeaveOverhaulPage() {
       if (newItem.type === 'lembur' && !newItem.leaveType) return;
       const mapped = mapApprovalToEssItem(newItem);
       setRequests((prev) => [mapped, ...prev.filter((r) => r.id !== mapped.id)]);
-      showToast(`✓ Pengajuan ${mapped.type} berhasil terkirim & menunggu persetujuan HR.`);
+      setRecentlyUpdatedId(mapped.id);
+      setTimeout(() => setRecentlyUpdatedId(null), 4000);
+      const now = new Date();
+      setLastSyncedAt(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB');
+      showToast(`✓ Pengajuan ${mapped.type} (${mapped.refNo}) terkirim & menunggu persetujuan.`);
     },
     onLeaveActioned: ({ id, status }) => {
       const isApproved = status === 'APPROVED';
+      const isRejected = status === 'REJECTED';
       setRequests((prev) =>
         prev.map((r) => {
           if (r.id === id) {
             return {
               ...r,
-              status: isApproved ? 'APPROVED' : 'REJECTED',
-              statusBadge: isApproved ? 'Disetujui HR & Atasan' : 'Ditolak oleh HRD',
-              completedAt: isApproved ? 'Hari ini, Selesai' : undefined,
+              status: isApproved ? 'APPROVED' : isRejected ? 'REJECTED' : 'PENDING',
+              statusBadge: isApproved ? 'Disetujui HR & Atasan' : isRejected ? 'Ditolak oleh HRD' : 'Menunggu Verifikasi HRD',
+              completedAt: isApproved ? 'Hari ini, Selesai' : isRejected ? 'Hari ini, Ditolak' : undefined,
               steps: [
-                r.steps[0],
+                r.steps[0] || {
+                  title: 'Pengajuan Mandiri',
+                  person: 'Rian Pratama',
+                  time: r.submittedAt,
+                  status: 'COMPLETED',
+                },
                 r.steps[1] || {
                   title: 'Atasan Langsung',
                   person: 'Arya Wibowo (VP Eng)',
@@ -278,8 +333,8 @@ export default function EssLeaveOverhaulPage() {
                 {
                   title: 'HR Operations',
                   person: 'Dewi Lestari, S.Psi',
-                  time: isApproved ? 'Disetujui HRD' : 'Ditolak HRD',
-                  status: isApproved ? 'COMPLETED' : 'PENDING',
+                  time: isApproved ? 'Disetujui HRD' : isRejected ? 'Ditolak HRD' : 'Menunggu Verifikasi',
+                  status: isApproved ? 'COMPLETED' : isRejected ? 'REJECTED' : 'IN_PROGRESS',
                 },
               ],
             };
@@ -288,10 +343,17 @@ export default function EssLeaveOverhaulPage() {
         })
       );
 
+      setRecentlyUpdatedId(id);
+      setTimeout(() => setRecentlyUpdatedId(null), 4500);
+      const now = new Date();
+      setLastSyncedAt(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB');
+
       showToast(
         isApproved
           ? '🎉 Selamat! Pengajuan Cuti Anda telah DISETUJUI oleh HR Admin!'
-          : 'ℹ️ Pengajuan Cuti Anda telah DITOLAK oleh HR Admin.'
+          : isRejected
+          ? 'ℹ️ Pengajuan Cuti Anda telah DITOLAK oleh HR Admin.'
+          : 'Status pengajuan cuti Anda telah diperbarui.'
       );
     },
     onRefresh: () => {
@@ -374,7 +436,7 @@ export default function EssLeaveOverhaulPage() {
         steps: [
           {
             title: 'Pengajuan Mandiri',
-            person: 'Rian Pratama',
+            person: currentUser.fullName,
             time: 'Hari ini, Baru saja',
             status: 'COMPLETED',
           },
@@ -407,11 +469,11 @@ export default function EssLeaveOverhaulPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'Rian Pratama, S.Kom',
-          nik: 'NX-2021008',
-          role: 'Lead Backend Architect • Technology',
-          department: 'Technology & Engineering',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+          name: currentUser.fullName,
+          nik: currentUser.employeeNumber,
+          role: currentUser.designation,
+          department: currentUser.department,
+          avatarUrl: currentUser.avatarUrl,
           type: 'cuti',
           leaveType: formType,
           typeCategory: formType.toLowerCase().includes('sakit') ? 'sakit' : 'tahunan',
@@ -471,177 +533,46 @@ export default function EssLeaveOverhaulPage() {
         </div>
       )}
 
-      {/* LEFT SIDEBAR matching screenshot */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200/90 flex flex-col flex-shrink-0 justify-between p-4 sm:p-5 sticky top-0 md:h-screen z-30 shadow-2xs">
-        <div className="space-y-5">
-          {/* Logo brand */}
-          <Link href="/karyawan" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-base shadow-sm shadow-blue-500/20 flex-shrink-0">
-              <span className="text-white font-black tracking-tight">❖</span>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-extrabold text-sm text-slate-900 tracking-tight leading-snug group-hover:text-blue-600 transition-colors">
-                Nexora <span className="text-blue-600 font-bold">HRIS</span>
-              </span>
-              <span className="text-[11px] font-semibold text-slate-400 leading-tight">
-                Portal Karyawan (ESS)
-              </span>
-            </div>
-          </Link>
-
-          {/* Active Session Pill */}
-          <div className="px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 text-[11px] font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Sesi Aktif: NX-2021008</span>
-          </div>
-
-          {/* SECTION 1: UTAMA */}
-          <div className="space-y-1">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
-              UTAMA
-            </p>
-
-            <Link
-              href="/karyawan"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <LayoutDashboard className="w-4 h-4 text-slate-400" />
-              <span>Beranda Saya</span>
-            </Link>
-
-            {/* Profil Saya */}
-            <Link
-              href="/karyawan/profile"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <User className="w-4 h-4 text-slate-400" />
-              <span>Profil Saya</span>
-            </Link>
-
-            <Link
-              href="/karyawan/attendance"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <Clock className="w-4 h-4 text-slate-400" />
-              <span>Presensi & Absensi</span>
-            </Link>
-
-            {/* Cuti & Izin Saya (ACTIVE matching screenshot) */}
-            <Link
-              href="/karyawan/leave"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm shadow-blue-500/20 transition-all"
-            >
-              <CalendarDays className="w-4 h-4 text-white" />
-              <span>Cuti & Izin Saya</span>
-            </Link>
-
-            <Link
-              href="/karyawan/payroll"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              <CreditCard className="w-4 h-4 text-slate-400" />
-              <span>Slip Gaji & Kompensasi</span>
-            </Link>
-          </div>
-
-          {/* SECTION 2: KARIR & PENGEMBANGAN */}
-          <div className="space-y-1 pt-1">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
-              KARIR & PENGEMBANGAN
-            </p>
-
-            <Link
-              href="/karyawan/performance"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <TrendingUp className="w-4 h-4 text-slate-400" />
-              <span>Kinerja & KPI Pribadi</span>
-            </Link>
-
-            <Link
-              href="/karyawan/training"
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <GraduationCap className="w-4 h-4 text-slate-400" />
-              <span>Pelatihan & Modul</span>
-            </Link>
-          </div>
-
-          {/* SECTION 3: DOKUMEN & BANTUAN */}
-          <div className="space-y-1 pt-1">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5">
-              DOKUMEN & BANTUAN
-            </p>
-
-            <Link
-              href="/karyawan/documents"
-              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <FolderArchive className="w-4 h-4 text-slate-400" />
-              <span>Arsip & Formulir</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => showToast('Kontak HR Helpdesk: Ext. 402 / helpdesk-hr@nexora.co.id')}
-              className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left"
-            >
-              <Headphones className="w-4 h-4 text-slate-400" />
-              <span>Bantuan & Kontak HR</span>
-            </button>
-          </div>
-        </div>
-
-        {/* BOTTOM CARD: PUSAT DUKUNGAN */}
-        <div className="mt-6 p-4 rounded-2xl bg-blue-50/60 border border-blue-200/70 text-xs space-y-2">
-          <div className="flex items-center gap-2 text-blue-900 font-bold">
-            <HelpCircle className="w-4 h-4 text-blue-600" />
-            <span>Pusat Dukungan</span>
-          </div>
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Ada kendala data kehadiran atau klaim?
-          </p>
-          <div className="pt-1 space-y-1 font-semibold text-[11px]">
-            <a
-              href="#sop"
-              onClick={(e) => {
-                e.preventDefault();
-                setIsPkbModalOpen(true);
-              }}
-              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-            >
-              <span>SOP Kepegawaian</span>
-              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-            </a>
-            <a
-              href="#tiket"
-              onClick={(e) => {
-                e.preventDefault();
-                showToast('Membuka Tiket Bantuan HR...');
-              }}
-              className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-            >
-              <span>Tiket Helpdesk HR</span>
-              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-            </a>
-          </div>
-        </div>
-      </aside>
+      {/* LEFT SIDEBAR with Collapse/Expand (Matching HR Admin) */}
+      <EmployeeSidebar
+        activeMenu="leave"
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+        onOpenPkbModal={() => setIsPkbModalOpen(true)}
+        onShowToast={showToast}
+      />
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOP HEADER BAR matching screenshot */}
         <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
-          {/* Search Input Box */}
-          <div className="relative w-72 sm:w-96 max-w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
-              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
-            />
+          {/* Left: Desktop Toggle Button & Search Input Box */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-lg">
+            {/* Desktop Sidebar Toggle Button (Matching HR Admin) */}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="hidden md:flex p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors flex-shrink-0"
+              title={isSidebarCollapsed ? 'Buka Sidebar' : 'Ciutkan Sidebar'}
+            >
+              {isSidebarCollapsed ? (
+                <PanelLeft className="w-5 h-5 text-slate-600" />
+              ) : (
+                <PanelLeftClose className="w-5 h-5 text-slate-600" />
+              )}
+            </button>
+
+            {/* Search Input Box */}
+            <div className="relative w-72 sm:w-96 max-w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
+                className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+              />
+            </div>
           </div>
 
           {/* Right Header Controls */}
@@ -658,19 +589,19 @@ export default function EssLeaveOverhaulPage() {
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs">
-                RP
+                {currentUser.initials}
               </div>
               <div className="hidden sm:flex flex-col text-left leading-tight">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
-                    Rian Pratama, S.Kom
+                    {currentUser.fullName}
                   </span>
                   <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-[9px] font-bold text-slate-600">
                     Karyawan (ESS)
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                  Lead Backend Architect • NX-2021008
+                  {currentUser.designation} • {currentUser.employeeNumber}
                 </span>
               </div>
             </Link>
@@ -848,37 +779,66 @@ export default function EssLeaveOverhaulPage() {
               <button
                 type="button"
                 onClick={() => setActiveFilter('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
                   activeFilter === 'all'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                Semua Pengajuan
+                <span>Semua Pengajuan</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                    activeFilter === 'all'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {requests.length}
+                </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveFilter('pending')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
                   activeFilter === 'pending'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                Menunggu Persetujuan
+                <span>Menunggu Persetujuan</span>
+                {balances.pendingCount > 0 && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                      activeFilter === 'pending'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {balances.pendingCount}
+                  </span>
+                )}
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveFilter('approved')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
                   activeFilter === 'approved'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                Disetujui
+                <span>Disetujui</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                    activeFilter === 'approved'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}
+                >
+                  {requests.filter((r) => r.status === 'APPROVED').length}
+                </span>
               </button>
             </div>
 
@@ -889,16 +849,49 @@ export default function EssLeaveOverhaulPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari catatan..."
+                placeholder="Cari pengajuan / catatan..."
                 className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
           </div>
 
-          {/* SECTION 3: 2-COLUMN CONTENT (LEFT 8 COLS, RIGHT 4 COLS) matching screenshot with full unclipped elements */}
+          {/* SECTION 3: 2-COLUMN CONTENT (LEFT 8 COLS, RIGHT 4 COLS) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* LEFT COLUMN (8 COLS): LEAVE CARDS WITH STEPPER */}
             <div className="lg:col-span-8 space-y-5">
+              {/* REAL-TIME LIVE STATUS BAR */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>Sinkronisasi Real-Time ESS Terhubung</span>
+                  </span>
+                  <span className="hidden sm:inline-block text-slate-300">•</span>
+                  <span className="hidden sm:inline-block text-[11px] text-slate-400 font-medium">
+                    Pembaruan persetujuan dari HR & Atasan diterima seketika
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto text-xs">
+                  <span className="text-[11px] text-slate-400">
+                    Sinkron: <strong className="text-slate-600 font-mono">{lastSyncedAt}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => fetchLiveLeaveData(true)}
+                    disabled={isRefreshing}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-all disabled:opacity-50 active:scale-95"
+                    title="Perbarui sinkronisasi sekarang"
+                  >
+                    <RotateCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+                    <span>{isRefreshing ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
+                  </button>
+                </div>
+              </div>
+
               {filteredRequests.length === 0 ? (
                 <div className="p-12 bg-white rounded-3xl border border-slate-200/90 text-center space-y-3">
                   <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
@@ -913,53 +906,102 @@ export default function EssLeaveOverhaulPage() {
                 filteredRequests.map((item) => (
                   <div
                     key={item.id}
-                    className={`bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-5 relative overflow-hidden transition-all ${
+                    className={`bg-white rounded-3xl p-6 sm:p-7 border transition-all duration-300 relative overflow-hidden space-y-5 ${
+                      recentlyUpdatedId === item.id
+                        ? 'ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-500/10'
+                        : 'shadow-2xs hover:shadow-md'
+                    } ${
                       item.status === 'PENDING'
-                        ? 'border-l-4 border-l-amber-500'
-                        : 'border-l-4 border-l-emerald-500'
+                        ? 'border-slate-200/90 hover:border-amber-300/80'
+                        : item.status === 'REJECTED'
+                        ? 'border-slate-200/90 hover:border-rose-300/80'
+                        : 'border-slate-200/90 hover:border-emerald-300/80'
                     }`}
                   >
-                    {/* Header Row */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {/* Sleek Inner Status Accent Bar (Preserves rounded corners without glitching) */}
+                    <div
+                      className={`absolute left-0 top-6 bottom-6 w-1.5 rounded-r-full transition-colors ${
+                        item.status === 'PENDING'
+                          ? 'bg-amber-500'
+                          : item.status === 'REJECTED'
+                          ? 'bg-rose-500'
+                          : 'bg-emerald-500'
+                      }`}
+                    />
+
+                    {/* Header Row: Badges & Right Actions */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 pl-2">
+                      <div className="flex flex-wrap items-center gap-2.5">
                         {/* Status Badge */}
                         <span
-                          className={`px-3 py-1 rounded-full text-[11px] font-bold ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-2xs transition-all ${
                             item.status === 'PENDING'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200/80'
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
+                              : item.status === 'REJECTED'
+                              ? 'bg-rose-50 text-rose-800 border border-rose-200/80'
+                              : 'bg-emerald-50 text-emerald-800 border border-emerald-200/80'
                           }`}
                         >
-                          {item.statusBadge}
-                        </span>
-
-                        <span className="font-semibold text-slate-500">
-                          No. Ref: <strong className="text-slate-700 font-mono">{item.refNo}</strong>
-                        </span>
-
-                        <span className="text-slate-300">•</span>
-                        <span className="text-slate-500 font-medium">
-                          Diajukan: {item.submittedAt}
-                        </span>
-                        {item.completedAt && (
-                          <>
-                            <span className="text-slate-300">•</span>
-                            <span className="text-emerald-700 font-medium">
-                              Selesai: {item.completedAt}
+                          {item.status === 'PENDING' ? (
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
                             </span>
-                          </>
-                        )}
+                          ) : item.status === 'REJECTED' ? (
+                            <X className="w-3.5 h-3.5 text-rose-600 stroke-[2.5]" />
+                          ) : (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                          )}
+                          <span>{item.statusBadge}</span>
+                        </span>
+
+                        {/* Leave Type Pill */}
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                            item.type.includes('Sakit') || item.title.includes('Sakit')
+                              ? 'bg-rose-50/70 text-rose-700 border-rose-200/80'
+                              : item.type.includes('Bersama')
+                              ? 'bg-purple-50/70 text-purple-700 border-purple-200/80'
+                              : 'bg-blue-50/70 text-blue-700 border-blue-200/80'
+                          }`}
+                        >
+                          {item.type.includes('Sakit') || item.title.includes('Sakit') ? (
+                            <HeartPulse className="w-3 h-3 text-rose-500" />
+                          ) : item.type.includes('Bersama') ? (
+                            <Building2 className="w-3 h-3 text-purple-500" />
+                          ) : (
+                            <CalendarDays className="w-3 h-3 text-blue-500" />
+                          )}
+                          <span>{item.type}</span>
+                        </span>
+
+                        {/* Reference No Pill with 1-Click Copy */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyRef(item.refNo)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono font-bold transition-colors group/ref"
+                          title="Klik untuk salin No. Referensi"
+                        >
+                          <span className="text-slate-400 font-sans font-medium text-[11px]">Ref:</span>
+                          <span>{item.refNo}</span>
+                          {copiedRef === item.refNo ? (
+                            <Check className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-slate-400 group-hover/ref:text-slate-700 transition-colors" />
+                          )}
+                        </button>
                       </div>
 
-                      {/* Right Action: Batalkan or Attachment link */}
-                      <div className="flex items-center gap-2">
+                      {/* Right Actions: Batalkan or Attachment */}
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
                         {item.status === 'PENDING' && (
                           <button
                             type="button"
                             onClick={() => handleCancelPending(item.id)}
-                            className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/80 transition-all shadow-2xs"
                           >
-                            Batalkan Pengajuan
+                            <X className="w-3.5 h-3.5" />
+                            <span>Batalkan Pengajuan</span>
                           </button>
                         )}
 
@@ -967,102 +1009,213 @@ export default function EssLeaveOverhaulPage() {
                           <button
                             type="button"
                             onClick={() => setPreviewDocName(item.documentName || null)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors"
-                            title="Buka lampiran surat dokter"
+                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100/90 text-blue-700 border border-blue-200 text-xs font-bold transition-all shadow-2xs group/doc"
+                            title="Buka lampiran dokumen"
                           >
-                            <Paperclip className="w-3.5 h-3.5" />
-                            <span>{item.documentName}</span>
+                            <Paperclip className="w-3.5 h-3.5 text-blue-600 group-hover/doc:rotate-12 transition-transform" />
+                            <span className="max-w-[200px] truncate">{item.documentName}</span>
+                            <ExternalLink className="w-3 h-3 text-blue-400 group-hover/doc:text-blue-600" />
                           </button>
                         )}
                       </div>
                     </div>
 
+                    {/* Timeline & SLA Row (Clean, perfectly aligned, no dangling lines) */}
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pl-2 pt-1 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <Clock3 className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-slate-400">Diajukan:</span>
+                        <span className="font-semibold text-slate-700">{item.submittedAt}</span>
+                      </div>
+
+                      {item.completedAt && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <div className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-slate-400">Selesai:</span>
+                            <span className="font-semibold text-emerald-700">{item.completedAt}</span>
+                          </div>
+                        </>
+                      )}
+
+                      <span className="text-slate-300">•</span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                        <ShieldCheck className="w-3 h-3 text-blue-500" />
+                        <span>Verifikasi Bertingkat 3-Tier</span>
+                      </span>
+                    </div>
+
                     {/* Title & Details */}
-                    <div>
-                      <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                    <div className="space-y-3 pl-2">
+                      <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-snug">
                         {item.title}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1 font-medium">
-                        <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                          <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                          <span>
-                            {item.startDate} - {item.endDate} ({item.durationDays} Hari Kerja)
+
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        {/* Periode & Durasi */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700">
+                          <Calendar className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                          <span className="font-medium">
+                            {item.startDate} – {item.endDate}
                           </span>
-                        </span>
-                        <span className="text-slate-300">•</span>
-                        <span>
-                          Pengganti Tugas: <strong className="text-slate-800">{item.handover}</strong>
-                        </span>
+                          <span className="px-2 py-0.5 rounded-md bg-blue-100/90 text-blue-800 text-[11px] font-bold">
+                            {item.durationDays} Hari Kerja
+                          </span>
+                        </div>
+
+                        {/* Pengganti Tugas */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700">
+                          <UserCheck className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                          <span className="text-slate-400">Pengganti Tugas:</span>
+                          <strong className="text-slate-800 font-bold">{item.handover}</strong>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Catatan Pemohon Box matching screenshot */}
-                    <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-1">
-                      <p className="text-[11px] font-bold text-slate-700">Catatan Pemohon:</p>
-                      <p className="text-xs text-slate-600 leading-relaxed italic">
+                    {/* Catatan Pemohon Box with Modern Quote Styling */}
+                    <div className="ml-2 relative rounded-2xl bg-gradient-to-r from-slate-50 via-slate-50/70 to-white border border-slate-200/80 p-4 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <MessageSquareQuote className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Catatan Pemohon</span>
+                      </div>
+                      <p className="text-xs text-slate-700 leading-relaxed italic pl-1 border-l-2 border-slate-300">
                         "{item.notes}"
                       </p>
                     </div>
 
-                    {/* ALUR VERIFIKASI BERTINGKAT (Horizontal Stepper matching screenshot) */}
-                    <div className="space-y-2.5 pt-1">
-                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                        ALUR VERIFIKASI BERTINGKAT
-                      </p>
+                    {/* ALUR VERIFIKASI BERTINGKAT (Horizontal Stepper Pipeline) */}
+                    <div className="space-y-3 pt-1 pl-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shadow-2xs">
+                            <Zap className="w-3.5 h-3.5 text-blue-600" />
+                          </div>
+                          <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-600">
+                            ALUR VERIFIKASI BERTINGKAT
+                          </p>
+                        </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {item.steps.map((st, idx) => (
-                          <div
-                            key={idx}
-                            className={`p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${
-                              st.status === 'COMPLETED'
-                                ? 'bg-emerald-50/40 border-emerald-200/80 text-emerald-900'
-                                : st.status === 'IN_PROGRESS'
-                                ? 'bg-amber-50/50 border-amber-200/80 text-amber-900'
-                                : 'bg-slate-50/50 border-slate-200/80 text-slate-500'
-                            }`}
-                          >
-                            {/* Step Icon */}
+                        <div className="flex items-center gap-2">
+                          {item.status === 'APPROVED' ? (
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold inline-flex items-center gap-1.5 shadow-2xs">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>3 dari 3 Tahap Disetujui</span>
+                            </span>
+                          ) : item.status === 'PENDING' ? (
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold inline-flex items-center gap-1.5 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              <span>Menunggu Review HRD</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-bold inline-flex items-center gap-1.5 shadow-2xs">
+                              <X className="w-3 h-3 text-rose-600" />
+                              <span>Ditolak oleh HRD</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Responsive 3-Stage Pipeline */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {item.steps.map((st, idx) => {
+                          const isCompleted = st.status === 'COMPLETED';
+                          const isInProgress = st.status === 'IN_PROGRESS';
+                          const isRejected = st.status === 'REJECTED';
+
+                          return (
                             <div
-                              className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5 ${
-                                st.status === 'COMPLETED'
-                                  ? 'bg-emerald-600 text-white'
-                                  : st.status === 'IN_PROGRESS'
-                                  ? 'bg-amber-500 text-white'
-                                  : 'bg-slate-200 text-slate-500'
+                              key={idx}
+                              className={`p-3.5 rounded-2xl border transition-all relative flex flex-col justify-between space-y-3 ${
+                                isCompleted
+                                  ? 'bg-gradient-to-br from-emerald-50/40 to-teal-50/20 border-emerald-200/90 shadow-2xs'
+                                  : isInProgress
+                                  ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/20 shadow-xs'
+                                  : isRejected
+                                  ? 'bg-rose-50/50 border-rose-200 text-rose-900 shadow-2xs'
+                                  : 'bg-slate-50/60 border-slate-200/70 text-slate-500'
                               }`}
                             >
-                              {st.status === 'COMPLETED' ? (
-                                <Check className="w-4 h-4 stroke-[3]" />
-                              ) : st.status === 'IN_PROGRESS' ? (
-                                <Clock3 className="w-4 h-4" />
-                              ) : (
-                                <UserCheck className="w-4 h-4" />
-                              )}
-                            </div>
-
-                            {/* Step Text */}
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold leading-tight truncate text-slate-900">
-                                {st.title}
-                              </p>
-                              <p className="text-[11px] text-slate-600 font-medium truncate mt-0.5">
-                                {st.person}
-                              </p>
-                              {st.time && (
-                                <p
-                                  className={`text-[10px] mt-0.5 font-semibold ${
-                                    st.status === 'IN_PROGRESS'
-                                      ? 'text-amber-700'
-                                      : 'text-slate-400'
+                              {/* Top Step Header */}
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold transition-all shadow-2xs ${
+                                    isCompleted
+                                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
+                                      : isInProgress
+                                      ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white'
+                                      : isRejected
+                                      ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white'
+                                      : 'bg-slate-200 text-slate-400'
                                   }`}
                                 >
-                                  {st.time}
-                                </p>
+                                  {isCompleted ? (
+                                    <Check className="w-4 h-4 stroke-[3]" />
+                                  ) : isInProgress ? (
+                                    <Clock3 className="w-4 h-4 animate-spin-slow" />
+                                  ) : isRejected ? (
+                                    <X className="w-4 h-4 stroke-[3]" />
+                                  ) : (
+                                    <UserCheck className="w-4 h-4" />
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <p className="text-xs font-extrabold text-slate-900 truncate">
+                                      {st.title}
+                                    </p>
+                                    <span
+                                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${
+                                        isCompleted
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : isInProgress
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : isRejected
+                                          ? 'bg-rose-100 text-rose-800'
+                                          : 'bg-slate-200/80 text-slate-600'
+                                      }`}
+                                    >
+                                      {isCompleted
+                                        ? 'Selesai'
+                                        : isInProgress
+                                        ? 'Proses'
+                                        : isRejected
+                                        ? 'Ditolak'
+                                        : 'Antrean'}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-600 font-semibold truncate mt-0.5">
+                                    {st.person}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Bottom Step Time Footer */}
+                              {st.time && (
+                                <div className="pt-2 border-t border-black/[0.04] flex items-center justify-between text-[10px]">
+                                  <span className="text-slate-400 flex items-center gap-1 font-medium">
+                                    <Clock className="w-3 h-3 text-slate-400" />
+                                    <span>Waktu:</span>
+                                  </span>
+                                  <span
+                                    className={`font-semibold ${
+                                      isCompleted
+                                        ? 'text-emerald-700'
+                                        : isInProgress
+                                        ? 'text-amber-700 font-bold'
+                                        : isRejected
+                                        ? 'text-rose-700'
+                                        : 'text-slate-400'
+                                    }`}
+                                  >
+                                    {st.time}
+                                  </span>
+                                </div>
                               )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

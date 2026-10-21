@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEmployeeByIdFromDb, updateEmployeeInDb, deleteEmployeeFromDb } from '@/lib/db';
+import { broadcastAuditEvent } from '@/lib/auditSSE';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -85,6 +87,31 @@ export async function PUT(
       );
     }
 
+    // Dispatch audit log
+    try {
+      const auditLog: AuditLogEntry = {
+        id: `aud-${Date.now()}`,
+        module: 'EMPLOYEE',
+        action: 'EMPLOYEE_UPDATED',
+        recordId: updated.id,
+        userName: 'HR Administrator',
+        userEmail: 'admin@nexora.local',
+        userNik: updated.employeeNumber,
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+        timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+        oldData: null,
+        newData: {
+          fullName: updated.fullName,
+          department: updated.department,
+          designation: updated.designation,
+          employmentStatus: updated.employmentStatus,
+        },
+      };
+      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
+      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    } catch {}
+
     return NextResponse.json(
       {
         success: true,
@@ -134,6 +161,25 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    // Dispatch audit log
+    try {
+      const auditLog: AuditLogEntry = {
+        id: `aud-${Date.now()}`,
+        module: 'EMPLOYEE',
+        action: hardDelete ? 'EMPLOYEE_PERMANENTLY_DELETED' : 'EMPLOYEE_TERMINATED',
+        recordId: params.id,
+        userName: 'HR Administrator',
+        userEmail: 'admin@nexora.local',
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+        timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+        oldData: null,
+        newData: { idOrNik: params.id, permanent: hardDelete },
+      };
+      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
+      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    } catch {}
 
     return NextResponse.json(
       {
