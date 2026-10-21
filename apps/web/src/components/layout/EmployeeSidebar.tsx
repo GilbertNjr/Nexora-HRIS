@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   LayoutDashboard,
@@ -33,6 +33,7 @@ interface EmployeeSidebarProps {
   onToggleCollapse: () => void;
   onOpenPkbModal?: () => void;
   onShowToast?: (msg: string) => void;
+  subtitle?: string;
 }
 
 export function EmployeeSidebar({
@@ -41,7 +42,77 @@ export function EmployeeSidebar({
   onToggleCollapse,
   onOpenPkbModal,
   onShowToast,
+  subtitle,
 }: EmployeeSidebarProps) {
+  const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('Nexora Group & HR Solutions');
+
+  useEffect(() => {
+    try {
+      const persistentLogo = localStorage.getItem('nexora_persistent_company_logo');
+      const cached = localStorage.getItem('nexora_company_settings');
+      if (persistentLogo) {
+        setCompanyLogo(persistentLogo);
+      }
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (!persistentLogo && parsed.logoUrl) setCompanyLogo(parsed.logoUrl);
+        if (parsed.commercialName) setCompanyName(parsed.commercialName);
+      }
+    } catch {
+      // ignore
+    }
+
+    fetch('/api/v1/company')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.success && json?.data) {
+          if (json.data.logoUrl) {
+            setCompanyLogo(json.data.logoUrl);
+            try {
+              localStorage.setItem('nexora_persistent_company_logo', json.data.logoUrl);
+            } catch {}
+          }
+          if (json.data.commercialName) setCompanyName(json.data.commercialName);
+        }
+      })
+      .catch(() => {});
+
+    // Listen to real-time BroadcastChannel & storage events
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('nexora_live_sync');
+      channel.onmessage = (event) => {
+        const msg = event.data;
+        if (msg?.type === 'LOGO_UPDATED') {
+          if (msg.logoUrl) setCompanyLogo(msg.logoUrl);
+          if (msg.companyName) setCompanyName(msg.companyName);
+        }
+      };
+    } catch {
+      // ignore
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'nexora_persistent_company_logo' && e.newValue) {
+        setCompanyLogo(e.newValue);
+      }
+      if (e.key === 'nexora_company_settings' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed.commercialName) setCompanyName(parsed.commercialName);
+          if (parsed.logoUrl) setCompanyLogo(parsed.logoUrl);
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
   const handleHelpdeskClick = () => {
     if (onShowToast) {
       onShowToast('Kontak HR Helpdesk: Ext. 402 / helpdesk-hr@nexora.co.id');
@@ -66,24 +137,38 @@ export function EmployeeSidebar({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-base shadow-sm shadow-blue-500/20 hover:scale-105 hover:ring-2 hover:ring-blue-400 transition-all cursor-pointer"
+              className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shadow-sm cursor-pointer hover:ring-2 hover:ring-blue-400 hover:scale-105 transition-all flex-shrink-0"
               title="Buka Sidebar Penuh (Expand)"
             >
-              <span className="text-white font-black tracking-tight">❖</span>
+              {companyLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={companyLogo} alt={companyName} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base">
+                  N
+                </div>
+              )}
             </button>
           ) : (
             /* Expanded Brand */
             <>
-              <Link href="/karyawan" className="flex items-center gap-3 group min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-base shadow-sm shadow-blue-500/20 flex-shrink-0">
-                  <span className="text-white font-black tracking-tight">❖</span>
+              <Link href="/karyawan" className="flex items-center gap-2.5 overflow-hidden min-w-0 group">
+                <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shadow-sm flex-shrink-0">
+                  {companyLogo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={companyLogo} alt={companyName} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-extrabold text-base">
+                      N
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="font-extrabold text-sm text-slate-900 tracking-tight leading-snug group-hover:text-blue-600 transition-colors truncate">
-                    Nexora <span className="text-blue-600 font-bold">HRIS</span>
+                  <span className="font-bold text-[15px] tracking-tight text-[#0F172A] leading-tight truncate group-hover:text-blue-600 transition-colors">
+                    {companyName || 'Nexora Group & HR Solutions'}
                   </span>
-                  <span className="text-[11px] font-semibold text-slate-400 leading-tight truncate">
-                    Portal Karyawan (ESS)
+                  <span className="text-[10px] font-medium text-slate-400 tracking-wider truncate">
+                    {subtitle || 'Portal Karyawan (ESS)'}
                   </span>
                 </div>
               </Link>
