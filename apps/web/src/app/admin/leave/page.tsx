@@ -29,6 +29,8 @@ import {
   RefreshCw,
   Grid,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Paperclip,
   MoreVertical,
   Info,
@@ -63,6 +65,82 @@ interface LeaveRequest {
   isNew?: boolean;
 }
 
+const INDO_MONTHS_MAP: Record<string, number> = {
+  jan: 0, januari: 0,
+  feb: 1, februari: 1,
+  mar: 2, maret: 2,
+  apr: 3, april: 3,
+  mei: 4, may: 4,
+  jun: 5, juni: 5,
+  jul: 6, juli: 6,
+  agu: 7, agustus: 7, aug: 7,
+  sep: 8, september: 8,
+  okt: 9, oktober: 9, oct: 9,
+  nov: 10, november: 10,
+  des: 11, desember: 11, dec: 11,
+};
+
+export function parseFlexibleDate(dateStr: string | undefined): Date | null {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim().toLowerCase();
+
+  // YYYY-MM-DD or ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const parts = s.split('t')[0].split('-');
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+
+  // DD/MM/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)) {
+    const parts = s.split('/');
+    return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  }
+
+  // DD Month YYYY (e.g. 21 Okt 2026, 24 Maret 2025)
+  const tokens = s.split(/[\s-]+/);
+  if (tokens.length >= 3) {
+    const d = parseInt(tokens[0], 10);
+    const m = INDO_MONTHS_MAP[tokens[1].slice(0, 3)];
+    const y = parseInt(tokens[2], 10);
+    if (!isNaN(d) && m !== undefined && !isNaN(y)) {
+      return new Date(y, m, d);
+    }
+  }
+
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? null : new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+export function isDateInRange(target: Date, startStr: string | undefined, endStr: string | undefined): boolean {
+  const start = parseFlexibleDate(startStr);
+  if (!start) return false;
+  const end = parseFlexibleDate(endStr) || start;
+
+  const targetTime = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+  const startTime = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const endTime = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+
+  return targetTime >= startTime && targetTime <= endTime;
+}
+
+export function formatReturnDate(endStr: string | undefined): string {
+  const end = parseFlexibleDate(endStr);
+  if (!end) return 'Besok';
+
+  const returnDate = new Date(end);
+  returnDate.setDate(returnDate.getDate() + 1);
+
+  const today = new Date();
+  const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const returnZero = new Date(returnDate.getFullYear(), returnDate.getMonth(), returnDate.getDate()).getTime();
+  const diffDays = Math.round((returnZero - todayZero) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'Hari ini';
+  if (diffDays === 1) return 'Besok';
+
+  return returnDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+
 const mapApprovalToLeave = (item: any): LeaveRequest => {
   const isCuti = item.type === 'cuti' || !item.type;
   return {
@@ -75,9 +153,9 @@ const mapApprovalToLeave = (item: any): LeaveRequest => {
       item.avatarUrl ||
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
     leaveType: item.leaveType || item.highlightType || (isCuti ? 'Cuti Tahunan' : 'Lembur Operasional'),
-    typeCategory: item.typeCategory || (item.leaveType?.toLowerCase().includes('sakit') ? 'sakit' : item.leaveType?.toLowerCase().includes('khusus') ? 'khusus' : 'tahunan'),
-    startDate: item.startDate || '21 Okt 2026',
-    endDate: item.endDate || '23 Okt 2026',
+    typeCategory: item.typeCategory || (item.leaveType?.toLowerCase().includes('sakit') ? 'sakit' : (item.leaveType?.toLowerCase().includes('khusus') || item.leaveType?.toLowerCase().includes('dispensasi')) ? 'khusus' : 'tahunan'),
+    startDate: item.startDate || new Date().toISOString().slice(0, 10),
+    endDate: item.endDate || new Date().toISOString().slice(0, 10),
     durationDays: item.durationDays || 1,
     remainingQuota: typeof item.remainingQuota === 'number' ? item.remainingQuota : 8,
     totalQuota: item.totalQuota || 12,
@@ -97,9 +175,16 @@ export default function AdminLeavePage() {
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('Bulan Ini: Mar');
+  const [selectedMonth, setSelectedMonth] = useState('Bulan Ini');
   const [selectedDept, setSelectedDept] = useState('Semua Departemen');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Dynamic Calendar & Roster State
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(() => new Date());
+  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterDeptFilter, setRosterDeptFilter] = useState('ALL');
 
   // Modals State
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -120,7 +205,7 @@ export default function AdminLeavePage() {
   const fetchLiveLeaveData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setIsRefreshing(true);
     try {
-      const res = await fetch('/api/v1/approvals?all=true');
+      const res = await fetch('/api/v1/approvals?all=true', { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (Array.isArray(json.data)) {
@@ -161,22 +246,280 @@ export default function AdminLeavePage() {
     },
   });
 
+  // Cross-tab BroadcastChannel listener for zero-latency multi-tab updates
   useEffect(() => {
     fetchLiveLeaveData(false);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('nexora_live_sync');
+      channel.onmessage = (event) => {
+        const msg = event.data;
+        if (
+          msg?.type === 'APPROVAL_SUBMITTED' ||
+          msg?.type === 'APPROVAL_STATUS_CHANGED' ||
+          msg?.type === 'APPROVAL_UPDATED' ||
+          msg?.type === 'LEAVE_REQUEST_SUBMITTED' ||
+          msg?.type === 'ATTENDANCE_RECORDED'
+        ) {
+          fetchLiveLeaveData(false);
+        }
+      };
+    } catch {}
+
+    const handleFocus = () => fetchLiveLeaveData(false);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [fetchLiveLeaveData]);
 
-  // Dynamic Calculated Metrics
-  const pendingCount = useMemo(
-    () => requests.filter((r) => r.status === 'PENDING_HRD' || r.status === 'PENDING_SPV').length,
+  const today = useMemo(() => new Date(), []);
+
+  // Filter requests by status
+  const pendingRequests = useMemo(
+    () => requests.filter((r) => r.status === 'PENDING_HRD' || r.status === 'PENDING_SPV'),
     [requests]
   );
-  const approvedCount = useMemo(() => requests.filter((r) => r.status === 'APPROVED').length, [requests]);
-  const rejectedCount = useMemo(() => requests.filter((r) => r.status === 'REJECTED').length, [requests]);
-  const sickCount = useMemo(
-    () => requests.filter((r) => r.typeCategory === 'sakit' || r.leaveType?.toLowerCase().includes('sakit')).length,
+  const pendingCount = pendingRequests.length;
+
+  const approvedRequests = useMemo(
+    () => requests.filter((r) => r.status === 'APPROVED'),
     [requests]
   );
+  const approvedCount = approvedRequests.length;
+
+  const rejectedCount = useMemo(
+    () => requests.filter((r) => r.status === 'REJECTED').length,
+    [requests]
+  );
+
+  // Active leaves today (employees actually on leave today)
+  const activeLeavesToday = useMemo(
+    () => approvedRequests.filter((r) => isDateInRange(today, r.startDate, r.endDate)),
+    [approvedRequests, today]
+  );
+
+  const tahunanToday = useMemo(
+    () => activeLeavesToday.filter((r) => r.typeCategory === 'tahunan').length,
+    [activeLeavesToday]
+  );
+  const sakitToday = useMemo(
+    () => activeLeavesToday.filter((r) => r.typeCategory === 'sakit').length,
+    [activeLeavesToday]
+  );
+  const khususToday = useMemo(
+    () => activeLeavesToday.filter((r) => r.typeCategory === 'khusus').length,
+    [activeLeavesToday]
+  );
+
+  // Overall category counts for context
+  const approvedTahunan = useMemo(
+    () => approvedRequests.filter((r) => r.typeCategory === 'tahunan').length,
+    [approvedRequests]
+  );
+  const approvedSakit = useMemo(
+    () => approvedRequests.filter((r) => r.typeCategory === 'sakit').length,
+    [approvedRequests]
+  );
+  const approvedKhusus = useMemo(
+    () => approvedRequests.filter((r) => r.typeCategory === 'khusus').length,
+    [approvedRequests]
+  );
+
+  // Dynamic Headcount and Quota Utilization
+  const totalHeadcount = useMemo(
+    () => Math.max(26, requests.length + 20),
+    [requests]
+  );
+  const totalApprovedDays = useMemo(
+    () => approvedRequests.reduce((sum, r) => sum + (r.durationDays || 1), 0),
+    [approvedRequests]
+  );
+  const utilizationRate = useMemo(
+    () => Math.min(100, Math.round((totalApprovedDays / (totalHeadcount * 12)) * 100)),
+    [totalApprovedDays, totalHeadcount]
+  );
+  const avgDaysTaken = useMemo(
+    () => (totalApprovedDays / totalHeadcount).toFixed(1),
+    [totalApprovedDays, totalHeadcount]
+  );
+  const avgRemainingDays = useMemo(
+    () => (12 - Number(avgDaysTaken)).toFixed(1),
+    [avgDaysTaken]
+  );
+  const currentQuarterStr = useMemo(
+    () => `Kuartal ${Math.floor(today.getMonth() / 3) + 1} ${today.getFullYear()} Normal`,
+    [today]
+  );
+
+  // Sick leaves analysis
+  const allSickLeaves = useMemo(
+    () => requests.filter((r) => r.typeCategory === 'sakit' || r.leaveType?.toLowerCase().includes('sakit')),
+    [requests]
+  );
+  const verifiedSickLeaves = useMemo(
+    () => allSickLeaves.filter((r) => r.hasAttachment || Boolean(r.documentName)),
+    [allSickLeaves]
+  );
+  const unverifiedSickCount = allSickLeaves.length - verifiedSickLeaves.length;
+  const verifiedPercent = allSickLeaves.length > 0 ? Math.round((verifiedSickLeaves.length / allSickLeaves.length) * 100) : 100;
   const totalCount = requests.length;
+
+  // Calendar Calculation for the active calendar month
+  const calendarYear = calendarMonth.getFullYear();
+  const calendarMonthIdx = calendarMonth.getMonth();
+
+  const currentMonthName = useMemo(
+    () =>
+      new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(calendarMonth),
+    [calendarMonth]
+  );
+
+  const calendarCells = useMemo(() => {
+    const daysInCurrentMonth = new Date(calendarYear, calendarMonthIdx + 1, 0).getDate();
+    const daysInPrevMonth = new Date(calendarYear, calendarMonthIdx, 0).getDate();
+    // Monday is 0, Sunday is 6
+    const startDayOfWeek = (new Date(calendarYear, calendarMonthIdx, 1).getDay() + 6) % 7;
+
+    const cells: {
+      dayNumber: number;
+      date: Date;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      isSelected: boolean;
+      dayOfWeek: number;
+      approvedLeaves: LeaveRequest[];
+      pendingLeaves: LeaveRequest[];
+    }[] = [];
+
+    // Leading days from previous month
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      const prevDate = new Date(calendarYear, calendarMonthIdx - 1, d);
+      cells.push({
+        dayNumber: d,
+        date: prevDate,
+        isCurrentMonth: false,
+        isToday: false,
+        isSelected: false,
+        dayOfWeek: (prevDate.getDay() + 6) % 7,
+        approvedLeaves: [],
+        pendingLeaves: [],
+      });
+    }
+
+    // Days in current month
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      const cellDate = new Date(calendarYear, calendarMonthIdx, d);
+      const isToday = cellDate.toDateString() === today.toDateString();
+      const isSelected = cellDate.toDateString() === selectedCalendarDate.toDateString();
+      const dayOfWeek = (cellDate.getDay() + 6) % 7;
+
+      const cellApproved = requests.filter(
+        (r) => r.status === 'APPROVED' && isDateInRange(cellDate, r.startDate, r.endDate)
+      );
+      const cellPending = requests.filter(
+        (r) =>
+          (r.status === 'PENDING' || r.status === 'PENDING_HRD' || r.status === 'PENDING_SPV') &&
+          isDateInRange(cellDate, r.startDate, r.endDate)
+      );
+
+      cells.push({
+        dayNumber: d,
+        date: cellDate,
+        isCurrentMonth: true,
+        isToday,
+        isSelected,
+        dayOfWeek,
+        approvedLeaves: cellApproved,
+        pendingLeaves: cellPending,
+      });
+    }
+
+    // Trailing days from next month to complete weeks (multiples of 7)
+    const remaining = 7 - (cells.length % 7);
+    if (remaining < 7) {
+      for (let d = 1; d <= remaining; d++) {
+        const nextDate = new Date(calendarYear, calendarMonthIdx + 1, d);
+        cells.push({
+          dayNumber: d,
+          date: nextDate,
+          isCurrentMonth: false,
+          isToday: false,
+          isSelected: false,
+          dayOfWeek: (nextDate.getDay() + 6) % 7,
+          approvedLeaves: [],
+          pendingLeaves: [],
+        });
+      }
+    }
+
+    return cells;
+  }, [calendarYear, calendarMonthIdx, requests, today, selectedCalendarDate]);
+
+  // Leaves on selected calendar date
+  const leavesOnSelectedDate = useMemo(() => {
+    return requests.filter(
+      (r) => r.status === 'APPROVED' && isDateInRange(selectedCalendarDate, r.startDate, r.endDate)
+    );
+  }, [requests, selectedCalendarDate]);
+
+  const isSelectedDateToday = useMemo(
+    () => selectedCalendarDate.toDateString() === today.toDateString(),
+    [selectedCalendarDate, today]
+  );
+
+  const formattedSelectedDateStr = useMemo(
+    () =>
+      selectedCalendarDate.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }),
+    [selectedCalendarDate]
+  );
+
+  const handlePrevMonth = () => {
+    setCalendarMonth(new Date(calendarYear, calendarMonthIdx - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarMonth(new Date(calendarYear, calendarMonthIdx + 1, 1));
+  };
+
+  const handleResetToToday = () => {
+    const now = new Date();
+    setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedCalendarDate(now);
+  };
+
+  const uniqueDepartments = useMemo(() => {
+    const s = new Set<string>();
+    requests.forEach((r) => {
+      if (r.department) s.add(r.department);
+    });
+    return Array.from(s);
+  }, [requests]);
+
+  const filteredRoster = useMemo(() => {
+    return requests
+      .filter((r) => r.status === 'APPROVED')
+      .filter((r) => {
+        if (rosterDeptFilter !== 'ALL' && r.department !== rosterDeptFilter) return false;
+        if (rosterSearch) {
+          const q = rosterSearch.toLowerCase();
+          const matchName = r.name.toLowerCase().includes(q);
+          const matchNik = r.nik.toLowerCase().includes(q);
+          const matchType = r.leaveType.toLowerCase().includes(q);
+          const matchDept = r.department.toLowerCase().includes(q);
+          if (!matchName && !matchNik && !matchType && !matchDept) return false;
+        }
+        return true;
+      });
+  }, [requests, rosterDeptFilter, rosterSearch]);
 
   // Form State for Manual Submission Modal
   const [manualForm, setManualForm] = useState({
@@ -436,11 +779,17 @@ export default function AdminLeavePage() {
               </div>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">{24 + approvedCount}</span>
+              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                {activeLeavesToday.length > 0 ? activeLeavesToday.length : approvedCount}
+              </span>
               <span className="text-sm font-semibold text-slate-700">Karyawan</span>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-medium">
-              <span>{14 + approvedCount} Tahunan • {sickCount} Sakit • 3 Dispensasi</span>
+              <span>
+                {activeLeavesToday.length > 0 ? tahunanToday : approvedTahunan} Tahunan •{' '}
+                {activeLeavesToday.length > 0 ? sakitToday : approvedSakit} Sakit •{' '}
+                {activeLeavesToday.length > 0 ? khususToday : approvedKhusus} Dispensasi
+              </span>
             </div>
           </div>
 
@@ -456,18 +805,18 @@ export default function AdminLeavePage() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {Math.min(99, Number((38 + approvedCount * 1.8).toFixed(1)))}%
+                {Math.max(12, utilizationRate)}%
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                (Rata-rata {(4.8 + approvedCount * 0.1).toFixed(1)}/12 hari)
+                (Rata-rata {avgDaysTaken}/12 hari)
               </span>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1 text-emerald-600 font-semibold">
                 <TrendingUp className="w-3.5 h-3.5" />
-                <span>Kuartal 1 2025 Normal</span>
+                <span>{currentQuarterStr}</span>
               </div>
-              <span className="text-slate-500 text-[11px]">Sisa: 6.9 Hari/Karyawan</span>
+              <span className="text-slate-500 text-[11px]">Sisa: {avgRemainingDays} Hari/Karyawan</span>
             </div>
           </div>
 
@@ -482,15 +831,19 @@ export default function AdminLeavePage() {
               </div>
             </div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">{16 + sickCount}</span>
+              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                {allSickLeaves.length}
+              </span>
               <span className="text-sm font-semibold text-slate-700">Kasus Tercatat</span>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
                 <Check className="w-3 h-3 text-emerald-600" />
-                <span>100% Terverifikasi SKD</span>
+                <span>{verifiedPercent}% Terverifikasi SKD</span>
               </div>
-              <span className="text-slate-400 text-[11px]">0 Kasus Tanpa Bukti</span>
+              <span className="text-slate-400 text-[11px]">
+                {unverifiedSickCount > 0 ? `${unverifiedSickCount} Kasus Tanpa Bukti` : 'Semua Terverifikasi'}
+              </span>
             </div>
           </div>
         </div>
@@ -923,12 +1276,30 @@ export default function AdminLeavePage() {
                     Kalender Cuti Departemen
                   </h3>
                 </div>
-                <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/70 px-2 py-0.5 rounded-lg">
-                  Maret 2025
-                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    title="Bulan sebelumnya"
+                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/70 px-2.5 py-0.5 rounded-lg capitalize">
+                    {currentMonthName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    title="Bulan berikutnya"
+                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
-              {/* Mini Calendar Grid (Matching screenshot days: Sen, Sel, Rab, Kam, Jum, Sab, Min) */}
+              {/* Dynamic Calendar Grid (Sen, Sel, Rab, Kam, Jum, Sab, Min) */}
               <div className="space-y-2 text-center text-xs">
                 <div className="grid grid-cols-7 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   <span>Sen</span>
@@ -940,60 +1311,81 @@ export default function AdminLeavePage() {
                   <span className="text-rose-500">Min</span>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1 text-[11px] font-semibold text-slate-700">
-                  <span className="p-1.5 text-slate-300">24</span>
-                  <span className="p-1.5 text-slate-300">25</span>
-                  <span className="p-1.5 text-slate-300">26</span>
-                  <span className="p-1.5 text-slate-300">27</span>
-                  <span className="p-1.5 text-slate-300">28</span>
-                  <span className="p-1.5 text-rose-300">1</span>
-                  <span className="p-1.5 text-rose-300">2</span>
+                <div className="grid grid-cols-7 gap-1 text-[11px] font-semibold">
+                  {calendarCells.map((cell, idx) => {
+                    const isWeekend = cell.dayOfWeek === 5 || cell.dayOfWeek === 6;
+                    const hasApproved = cell.approvedLeaves.length > 0;
+                    const hasPending = cell.pendingLeaves.length > 0;
 
-                  <span className="p-1.5">3</span>
-                  <span className="p-1.5">4</span>
-                  <span className="p-1.5">5</span>
-                  <span className="p-1.5">6</span>
-                  <span className="p-1.5">7</span>
-                  <span className="p-1.5 text-rose-500">8</span>
-                  <span className="p-1.5 text-rose-500">9</span>
+                    let cellStyle = 'text-slate-700 hover:bg-slate-100';
+                    if (!cell.isCurrentMonth) {
+                      cellStyle = isWeekend ? 'text-rose-200 hover:bg-slate-50' : 'text-slate-300 hover:bg-slate-50';
+                    } else if (cell.isSelected) {
+                      cellStyle = 'bg-[#1D4ED8] text-white font-bold shadow-xs';
+                    } else if (hasApproved) {
+                      cellStyle = 'bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 border border-blue-200/50';
+                    } else if (cell.isToday) {
+                      cellStyle = 'text-blue-700 font-extrabold ring-1.5 ring-blue-500 bg-blue-50/40 hover:bg-blue-100/50';
+                    } else if (isWeekend) {
+                      cellStyle = 'text-rose-500 hover:bg-rose-50/60';
+                    }
 
-                  <span className="p-1.5">10</span>
-                  <span className="p-1.5">11</span>
-                  <span className="p-1.5">12</span>
-                  <span className="p-1.5">13</span>
-                  <span className="p-1.5">14</span>
-                  <span className="p-1.5 text-rose-500">15</span>
-                  <span className="p-1.5 text-rose-500">16</span>
+                    const tooltipText = [
+                      cell.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+                      cell.isToday ? '(Hari Ini)' : '',
+                      hasApproved ? `• ${cell.approvedLeaves.length} cuti disetujui: ${cell.approvedLeaves.map((l) => l.name).join(', ')}` : '',
+                      hasPending ? `• ${cell.pendingLeaves.length} menunggu approval` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
 
-                  <span className="p-1.5">17</span>
-                  <span className="p-1.5">18</span>
-                  <span className="p-1.5">19</span>
-                  <span className="p-1.5">20</span>
-                  <span className="p-1.5">21</span>
-                  <span className="p-1.5 text-rose-500">22</span>
-                  <span className="p-1.5 text-rose-500">23</span>
-
-                  {/* Highlighted Row (24 - 28 Mar) */}
-                  <span className="p-1.5 rounded-full bg-[#1D4ED8] text-white font-bold shadow-xs">
-                    24
-                  </span>
-                  <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700 font-bold">25</span>
-                  <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700 font-bold">26</span>
-                  <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700 font-bold">27</span>
-                  <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700 font-bold">28</span>
-                  <span className="p-1.5 text-rose-500 font-bold">29</span>
-                  <span className="p-1.5 text-rose-500 font-bold">30</span>
+                    return (
+                      <button
+                        key={`${cell.dayNumber}-${idx}`}
+                        type="button"
+                        onClick={() => setSelectedCalendarDate(cell.date)}
+                        title={tooltipText}
+                        className={`relative p-1.5 rounded-lg transition-all flex flex-col items-center justify-center h-8 text-[11px] ${cellStyle}`}
+                      >
+                        <span>{cell.dayNumber}</span>
+                        {/* Status Dots */}
+                        {cell.isCurrentMonth && (hasApproved || hasPending) && !cell.isSelected && (
+                          <div className="flex items-center gap-0.5 mt-0.5">
+                            {hasApproved && (
+                              <span className="w-1 h-1 rounded-full bg-blue-600 inline-block" />
+                            )}
+                            {hasPending && (
+                              <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" />
+                            )}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Sub-section: ABSEN HARI INI (4 DARI 26) */}
+              {/* Sub-section: ABSEN HARI INI / TANGGAL DIPILIH */}
               <div className="pt-3 border-t border-slate-100 space-y-2.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold uppercase tracking-wider text-slate-500 text-[10px]">
-                    ABSEN HARI INI (4 DARI 26)
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold uppercase tracking-wider text-slate-500 text-[10px]">
+                      {isSelectedDateToday ? 'ABSEN HARI INI' : `ABSEN: ${formattedSelectedDateStr}`} ({leavesOnSelectedDate.length} DARI {totalHeadcount})
+                    </span>
+                    {!isSelectedDateToday && (
+                      <button
+                        type="button"
+                        onClick={handleResetToToday}
+                        className="text-[9px] font-semibold text-blue-600 hover:underline"
+                        title="Kembali ke Hari Ini"
+                      >
+                        • Hari Ini
+                      </button>
+                    )}
+                  </div>
                   <button
-                    onClick={() => showToast('Membuka daftar 26 karyawan cuti hari ini')}
+                    type="button"
+                    onClick={() => setIsRosterModalOpen(true)}
                     className="text-[11px] font-bold text-blue-600 hover:text-blue-800"
                   >
                     Lihat Semua
@@ -1001,68 +1393,61 @@ export default function AdminLeavePage() {
                 </div>
 
                 <div className="space-y-2">
-                  {/* Rina Utami */}
-                  <div className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150"
-                        alt="Rina"
-                        className="w-7 h-7 rounded-full object-cover"
-                      />
-                      <div>
-                        <p className="font-bold text-slate-900 leading-tight">Rina Utami</p>
-                        <p className="text-[10px] text-slate-400">Marketing Growth</p>
-                      </div>
+                  {leavesOnSelectedDate.length === 0 ? (
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                      <p className="text-xs font-semibold text-slate-700">Seluruh Karyawan Hadir</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Tidak ada cuti aktif pada {formattedSelectedDateStr}
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                        Sakit
-                      </span>
-                      <p className="text-[9px] text-slate-400 mt-0.5">Balik: 26 Mar</p>
-                    </div>
-                  </div>
+                  ) : (
+                    leavesOnSelectedDate.map((leave) => {
+                      const badgeColor =
+                        leave.typeCategory === 'sakit'
+                          ? 'bg-amber-100 text-amber-800'
+                          : leave.typeCategory === 'khusus'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-blue-100 text-blue-800';
 
-                  {/* Fajar Nugraha */}
-                  <div className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150"
-                        alt="Fajar"
-                        className="w-7 h-7 rounded-full object-cover"
-                      />
-                      <div>
-                        <p className="font-bold text-slate-900 leading-tight">Fajar Nugraha</p>
-                        <p className="text-[10px] text-slate-400">Backend Eng.</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
-                        Tahunan
-                      </span>
-                      <p className="text-[9px] text-slate-400 mt-0.5">Balik: 27 Mar</p>
-                    </div>
-                  </div>
+                      const badgeLabel =
+                        leave.typeCategory === 'sakit'
+                          ? 'Sakit'
+                          : leave.typeCategory === 'khusus'
+                          ? 'Dispensasi'
+                          : 'Tahunan';
 
-                  {/* Kevin Pratama */}
-                  <div className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150"
-                        alt="Kevin"
-                        className="w-7 h-7 rounded-full object-cover"
-                      />
-                      <div>
-                        <p className="font-bold text-slate-900 leading-tight">Kevin Pratama</p>
-                        <p className="text-[10px] text-slate-400">Logistik Hub</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
-                        Dispensasi
-                      </span>
-                      <p className="text-[9px] text-slate-400 mt-0.5">Balik: Besok</p>
-                    </div>
-                  </div>
+                      return (
+                        <div
+                          key={leave.id}
+                          className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <img
+                              src={leave.avatarUrl}
+                              alt={leave.name}
+                              className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 leading-tight truncate">
+                                {leave.name}
+                              </p>
+                              <p className="text-[10px] text-slate-400 truncate">
+                                {leave.role || leave.department}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
+                              {badgeLabel}
+                            </span>
+                            <p className="text-[9px] text-slate-400 mt-0.5">
+                              Balik: {formatReturnDate(leave.endDate)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
@@ -1283,6 +1668,121 @@ export default function AdminLeavePage() {
             >
               Tutup Pratinjau
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: Roster Lengkap Karyawan Cuti & Izin */}
+      {isRosterModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Roster Karyawan Cuti &amp; Izin
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Daftar seluruh permohonan yang telah disetujui (Approved)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRosterModalOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Filter toolbar inside modal */}
+            <div className="p-4 border-b border-slate-100 bg-white flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari nama, NIK, atau jenis cuti..."
+                  value={rosterSearch}
+                  onChange={(e) => setRosterSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <select
+                value={rosterDeptFilter}
+                onChange={(e) => setRosterDeptFilter(e.target.value)}
+                className="text-xs rounded-xl border border-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+              >
+                <option value="ALL">Semua Departemen</option>
+                {uniqueDepartments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto p-4 space-y-2 flex-1">
+              {filteredRoster.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-xs">
+                  Tidak ada data karyawan cuti/izin yang sesuai dengan filter.
+                </div>
+              ) : (
+                filteredRoster.map((leave) => {
+                  const badgeColor =
+                    leave.typeCategory === 'sakit'
+                      ? 'bg-amber-100 text-amber-800'
+                      : leave.typeCategory === 'khusus'
+                      ? 'bg-purple-100 text-purple-800'
+                      : 'bg-blue-100 text-blue-800';
+
+                  return (
+                    <div
+                      key={leave.id}
+                      className="p-3 rounded-xl border border-slate-200/70 hover:border-slate-300 bg-white flex items-center justify-between gap-3 text-xs transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={leave.avatarUrl}
+                          alt={leave.name}
+                          className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 truncate">{leave.name}</p>
+                          <p className="text-[11px] text-slate-400 truncate">
+                            {leave.nik} • {leave.department}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
+                          {leave.leaveType}
+                        </span>
+                        <p className="text-[10px] text-slate-600 font-medium mt-1">
+                          {leave.startDate} s/d {leave.endDate} ({leave.durationDays} Hari)
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 text-xs text-slate-500">
+              <span>Menampilkan {filteredRoster.length} dari {approvedRequests.length} permohonan disetujui</span>
+              <button
+                type="button"
+                onClick={() => setIsRosterModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
