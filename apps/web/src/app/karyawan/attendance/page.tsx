@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -47,6 +47,43 @@ import {
   Eye,
 } from 'lucide-react';
 
+export interface AttendanceDailyRecord {
+  id: string;
+  date: string;
+  dayName: string;
+  shiftName: string;
+  checkIn: string;
+  checkOut: string;
+  status: 'TEPAT_WAKTU' | 'TERLAMBAT' | 'WFH' | 'DINAS_LUAR';
+  statusLabel: string;
+  workLocation: string;
+  duration: string;
+  effectiveHours: number;
+  overtimeHours: number;
+  lateMinutes: number;
+  verificationMethod: string;
+  isToday?: boolean;
+}
+
+export interface MonthlyAttendanceStats {
+  presentDays: number;
+  totalWorkDays: number;
+  attendancePercentage: number;
+  totalEffectiveHours: number;
+  overtimeHours: number;
+  totalLateMinutes: number;
+  lateCount: number;
+  alphaCount: number;
+  avgCheckInTime: string;
+  remainingCorrectionQuota: number;
+  maxCorrectionQuota: number;
+  isCheckedIn: boolean;
+  checkInTimeStr: string;
+  hasClockedOut: boolean;
+  clockOutTimeStr: string;
+  todayStatus: 'TEPAT_WAKTU' | 'TERLAMBAT' | 'BELUM_CHECK_IN' | 'SELESAI_BEKERJA';
+}
+
 interface CorrectionItem {
   ticketNo: string;
   type: string;
@@ -91,12 +128,39 @@ export default function EmployeeAttendancePage() {
   // Check-In / Check-Out Status
   const [isCheckedIn, setIsCheckedIn] = useState(true);
   const [checkInTimeStr, setCheckInTimeStr] = useState('07:51 WIB');
+  const [isTodayLate, setIsTodayLate] = useState(false);
   const [hasClockedOut, setHasClockedOut] = useState(false);
   const [clockOutTimeStr, setClockOutTimeStr] = useState('-- : -- : -- WIB');
 
+  // Real-Time Monthly KPI Stats
+  const [attendanceStats, setAttendanceStats] = useState<MonthlyAttendanceStats>({
+    presentDays: 21,
+    totalWorkDays: 21,
+    attendancePercentage: 100,
+    totalEffectiveHours: 168.5,
+    overtimeHours: 8.5,
+    totalLateMinutes: 0,
+    lateCount: 0,
+    alphaCount: 0,
+    avgCheckInTime: '08:02 WIB',
+    remainingCorrectionQuota: 2,
+    maxCorrectionQuota: 3,
+    isCheckedIn: true,
+    checkInTimeStr: '07:51 WIB',
+    hasClockedOut: false,
+    clockOutTimeStr: '-- : -- : -- WIB',
+    todayStatus: 'TEPAT_WAKTU',
+  });
+
+  // History state
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceDailyRecord[]>([]);
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('ALL');
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+
   // Quota and Corrections
   const [remainingCorrectionQuota, setRemainingCorrectionQuota] = useState(2);
-  const [correctionDate, setCorrectionDate] = useState('2025-03-24');
+  const [correctionDate, setCorrectionDate] = useState(new Date().toISOString().split('T')[0]);
   const [correctionType, setCorrectionType] = useState('Lupa Tap-Out');
   const [correctionTargetTime, setCorrectionTargetTime] = useState('16:30');
   const [correctionReason, setCorrectionReason] = useState('');
@@ -114,8 +178,44 @@ export default function EmployeeAttendancePage() {
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Restore today's selfie from localStorage if already checked in today
+  // Fetch live attendance data from API
+  const fetchAttendanceData = useCallback(async () => {
+    setIsLoadingStats(true);
+    try {
+      const empId = currentUser.employeeNumber || 'NX-2021008';
+      const empName = currentUser.fullName || 'Rian Pratama';
+      const res = await fetch(
+        `/api/v1/attendance?employeeId=${encodeURIComponent(empId)}&employeeName=${encodeURIComponent(empName)}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data?.employeeStats) {
+          const s = json.data.employeeStats as MonthlyAttendanceStats & { history?: AttendanceDailyRecord[] };
+          setAttendanceStats(s);
+          setIsCheckedIn(s.isCheckedIn);
+          if (s.checkInTimeStr) setCheckInTimeStr(s.checkInTimeStr);
+          setIsTodayLate(s.todayStatus === 'TERLAMBAT');
+          setHasClockedOut(s.hasClockedOut);
+          if (s.clockOutTimeStr) setClockOutTimeStr(s.clockOutTimeStr);
+          if (s.remainingCorrectionQuota !== undefined) {
+            setRemainingCorrectionQuota(s.remainingCorrectionQuota);
+          }
+          if (Array.isArray(s.history) && s.history.length > 0) {
+            setAttendanceHistory(s.history);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch attendance data:', err);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [currentUser.employeeNumber, currentUser.fullName]);
+
+  // Initial fetch and restore today's selfie from localStorage
   useEffect(() => {
+    fetchAttendanceData();
+
     try {
       const saved = localStorage.getItem('nexora_latest_selfie_attendance');
       if (saved) {
@@ -123,10 +223,86 @@ export default function EmployeeAttendancePage() {
         if (parsed.photoUrl) {
           setTodaySelfiePhoto(parsed.photoUrl);
           if (parsed.time) setCheckInTimeStr(parsed.time);
+          if (parsed.isLate !== undefined) setIsTodayLate(parsed.isLate);
         }
       }
     } catch {}
-  }, []);
+  }, [fetchAttendanceData]);
+
+  // Cross-tab real-time listener via BroadcastChannel
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('nexora_live_sync');
+      bc.onmessage = (event) => {
+        if (
+          event.data?.type === 'EMPLOYEE_CLOCKED_IN' ||
+          event.data?.type === 'ATTENDANCE_RECORDED' ||
+          event.data?.type === 'APPROVAL_SUBMITTED' ||
+          event.data?.type === 'APPROVAL_STATUS_CHANGED'
+        ) {
+          fetchAttendanceData();
+        }
+      };
+    } catch {}
+
+    return () => {
+      if (bc) bc.close();
+    };
+  }, [fetchAttendanceData]);
+
+  // Filtered attendance history for Section 3
+  const filteredHistory = useMemo(() => {
+    return attendanceHistory.filter((item) => {
+      const matchesSearch =
+        !historySearchQuery ||
+        item.date.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+        item.dayName.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+        item.statusLabel.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+        item.workLocation.toLowerCase().includes(historySearchQuery.toLowerCase());
+
+      const matchesStatus =
+        historyStatusFilter === 'ALL' || item.status === historyStatusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [attendanceHistory, historySearchQuery, historyStatusFilter]);
+
+  // Handle Reset Today's Attendance (for interactive demonstration and live testing)
+  const handleResetTodayAttendance = async () => {
+    try {
+      const empId = currentUser.employeeNumber || 'NX-2021008';
+      const empName = currentUser.fullName || 'Rian Pratama';
+      const res = await fetch(
+        `/api/v1/attendance?employeeId=${encodeURIComponent(empId)}&employeeName=${encodeURIComponent(empName)}`,
+        { method: 'DELETE' }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data?.employeeStats) {
+          setAttendanceStats(json.data.employeeStats);
+          if (Array.isArray(json.data.employeeStats.history)) {
+            setAttendanceHistory(json.data.employeeStats.history);
+          }
+        }
+      }
+      localStorage.removeItem('nexora_latest_selfie_attendance');
+      setTodaySelfiePhoto(null);
+      setIsCheckedIn(false);
+      setHasClockedOut(false);
+      setIsTodayLate(false);
+      setCheckInTimeStr('-- : -- WIB');
+      setClockOutTimeStr('-- : -- : -- WIB');
+
+      const ch = new BroadcastChannel('nexora_live_sync');
+      ch.postMessage({ type: 'ATTENDANCE_RECORDED' });
+      ch.close();
+
+      showToast('✓ Status hari ini direset ke Belum Check-In. Data real-time diperbarui.');
+    } catch {
+      showToast('Gagal mereset presensi.');
+    }
+  };
 
   const toggleRealCamera = async () => {
     if (isLiveCameraActive && webcamStream) {
@@ -196,25 +372,43 @@ export default function EmployeeAttendancePage() {
 
   // Handle Download Rekap Absensi (.xlsx / .csv)
   const handleDownloadExcel = () => {
+    const list =
+      attendanceHistory.length > 0
+        ? attendanceHistory
+        : [
+            {
+              date: '2025-03-24',
+              shiftName: 'Reguler Ramadhan (08:30-16:30)',
+              checkIn: checkInTimeStr,
+              checkOut: hasClockedOut ? clockOutTimeStr : '16:35 WIB',
+              statusLabel: isTodayLate ? 'Terlambat' : 'Tepat Waktu',
+              workLocation: 'HQ Pacific SCBD Lt. 7',
+              verificationMethod: 'Biometrik Face Scan + GPS',
+              duration: '7.5 Jam',
+            },
+          ];
+
+    const rows = list.map(
+      (item) =>
+        `${item.date},${currentUser.employeeNumber || 'NX-2021008'},"${currentUser.fullName || 'Rian Pratama'}",${item.shiftName},${item.checkIn},${item.checkOut},${item.statusLabel},"${item.workLocation}","${item.verificationMethod}",${item.duration}`
+    );
+
     const csvContent =
       'data:text/csv;charset=utf-8,' +
       'Tanggal,NIP,Nama Karyawan,Shift,Jam Masuk,Jam Pulang,Status,Lokasi Kerja,Metode Verifikasi,Durasi Efektif\n' +
-      `2025-03-24,${currentUser.employeeNumber || 'NX-2021008'},${currentUser.fullName || 'Rian Pratama'},Reguler Ramadhan (08:30-16:30),07:51 WIB,16:35 WIB,Tepat Waktu,HQ Pacific SCBD Lt. 7,Biometrik Face Scan + GPS,7.5 Jam\n` +
-      `2025-03-23,${currentUser.employeeNumber || 'NX-2021008'},${currentUser.fullName || 'Rian Pratama'},Reguler Ramadhan (08:30-16:30),07:55 WIB,16:40 WIB,Tepat Waktu,HQ Pacific SCBD Lt. 7,Biometrik Face Scan + GPS,7.5 Jam\n` +
-      `2025-03-22,${currentUser.employeeNumber || 'NX-2021008'},${currentUser.fullName || 'Rian Pratama'},Reguler Ramadhan (08:30-16:30),08:02 WIB,17:00 WIB,Tepat Waktu,HQ Pacific SCBD Lt. 7,Biometrik Face Scan + GPS,8.0 Jam\n` +
-      `2025-03-21,${currentUser.employeeNumber || 'NX-2021008'},${currentUser.fullName || 'Rian Pratama'},Reguler Ramadhan (08:30-16:30),07:48 WIB,16:30 WIB,Tepat Waktu,HQ Pacific SCBD Lt. 7,Biometrik Face Scan + GPS,7.5 Jam\n` +
-      `2025-03-20,${currentUser.employeeNumber || 'NX-2021008'},${currentUser.fullName || 'Rian Pratama'},Reguler Ramadhan (08:30-16:30),08:10 WIB,18:30 WIB,Lembur SPL,HQ Pacific SCBD Lt. 7,Biometrik Face Scan + GPS,9.5 Jam\n`;
+      rows.join('\n');
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute(
       'download',
-      `Rekap_Presensi_${currentUser.employeeNumber || 'NX-2021008'}_Maret_2025.csv`
+      `Rekap_Presensi_${currentUser.employeeNumber || 'NX-2021008'}_RealTime_${new Date().toISOString().split('T')[0]}.csv`
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('✓ Rekap Absensi (.xlsx/csv) berhasil diunduh.');
+    showToast('✓ Rekap Absensi (.xlsx/csv) real-time berhasil diunduh.');
   };
 
   // Start modal camera for real selfie capture
@@ -310,11 +504,14 @@ export default function EmployeeAttendancePage() {
     setIsVerifyingSelfie(true);
 
     const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const isLate = hours > 8 || (hours === 8 && minutes > 45); // Tolerance: 08:45 WIB
     const timeNow = `${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
 
     try {
       // 1. Post to attendance API
-      await fetch('/api/v1/attendance', {
+      const res = await fetch('/api/v1/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -323,8 +520,13 @@ export default function EmployeeAttendancePage() {
           department: currentUser.department || 'Teknologi Informasi & Rekayasa Cloud',
           type: 'CLOCK_IN',
           time: timeNow,
-          location: 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
-          status: 'TEPAT_WAKTU',
+          location:
+            workLocation === 'WFH'
+              ? 'Remote Residence (WFH)'
+              : workLocation === 'DINAS'
+              ? 'Surabaya Client Site (Dinas)'
+              : 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
+          status: isLate ? 'TERLAMBAT' : 'TEPAT_WAKTU',
           coordinates: '-6.2253, 106.8091',
           device: 'Selfie Liveness Camera (NX-Biometric v4.2)',
           notes: standupNote,
@@ -334,6 +536,16 @@ export default function EmployeeAttendancePage() {
         }),
       });
 
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data?.employeeStats) {
+          setAttendanceStats(json.data.employeeStats);
+          if (Array.isArray(json.data.employeeStats.history)) {
+            setAttendanceHistory(json.data.employeeStats.history);
+          }
+        }
+      }
+
       // 2. Broadcast on BroadcastChannel for all open tabs & admin dashboard
       const ch = new BroadcastChannel('nexora_live_sync');
       ch.postMessage({
@@ -342,7 +554,7 @@ export default function EmployeeAttendancePage() {
         employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
         department: currentUser.department || 'Teknologi Informasi & Rekayasa Cloud',
         time: timeNow,
-        status: 'TEPAT_WAKTU',
+        status: isLate ? 'TERLAMBAT' : 'TEPAT_WAKTU',
         location: 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
         workLocation: workLocation,
         notes: standupNote,
@@ -357,6 +569,7 @@ export default function EmployeeAttendancePage() {
         JSON.stringify({
           photoUrl: capturedSelfie,
           time: timeNow,
+          isLate,
           date: now.toISOString().split('T')[0],
         })
       );
@@ -367,14 +580,18 @@ export default function EmployeeAttendancePage() {
       setTodaySelfiePhoto(capturedSelfie);
       setIsCheckedIn(true);
       setCheckInTimeStr(timeNow);
+      setIsTodayLate(isLate);
+      setHasClockedOut(false);
       setIsSelfieModalOpen(false);
       stopSelfieModalCamera();
-      showToast('✓ Presensi Masuk & Foto Selfie Berhasil Tersinkron ke Dashboard HR Admin!');
+      showToast(
+        `✓ Presensi Masuk (${timeNow} - ${isLate ? 'Terlambat' : 'Tepat Waktu'}) Berhasil Tersinkron Real-Time!`
+      );
     }
   };
 
   // Handle Perform Check-Out
-  const handlePerformCheckOut = () => {
+  const handlePerformCheckOut = async () => {
     const timeStr = `${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
     setHasClockedOut(true);
     setClockOutTimeStr(timeStr);
@@ -382,7 +599,7 @@ export default function EmployeeAttendancePage() {
     showToast(`✓ Check-Out Berhasil dicatat (${timeStr})! Terima kasih atas dedikasi Anda hari ini.`);
 
     try {
-      fetch('/api/v1/attendance', {
+      const res = await fetch('/api/v1/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -394,7 +611,17 @@ export default function EmployeeAttendancePage() {
           location: 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
           status: 'TEPAT_WAKTU',
         }),
-      }).catch(() => {});
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data?.employeeStats) {
+          setAttendanceStats(json.data.employeeStats);
+          if (Array.isArray(json.data.employeeStats.history)) {
+            setAttendanceHistory(json.data.employeeStats.history);
+          }
+        }
+      }
 
       const ch = new BroadcastChannel('nexora_live_sync');
       ch.postMessage({
@@ -416,7 +643,12 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    setRemainingCorrectionQuota((prev) => Math.max(0, prev - 1));
+    const newQuota = Math.max(0, remainingCorrectionQuota - 1);
+    setRemainingCorrectionQuota(newQuota);
+    setAttendanceStats((prev) => ({
+      ...prev,
+      remainingCorrectionQuota: newQuota,
+    }));
     setIsCorrectionModalOpen(false);
     setCorrectionReason('');
     showToast(
@@ -509,7 +741,7 @@ export default function EmployeeAttendancePage() {
           <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
             <div className="hidden lg:flex items-center gap-2 text-xs text-slate-700 font-semibold">
               <Calendar className="w-4 h-4 text-slate-400" />
-              <span>Senin, 24 Maret 2025</span>
+              <span>{liveDate}</span>
             </div>
 
             <NotificationBellDropdown portal="ess" />
@@ -579,11 +811,40 @@ export default function EmployeeAttendancePage() {
                 Presensi Mandiri &amp; Liveness Face Scan
               </h1>
 
-              {/* Status Pill on its own line */}
-              <div className="pt-0.5">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Status: Sudah Check-In ({checkInTimeStr} - Tepat Waktu)</span>
+              {/* Status Pill on its own line - 100% REAL-TIME DYNAMIC */}
+              <div className="pt-0.5 flex flex-wrap items-center gap-2">
+                {hasClockedOut ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs animate-in fade-in">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>Status: Selesai Bekerja (Check-Out: {clockOutTimeStr})</span>
+                  </span>
+                ) : isCheckedIn ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-2xs animate-in fade-in ${
+                      isTodayLate
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full animate-pulse ${
+                        isTodayLate ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                    />
+                    <span>
+                      Status: Sudah Check-In ({checkInTimeStr} - {isTodayLate ? 'Terlambat' : 'Tepat Waktu'})
+                    </span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs animate-in fade-in">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Status: Belum Check-In (Jadwal: 08:30 WIB)</span>
+                  </span>
+                )}
+
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Real-Time Biometrik Sync</span>
                 </span>
               </div>
 
@@ -594,8 +855,33 @@ export default function EmployeeAttendancePage() {
               </p>
             </div>
 
-            {/* Top Right Action Buttons matching user screenshot */}
+            {/* Top Right Action Buttons matching user screenshot with live sync & test capabilities */}
             <div className="flex flex-wrap items-center gap-2.5 flex-shrink-0">
+              {/* Sinkronkan Status Live button */}
+              <button
+                type="button"
+                onClick={fetchAttendanceData}
+                disabled={isLoadingStats}
+                title="Sinkronkan data presensi real-time dari server"
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 text-blue-600 ${isLoadingStats ? 'animate-spin' : ''}`}
+                />
+                <span className="hidden sm:inline">Sinkron Live</span>
+              </button>
+
+              {/* Uji Reset Presensi Hari Ini (opsi pengujian real-time) */}
+              <button
+                type="button"
+                onClick={handleResetTodayAttendance}
+                title="Reset presensi hari ini untuk menguji status real-time"
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold shadow-2xs transition-all active:scale-95 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden md:inline">Uji Reset Hari Ini</span>
+              </button>
+
               {/* Ajukan Koreksi Presensi (White Button) */}
               <button
                 type="button"
@@ -618,7 +904,7 @@ export default function EmployeeAttendancePage() {
             </div>
           </div>
 
-          {/* SECTION 1: 4 KEY METRIC CARDS matching user screenshot */}
+          {/* SECTION 1: 4 KEY METRIC CARDS matching user screenshot - 100% REAL-TIME DYNAMIC */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {/* Card 1: Kehadiran Bulan Ini */}
             <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
@@ -631,23 +917,48 @@ export default function EmployeeAttendancePage() {
 
               <div className="flex items-baseline justify-between">
                 <div>
-                  <span className="text-3xl font-black text-slate-900 tracking-tight">21</span>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {attendanceStats.presentDays}
+                  </span>
                   <span className="text-slate-400 font-bold text-2xl mx-1">/</span>
-                  <span className="text-3xl font-black text-slate-900 tracking-tight">21</span>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {attendanceStats.totalWorkDays}
+                  </span>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  100% Sempurna
+                <span
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${
+                    attendanceStats.attendancePercentage === 100
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : attendanceStats.attendancePercentage >= 90
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}
+                >
+                  {attendanceStats.attendancePercentage}%{' '}
+                  {attendanceStats.attendancePercentage === 100 ? 'Sempurna' : 'Disiplin'}
                 </span>
               </div>
 
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>0 Alpha • 0 Keterlambatan</span>
+                <ShieldCheck
+                  className={`w-3.5 h-3.5 ${
+                    attendanceStats.alphaCount === 0 && attendanceStats.lateCount === 0
+                      ? 'text-emerald-600'
+                      : 'text-amber-500'
+                  }`}
+                />
+                <span>
+                  {attendanceStats.alphaCount} Alpha • {attendanceStats.lateCount} Keterlambatan
+                </span>
               </div>
 
-              {/* Green bottom accent line matching screenshot */}
+              {/* Dynamic accent line matching screenshot */}
               <div className="pt-0.5">
-                <div className="w-28 h-1 bg-emerald-500 rounded-full" />
+                <div
+                  className={`w-28 h-1 rounded-full ${
+                    attendanceStats.attendancePercentage >= 90 ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                />
               </div>
             </div>
 
@@ -661,13 +972,17 @@ export default function EmployeeAttendancePage() {
               </div>
 
               <div className="flex items-baseline">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">168.5</span>
+                <span className="text-3xl font-black text-slate-900 tracking-tight">
+                  {attendanceStats.totalEffectiveHours.toFixed(1)}
+                </span>
                 <span className="text-xs font-bold text-slate-600 ml-1.5">Jam Efektif</span>
               </div>
 
               <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-bold">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                <span>+8.5 Jam (Lembur SPL &amp; Produktif)</span>
+                <span>
+                  +{attendanceStats.overtimeHours.toFixed(1)} Jam (Lembur SPL &amp; Produktif)
+                </span>
               </div>
 
               {/* Blue bottom accent line matching screenshot */}
@@ -680,29 +995,55 @@ export default function EmployeeAttendancePage() {
             <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-600">Keterlambatan (Bulan Ini)</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    attendanceStats.totalLateMinutes === 0
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-amber-50 text-amber-600'
+                  }`}
+                >
                   <Clock className="w-4 h-4" />
                 </div>
               </div>
 
               <div className="flex items-baseline justify-between">
                 <div>
-                  <span className="text-3xl font-black text-slate-900 tracking-tight">0</span>
-                  <span className="text-lg font-black text-emerald-600 ml-2">Menit</span>
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {attendanceStats.totalLateMinutes}
+                  </span>
+                  <span
+                    className={`text-lg font-black ml-2 ${
+                      attendanceStats.totalLateMinutes === 0 ? 'text-emerald-600' : 'text-amber-600'
+                    }`}
+                  >
+                    Menit
+                  </span>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Nihil / On-Time
+                <span
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${
+                    attendanceStats.totalLateMinutes === 0
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}
+                >
+                  {attendanceStats.totalLateMinutes === 0
+                    ? 'Nihil / On-Time'
+                    : `${attendanceStats.totalLateMinutes} Mnt Terlambat`}
                 </span>
               </div>
 
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Rata-rata check-in: 08:02 WIB</span>
+                <span>Rata-rata check-in: {attendanceStats.avgCheckInTime}</span>
               </div>
 
-              {/* Green bottom accent line matching screenshot */}
+              {/* Dynamic accent line matching screenshot */}
               <div className="pt-0.5">
-                <div className="w-28 h-1 bg-emerald-500 rounded-full" />
+                <div
+                  className={`w-28 h-1 rounded-full ${
+                    attendanceStats.totalLateMinutes === 0 ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                />
               </div>
             </div>
 
@@ -723,8 +1064,14 @@ export default function EmployeeAttendancePage() {
                   <span className="text-slate-400 font-bold text-2xl mx-1">/</span>
                   <span className="text-3xl font-black text-slate-900 tracking-tight">3</span>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  Tersedia
+                <span
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${
+                    remainingCorrectionQuota > 0
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                  }`}
+                >
+                  {remainingCorrectionQuota > 0 ? 'Tersedia' : 'Habis'}
                 </span>
               </div>
 
@@ -733,12 +1080,17 @@ export default function EmployeeAttendancePage() {
                 <span>Sesuai PKB HR Pasal 14 (Maks. 3x/Bln)</span>
               </div>
 
-              {/* 3-Segmented bar (2 blue, 1 gray) matching screenshot */}
+              {/* 3-Segmented bar dynamically rendering blue vs slate bars based on remainingCorrectionQuota */}
               <div className="pt-0.5">
                 <div className="w-28 grid grid-cols-3 gap-1 h-1">
-                  <div className="bg-blue-600 rounded-full h-full" />
-                  <div className="bg-blue-600 rounded-full h-full" />
-                  <div className="bg-slate-200 rounded-full h-full" />
+                  {[0, 1, 2].map((idx) => (
+                    <div
+                      key={idx}
+                      className={`rounded-full h-full transition-all duration-300 ${
+                        idx < remainingCorrectionQuota ? 'bg-blue-600' : 'bg-slate-200'
+                      }`}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -776,7 +1128,11 @@ export default function EmployeeAttendancePage() {
                     type="button"
                     onClick={() => {
                       if (isCheckedIn) {
-                        showToast(`Anda telah melakukan Check-In (${checkInTimeStr} - Tepat Waktu).`);
+                        showToast(
+                          `Anda telah melakukan Check-In (${checkInTimeStr} - ${
+                            isTodayLate ? 'Terlambat' : 'Tepat Waktu'
+                          }). Klik "Ambil Foto Selfie" jika ingin memperbarui foto/lokasi.`
+                        );
                       } else {
                         handleTriggerSelfieScan();
                       }
@@ -784,20 +1140,34 @@ export default function EmployeeAttendancePage() {
                     className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isCheckedIn
                         ? 'bg-slate-100 hover:bg-slate-200/80 text-slate-500'
-                        : 'bg-[#1E3A8A] hover:bg-[#172554] text-white shadow-xs'
+                        : 'bg-[#1E3A8A] hover:bg-[#172554] text-white shadow-xs animate-pulse'
                     }`}
                   >
                     <LogIn className="w-3.5 h-3.5" />
-                    <span>Check-In</span>
+                    <span>{isCheckedIn ? 'Sudah Check-In' : 'Check-In Sekarang'}</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setIsCheckOutModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1E3A8A] hover:bg-[#172554] text-white font-bold text-xs shadow-md shadow-blue-950/20 active:scale-95 transition-all cursor-pointer"
+                    onClick={() => {
+                      if (!isCheckedIn) {
+                        showToast('Anda belum melakukan Check-In hari ini.');
+                        return;
+                      }
+                      if (hasClockedOut) {
+                        showToast(`Anda telah menyelesaikan jam kerja (Check-Out: ${clockOutTimeStr}).`);
+                        return;
+                      }
+                      setIsCheckOutModalOpen(true);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer ${
+                      hasClockedOut
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'bg-[#1E3A8A] hover:bg-[#172554] text-white shadow-blue-950/20'
+                    }`}
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    <span>Check-Out Mandiri</span>
+                    <span>{hasClockedOut ? 'Sudah Check-Out' : 'Check-Out Mandiri'}</span>
                   </button>
                 </div>
               </div>
@@ -1139,6 +1509,153 @@ export default function EmployeeAttendancePage() {
                   <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: RIWAYAT PRESENSI MANDIRI BULAN INI (REAL-TIME DATA LEDGER) */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                      Riwayat Presensi Mandiri Bulan Ini
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Sinkronisasi otomatis dengan NX-Biometric Server &amp; Database HRIS
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table search & filter controls */}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={historySearchQuery}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    placeholder="Cari tanggal, hari, lokasi..."
+                    className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <select
+                  value={historyStatusFilter}
+                  onChange={(e) => setHistoryStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50/70 font-semibold text-slate-700 focus:bg-white focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="TEPAT_WAKTU">Tepat Waktu</option>
+                  <option value="TERLAMBAT">Terlambat</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadExcel}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Ekspor CSV</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Attendance Table */}
+            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <table className="w-full text-left text-xs min-w-[750px]">
+                <thead>
+                  <tr className="border-b border-slate-200/90 text-slate-500 font-bold bg-slate-50/60 text-[11px]">
+                    <th className="py-3 px-3.5 rounded-l-xl">Tanggal</th>
+                    <th className="py-3 px-3.5">Shift Kerja</th>
+                    <th className="py-3 px-3.5 font-mono">Jam Masuk</th>
+                    <th className="py-3 px-3.5 font-mono">Jam Pulang</th>
+                    <th className="py-3 px-3.5">Durasi</th>
+                    <th className="py-3 px-3.5">Status</th>
+                    <th className="py-3 px-3.5 rounded-r-xl">Lokasi &amp; Metode</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {filteredHistory.length > 0 ? (
+                    filteredHistory.map((row) => (
+                      <tr
+                        key={row.id}
+                        className={`hover:bg-slate-50/70 transition-colors ${
+                          row.isToday ? 'bg-blue-50/40 font-semibold' : ''
+                        }`}
+                      >
+                        <td className="py-3.5 px-3.5">
+                          <div className="flex items-center gap-2">
+                            {row.isToday && (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping flex-shrink-0" />
+                            )}
+                            <div>
+                              <span className="font-bold text-slate-900">{row.date}</span>
+                              <span className="text-[11px] text-slate-400 ml-1.5">
+                                ({row.dayName})
+                              </span>
+                            </div>
+                            {row.isToday && (
+                              <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-[9px] font-bold text-emerald-800">
+                                Hari Ini
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-3.5 text-slate-600">{row.shiftName}</td>
+                        <td className="py-3.5 px-3.5 font-mono font-bold text-slate-800">
+                          {row.checkIn}
+                        </td>
+                        <td className="py-3.5 px-3.5 font-mono text-slate-600">{row.checkOut}</td>
+                        <td className="py-3.5 px-3.5 font-bold text-blue-700">{row.duration}</td>
+                        <td className="py-3.5 px-3.5">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              row.status === 'TERLAMBAT'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                row.status === 'TERLAMBAT' ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}
+                            />
+                            <span>{row.statusLabel}</span>
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3.5 text-slate-500 text-[11px]">
+                          <div className="font-medium text-slate-700">{row.workLocation}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {row.verificationMethod}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                        Tidak ada catatan presensi yang sesuai dengan filter pencarian.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer Summary note */}
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-500 border-t border-slate-100 gap-2">
+              <span>
+                Menampilkan <strong>{filteredHistory.length}</strong> dari{' '}
+                <strong>{attendanceHistory.length}</strong> hari kerja bulan ini
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono">
+                Terverifikasi SCBD Biometric Geofence
+              </span>
             </div>
           </div>
         </main>

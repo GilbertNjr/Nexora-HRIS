@@ -80,7 +80,7 @@ const INDO_MONTHS_MAP: Record<string, number> = {
   des: 11, desember: 11, dec: 11,
 };
 
-export function parseFlexibleDate(dateStr: string | undefined): Date | null {
+function parseFlexibleDate(dateStr: string | undefined): Date | null {
   if (!dateStr) return null;
   const s = String(dateStr).trim().toLowerCase();
 
@@ -111,7 +111,7 @@ export function parseFlexibleDate(dateStr: string | undefined): Date | null {
   return isNaN(parsed.getTime()) ? null : new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
-export function isDateInRange(target: Date, startStr: string | undefined, endStr: string | undefined): boolean {
+function isDateInRange(target: Date, startStr: string | undefined, endStr: string | undefined): boolean {
   const start = parseFlexibleDate(startStr);
   if (!start) return false;
   const end = parseFlexibleDate(endStr) || start;
@@ -123,7 +123,7 @@ export function isDateInRange(target: Date, startStr: string | undefined, endStr
   return targetTime >= startTime && targetTime <= endTime;
 }
 
-export function formatReturnDate(endStr: string | undefined): string {
+function formatReturnDate(endStr: string | undefined): string {
   const end = parseFlexibleDate(endStr);
   if (!end) return 'Besok';
 
@@ -361,7 +361,7 @@ export default function AdminLeavePage() {
     [requests]
   );
   const verifiedSickLeaves = useMemo(
-    () => allSickLeaves.filter((r) => r.hasAttachment || Boolean(r.documentName)),
+    () => allSickLeaves.filter((r) => Boolean((r as any).hasAttachment) || Boolean(r.documentName)),
     [allSickLeaves]
   );
   const unverifiedSickCount = allSickLeaves.length - verifiedSickLeaves.length;
@@ -423,7 +423,7 @@ export default function AdminLeavePage() {
       );
       const cellPending = requests.filter(
         (r) =>
-          (r.status === 'PENDING' || r.status === 'PENDING_HRD' || r.status === 'PENDING_SPV') &&
+          ((r.status as string) === 'PENDING' || r.status === 'PENDING_HRD' || r.status === 'PENDING_SPV') &&
           isDateInRange(cellDate, r.startDate, r.endDate)
       );
 

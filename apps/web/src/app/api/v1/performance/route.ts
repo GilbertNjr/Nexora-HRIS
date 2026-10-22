@@ -35,7 +35,7 @@ export interface PerformanceCycle {
 const STORAGE_DIR = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(process.cwd(), '.data');
 const PERFORMANCE_FILE = path.join(STORAGE_DIR, 'nexora_performance.json');
 
-export function getGradeFromScore(score: number): { grade: string; gradeColor: string } {
+function getGradeFromScore(score: number): { grade: string; gradeColor: string } {
   if (score >= 4.5) {
     return {
       grade: 'Grade A (Outstanding)',
