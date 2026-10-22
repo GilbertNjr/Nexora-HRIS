@@ -69,12 +69,18 @@ function parseStoredUser(): CurrentUser {
     const primaryRole = merged.primaryRole || roles[0] || 'EMPLOYEE';
     const department = merged.department || DEFAULT_USER.department;
     const designation = merged.designation || merged.role || DEFAULT_USER.designation;
-    const avatarUrl =
+    let avatarUrl =
       typeof merged.avatarUrl === 'string'
         ? merged.avatarUrl
         : typeof merged.avatar_url === 'string'
         ? merged.avatar_url
         : '';
+
+    // Ignore corrupted test strings
+    if (avatarUrl && avatarUrl.includes('TESTING_AVATAR')) {
+      avatarUrl = '';
+    }
+
     const initials = getInitials(fullName);
 
     return {
@@ -118,7 +124,14 @@ export function useCurrentUser() {
           const json = await res.json();
           if (json.success && json.data && isMounted) {
             setUser((prev) => {
-              const nextAvatar = json.data.avatarUrl !== undefined ? json.data.avatarUrl : prev.avatarUrl;
+              const liveAvatar = json.data.avatarUrl;
+              const hasValidLiveAvatar =
+                typeof liveAvatar === 'string' &&
+                liveAvatar.length > 15 &&
+                !liveAvatar.includes('TESTING_AVATAR');
+
+              const nextAvatar = hasValidLiveAvatar ? liveAvatar : prev.avatarUrl;
+
               const updated: CurrentUser = {
                 ...prev,
                 fullName: json.data.fullName || prev.fullName,
@@ -133,6 +146,7 @@ export function useCurrentUser() {
               }
               try {
                 localStorage.setItem('nexora_user', JSON.stringify(updated));
+                localStorage.setItem('nexora_employee_profile', JSON.stringify(updated));
               } catch {}
               return updated;
             });
@@ -200,9 +214,10 @@ export function useCurrentUser() {
       }
       if (typeof window !== 'undefined') {
         localStorage.setItem('nexora_user', JSON.stringify(next));
+        localStorage.setItem('nexora_employee_profile', JSON.stringify(next));
         try {
           const ch = new BroadcastChannel('nexora_live_sync');
-          ch.postMessage({ type: 'PROFILE_UPDATED', user: next });
+          ch.postMessage({ type: 'PROFILE_UPDATED', user: next, profile: next });
           ch.close();
         } catch {}
       }

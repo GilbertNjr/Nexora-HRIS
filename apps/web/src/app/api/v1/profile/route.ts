@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
         (emailParam && e.email?.toLowerCase() === emailParam.toLowerCase())
     );
 
+    const empData = getStoredProfile(EMPLOYEE_PROFILE_FILE, defaultEmployeeProfile);
     if (matched) {
       const merged: UserProfile = {
         fullName: matched.fullName || defaultEmployeeProfile.fullName,
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
         manager: matched.managerName || defaultEmployeeProfile.manager,
         location: matched.office || defaultEmployeeProfile.location,
         joinDate: matched.joinDate || defaultEmployeeProfile.joinDate,
-        avatarUrl: matched.avatarUrl || '',
+        avatarUrl: matched.avatarUrl || empData.avatarUrl || '',
         updatedAt: matched.updatedAt || new Date().toISOString(),
         role: 'EMPLOYEE',
       };
@@ -231,13 +232,19 @@ export async function PUT(request: NextRequest) {
     if (DATABASE_URL) {
       try {
         const sql = neon(DATABASE_URL);
-        await sql.query(
-          `UPDATE employees 
-           SET first_name = $1, last_name = $2, phone = $3, avatar_url = $4, updated_at = NOW() 
-           WHERE employee_number = $5`,
-          [firstName, lastName, updatedEmployee.phone, updatedEmployee.avatarUrl || null, updatedEmployee.employeeNumber]
-        );
-      } catch {}
+        const av = updatedEmployee.avatarUrl || null;
+        const ph = updatedEmployee.phone || null;
+        const empNum = updatedEmployee.employeeNumber;
+        await sql`UPDATE employees 
+                  SET first_name = ${firstName}, 
+                      last_name = ${lastName}, 
+                      phone = ${ph}, 
+                      avatar_url = ${av}, 
+                      updated_at = NOW() 
+                  WHERE employee_number = ${empNum}`;
+      } catch (err: any) {
+        console.warn('[Profile PUT] Neon update error:', err?.message);
+      }
     }
 
     // D. Log to HR Admin Audit System

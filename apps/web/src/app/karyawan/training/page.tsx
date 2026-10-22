@@ -299,16 +299,24 @@ export default function EssTrainingPage() {
               href="/karyawan/profile"
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden relative">
                 {currentUser.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={currentUser.avatarUrl}
                     alt={currentUser.fullName}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
                   />
                 ) : (
                   currentUser.initials
+                )}
+                {currentUser.avatarUrl && (
+                  <span className="absolute inset-0 flex items-center justify-center -z-10 font-bold text-xs">
+                    {currentUser.initials}
+                  </span>
                 )}
               </div>
               <div className="hidden sm:flex flex-col text-left leading-tight">

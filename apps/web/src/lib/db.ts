@@ -502,24 +502,18 @@ export async function updateEmployeeInDb(
   if (DATABASE_URL) {
     try {
       const sql = neon(DATABASE_URL);
-      const isUuid = idOrNik.includes('-') && idOrNik.length === 36;
-      await sql.query(
-        `UPDATE employees
-         SET first_name = COALESCE($1, first_name),
-             last_name = COALESCE($2, last_name),
-             phone = COALESCE($3, phone),
-             avatar_url = COALESCE($4, avatar_url),
-             updated_at = NOW()
-         WHERE (id = $5::uuid) OR (employee_number = $6)`,
-        [
-          data.firstName ?? null,
-          data.lastName ?? null,
-          data.phone ?? null,
-          data.avatarUrl ?? null,
-          isUuid ? idOrNik : null,
-          existing[index].employeeNumber,
-        ]
-      );
+      const empNum = existing[index].employeeNumber;
+      const fn = updatedRecord.firstName;
+      const ln = updatedRecord.lastName;
+      const ph = updatedRecord.phone;
+      const av = updatedRecord.avatarUrl || null;
+      await sql`UPDATE employees
+                SET first_name = ${fn},
+                    last_name = ${ln},
+                    phone = ${ph},
+                    avatar_url = ${av},
+                    updated_at = NOW()
+                WHERE employee_number = ${empNum}`;
     } catch (err: any) {
       console.warn('[DB] Neon updateEmployee error:', err?.message);
     }

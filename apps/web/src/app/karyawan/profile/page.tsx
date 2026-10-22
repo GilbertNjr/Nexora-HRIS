@@ -247,6 +247,7 @@ export default function EmployeeProfilePage() {
 
       // Save to employee storage and user hook
       localStorage.setItem('nexora_employee_profile', JSON.stringify(updated));
+      localStorage.setItem('nexora_user', JSON.stringify({ ...currentUser, ...updated, avatarUrl: compressedDataUrl }));
       updateLocalUser({ avatarUrl: compressedDataUrl });
 
       // Persist to backend with role=employee
@@ -434,16 +435,24 @@ export default function EmployeeProfilePage() {
               href="/karyawan/profile"
               className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-2xs overflow-hidden relative">
                 {profileData.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={profileData.avatarUrl}
                     alt={profileData.fullName}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
                   />
                 ) : (
                   currentUser.initials || 'RP'
+                )}
+                {profileData.avatarUrl && (
+                  <span className="absolute inset-0 flex items-center justify-center -z-10 font-bold text-xs">
+                    {currentUser.initials || 'RP'}
+                  </span>
                 )}
               </div>
               <div className="hidden sm:flex flex-col text-left leading-tight">
@@ -523,6 +532,9 @@ export default function EmployeeProfilePage() {
                         src={profileData.avatarUrl || currentUser.avatarUrl}
                         alt={profileData.fullName}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-800 text-white font-extrabold text-2xl sm:text-3xl">
