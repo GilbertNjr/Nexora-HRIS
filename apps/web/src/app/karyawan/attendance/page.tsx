@@ -320,7 +320,7 @@ export default function EmployeeAttendancePage() {
         body: JSON.stringify({
           employeeId: currentUser.employeeNumber || 'NX-2021008',
           employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
-          department: currentUser.department || 'Technology',
+          department: currentUser.department || 'Teknologi Informasi & Rekayasa Cloud',
           type: 'CLOCK_IN',
           time: timeNow,
           location: 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
@@ -330,6 +330,7 @@ export default function EmployeeAttendancePage() {
           notes: standupNote,
           workLocation: workLocation,
           photoUrl: capturedSelfie,
+          avatarUrl: currentUser.avatarUrl,
         }),
       });
 
@@ -339,12 +340,14 @@ export default function EmployeeAttendancePage() {
         type: 'EMPLOYEE_CLOCKED_IN',
         employeeId: currentUser.employeeNumber || 'NX-2021008',
         employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
+        department: currentUser.department || 'Teknologi Informasi & Rekayasa Cloud',
         time: timeNow,
         status: 'TEPAT_WAKTU',
         location: 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
         workLocation: workLocation,
         notes: standupNote,
         photoUrl: capturedSelfie,
+        avatarUrl: currentUser.avatarUrl,
       });
       ch.close();
 
@@ -385,7 +388,7 @@ export default function EmployeeAttendancePage() {
         body: JSON.stringify({
           employeeId: currentUser.employeeNumber || 'NX-2021008',
           employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
-          department: currentUser.department || 'Technology',
+          department: currentUser.department || 'Teknologi Informasi & Rekayasa Cloud',
           type: 'CLOCK_OUT',
           time: timeStr,
           location: 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
@@ -396,6 +399,8 @@ export default function EmployeeAttendancePage() {
       const ch = new BroadcastChannel('nexora_live_sync');
       ch.postMessage({
         type: 'ATTENDANCE_RECORDED',
+        type_action: 'CLOCK_OUT',
+        employeeId: currentUser.employeeNumber || 'NX-2021008',
         employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
         time: timeStr,
       });
