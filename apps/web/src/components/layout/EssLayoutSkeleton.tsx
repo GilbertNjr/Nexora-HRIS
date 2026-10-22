@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NexoraLogo } from '../common/NexoraLogo';
 import { NotificationBellDropdown } from '../notifications/NotificationBellDropdown';
+import { EmployeeAnnouncementBroadcastListener } from '../notifications/EmployeeAnnouncementBroadcastListener';
 import {
   LayoutDashboard,
   Clock,
@@ -244,6 +245,9 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
           <span className="text-[10px]">HR Admin</span>
         </Link>
       </nav>
+
+      {/* Real-time HR Announcement Listener & Decree Modal */}
+      <EmployeeAnnouncementBroadcastListener />
     </div>
   );
 }

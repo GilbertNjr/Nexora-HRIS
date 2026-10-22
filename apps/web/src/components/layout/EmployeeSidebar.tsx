@@ -17,7 +17,9 @@ import {
   PanelLeft,
   X,
   Menu,
+  Megaphone,
 } from 'lucide-react';
+import { EmployeeAnnouncementBroadcastListener } from '@/components/notifications/EmployeeAnnouncementBroadcastListener';
 
 export type EmployeeActiveMenu =
   | 'dashboard'
@@ -251,6 +253,53 @@ export function EmployeeSidebar({
         }`}>
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
           <span className="truncate">Sesi Aktif: NX-2021008</span>
+        </div>
+
+        {/* Quick Access: Pengumuman HRD Live */}
+        {isCollapsed && (
+          <div className="hidden md:flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('nexora_open_announcement'));
+                }
+              }}
+              className="w-10 h-10 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 flex items-center justify-center transition-all shadow-2xs group relative cursor-pointer"
+              title="Pengumuman HRD & Surat Edaran Aktif"
+            >
+              <Megaphone className="w-4 h-4 transition-transform group-hover:scale-110" />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border border-white animate-pulse" />
+            </button>
+          </div>
+        )}
+
+        <div className={`p-2.5 rounded-2xl bg-gradient-to-r from-amber-50/90 to-orange-50/90 border border-amber-200/90 items-center justify-between gap-2 shadow-2xs transition-all ${
+          isCollapsed ? 'flex md:hidden' : 'flex'
+        }`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
+              <Megaphone className="w-3.5 h-3.5" />
+            </div>
+            <div className="truncate">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-extrabold text-amber-950 truncate">Pengumuman HRD</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              </div>
+              <p className="text-[10px] text-amber-800/80 font-medium truncate">Surat Edaran Manajemen</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('nexora_open_announcement'));
+              }
+            }}
+            className="px-2.5 py-1 rounded-lg bg-white hover:bg-amber-50 text-amber-800 text-[10px] font-extrabold border border-amber-200 shadow-2xs transition-all active:scale-95 flex-shrink-0 cursor-pointer"
+          >
+            Lihat
+          </button>
         </div>
 
         {/* SECTION 1: UTAMA */}
@@ -496,6 +545,9 @@ export function EmployeeSidebar({
         </div>
       </div>
     </aside>
+
+    {/* Global Real-Time HR Announcement Broadcast Listener across all employee sub-pages */}
+    <EmployeeAnnouncementBroadcastListener />
     </>
   );
 }

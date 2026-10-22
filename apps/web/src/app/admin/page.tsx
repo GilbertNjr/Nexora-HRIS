@@ -129,6 +129,9 @@ export default function AdminDashboardPage() {
             type: 'ANNOUNCEMENT_PUBLISHED',
             payload: data.data,
           });
+          bc.postMessage({
+            type: 'NEW_NOTIFICATION',
+          });
           bc.close();
         } catch {}
 

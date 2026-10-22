@@ -22,6 +22,7 @@ import {
   Sparkles,
   ChevronRight,
   Filter,
+  Megaphone,
 } from 'lucide-react';
 
 export interface NotificationItem {
@@ -137,11 +138,26 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
           msg?.type === 'NEW_NOTIFICATION' ||
           msg?.type === 'APPROVAL_SUBMITTED' ||
           msg?.type === 'APPROVAL_STATUS_CHANGED' ||
-          msg?.type === 'ATTENDANCE_RECORDED'
+          msg?.type === 'ATTENDANCE_RECORDED' ||
+          msg?.type === 'ANNOUNCEMENT_PUBLISHED'
         ) {
           fetchNotifications(false);
         }
       };
+    } catch {
+      // ignore
+    }
+
+    // Server-Sent Events (SSE) listener for multi-device cross-browser live sync
+    let sse: EventSource | null = null;
+    try {
+      sse = new EventSource('/api/v1/employees/stream');
+      sse.addEventListener('ANNOUNCEMENT_PUBLISHED', () => {
+        fetchNotifications(false);
+      });
+      sse.addEventListener('NEW_NOTIFICATION', () => {
+        fetchNotifications(false);
+      });
     } catch {
       // ignore
     }
@@ -154,6 +170,7 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       if (channel) channel.close();
+      if (sse) sse.close();
     };
   }, [fetchNotifications]);
 
@@ -325,6 +342,11 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
       handleToggleRead(notif.id);
     }
     setIsOpen(false);
+    if (notif.metadata?.isAnnouncement && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('nexora_open_announcement', { detail: notif.metadata })
+      );
+    }
     if (notif.actionUrl) {
       router.push(notif.actionUrl);
     }
@@ -358,7 +380,10 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
     return true;
   });
 
-  const getCategoryIcon = (category: NotificationItem['category']) => {
+  const getCategoryIcon = (category: NotificationItem['category'], metadata?: Record<string, any>) => {
+    if (metadata?.isAnnouncement) {
+      return <Megaphone className="w-4 h-4 text-amber-600" />;
+    }
     switch (category) {
       case 'leave':
         return <CalendarCheck className="w-4 h-4 text-amber-600" />;
@@ -375,7 +400,10 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
     }
   };
 
-  const getCategoryBg = (category: NotificationItem['category']) => {
+  const getCategoryBg = (category: NotificationItem['category'], metadata?: Record<string, any>) => {
+    if (metadata?.isAnnouncement) {
+      return 'bg-amber-50 border-amber-200/80';
+    }
     switch (category) {
       case 'leave':
         return 'bg-amber-50 border-amber-200/80';
@@ -565,10 +593,11 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
                   {/* Category icon badge */}
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-2xs ${getCategoryBg(
-                      notif.category
+                      notif.category,
+                      notif.metadata
                     )}`}
                   >
-                    {getCategoryIcon(notif.category)}
+                    {getCategoryIcon(notif.category, notif.metadata)}
                   </div>
 
                   {/* Main Content */}

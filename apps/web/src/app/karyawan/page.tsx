@@ -237,10 +237,26 @@ export default function EmployeeDashboardOverhaulPage() {
       });
     } catch {}
 
+    // 3. Custom Event to open announcement modal directly
+    const handleOpenModalEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const meta = customEvent.detail;
+      if (meta?.announcementId) {
+        setAnnouncements((current) => {
+          const foundIdx = current.findIndex((a) => a.id === meta.announcementId);
+          if (foundIdx !== -1) setActiveAnnouncementIdx(foundIdx);
+          return current;
+        });
+      }
+      setIsAnnouncementModalOpen(true);
+    };
+    window.addEventListener('nexora_open_announcement', handleOpenModalEvent);
+
     return () => {
       isMounted = false;
       if (bc) bc.close();
       if (es) es.close();
+      window.removeEventListener('nexora_open_announcement', handleOpenModalEvent);
     };
   }, []);
 

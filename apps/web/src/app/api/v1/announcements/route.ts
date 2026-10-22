@@ -149,6 +149,58 @@ export async function POST(request: NextRequest) {
       broadcastEmployeeEvent('ANNOUNCEMENT_PUBLISHED', newAnnouncement);
     } catch {}
 
+    // Synchronize to persistent notifications center so every employee role sees it in the bell dropdown
+    try {
+      const NOTIFICATIONS_FILE = path.join(STORAGE_DIR, 'nexora_notifications.json');
+      let notifs: any[] = [];
+      if (fs.existsSync(NOTIFICATIONS_FILE)) {
+        try {
+          const raw = fs.readFileSync(NOTIFICATIONS_FILE, 'utf-8');
+          notifs = JSON.parse(raw);
+          if (!Array.isArray(notifs)) notifs = [];
+        } catch {}
+      }
+
+      const notifItem = {
+        id: `notif-ann-${Date.now()}`,
+        title: `📢 ${newAnnouncement.badge}: ${newAnnouncement.title}`,
+        message: newAnnouncement.summary,
+        category: 'system',
+        type:
+          newAnnouncement.priority === 'URGENT'
+            ? 'urgent'
+            : newAnnouncement.priority === 'IMPORTANT'
+            ? 'warning'
+            : 'info',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        actionUrl: '/karyawan',
+        actionLabel: newAnnouncement.buttonText || 'Buka Dokumen',
+        actor: {
+          name: newAnnouncement.author || 'Dewan Direksi & HR',
+          initials: 'HR',
+          avatarColor: 'from-amber-600 to-orange-600',
+        },
+        metadata: {
+          announcementId: newAnnouncement.id,
+          docNumber: newAnnouncement.docNumber,
+          isAnnouncement: true,
+          priority: newAnnouncement.priority,
+        },
+      };
+
+      const updatedNotifs = [notifItem, ...notifs].slice(0, 50);
+      ensureStorage();
+      fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(updatedNotifs, null, 2), 'utf-8');
+
+      // Broadcast NEW_NOTIFICATION so bell icons ring and refresh unread counter
+      try {
+        broadcastEmployeeEvent('NEW_NOTIFICATION', notifItem);
+      } catch {}
+    } catch (notifErr) {
+      console.error('[Announcements] Failed to sync notification:', notifErr);
+    }
+
     // Audit log
     try {
       const auditLog: AuditLogEntry = {
