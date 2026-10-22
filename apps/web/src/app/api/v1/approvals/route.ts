@@ -467,3 +467,69 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: { message: 'ID permohonan dibutuhkan untuk pembatalan' } },
+        { status: 400 }
+      );
+    }
+
+    const approvals = getStoredApprovals();
+    const index = approvals.findIndex((a) => a.id === id);
+    if (index === -1) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Data pengajuan cuti tidak ditemukan' } },
+        { status: 404 }
+      );
+    }
+
+    const [deletedItem] = approvals.splice(index, 1);
+    saveStoredApprovals(approvals);
+
+    // Broadcast SSE update event to all connected devices
+    broadcastApprovalEvent('LEAVE_ACTIONED', {
+      id,
+      status: 'CANCELLED',
+      item: deletedItem,
+    });
+
+    // Record audit log for cancellation
+    try {
+      const auditLog: AuditLogEntry = {
+        id: `aud-${Date.now()}`,
+        module: 'LEAVE',
+        action: 'LEAVE_CANCELLED',
+        recordId: id,
+        userName: deletedItem.name,
+        userEmail: `${deletedItem.nik || 'user'}@nexora.co.id`,
+        userNik: deletedItem.nik,
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Portal Karyawan ESS (Web)',
+        timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+        oldData: { status: deletedItem.status, type: deletedItem.leaveType },
+        newData: { status: 'CANCELLED' },
+      };
+      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
+      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    } catch {}
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Pengajuan cuti berhasil dibatalkan dan kuota telah dikembalikan.',
+        data: deletedItem,
+      },
+      { status: 200 }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: { code: 'DELETE_ERROR', message: err.message } },
+      { status: 500 }
+    );
+  }
+}

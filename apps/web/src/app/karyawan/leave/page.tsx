@@ -76,6 +76,62 @@ interface LeaveRequestItem {
   }[];
 }
 
+interface SquadMember {
+  id: string;
+  name: string;
+  role: string;
+  initials: string;
+  status: 'WFO' | 'WFH' | 'SAKIT' | 'CUTI' | 'OFF';
+  statusLabel: string;
+  badgeClass: string;
+  location?: string;
+  checkInTime?: string;
+  notes?: string;
+}
+
+const initialSquadMembers: SquadMember[] = [
+  {
+    id: 'squad-1',
+    name: 'Nadia Wijaya',
+    role: 'Senior Backend Go',
+    initials: 'NW',
+    status: 'WFO',
+    statusLabel: 'WFO (Pusat)',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    location: 'SCBD Treasury Tower Lt. 32',
+  },
+  {
+    id: 'squad-2',
+    name: 'Dimas Surya',
+    role: 'DevOps Specialist',
+    initials: 'DS',
+    status: 'WFH',
+    statusLabel: 'WFH (Remote)',
+    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+    location: 'Remote Residence (Tangerang Selatan)',
+  },
+  {
+    id: 'squad-3',
+    name: 'Farhan Harahap',
+    role: 'Database Admin',
+    initials: 'FH',
+    status: 'SAKIT',
+    statusLabel: 'Sakit (1 Hari)',
+    badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
+    notes: 'Istirahat Surat Dokter Terverifikasi',
+  },
+  {
+    id: 'squad-4',
+    name: 'Raden Bagus Prakoso, S.Kom',
+    role: 'Cloud Architect Lead',
+    initials: 'RB',
+    status: 'WFO',
+    statusLabel: 'WFO (Pusat)',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    location: 'SCBD Treasury Tower Lt. 32',
+  },
+];
+
 // Historical default leave records
 const defaultHistoricalLeaves: LeaveRequestItem[] = [
   {
@@ -229,6 +285,8 @@ export default function EssLeaveOverhaulPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
+  const [squadRoster, setSquadRoster] = useState<SquadMember[]>(initialSquadMembers);
+  const [todayDateString, setTodayDateString] = useState<string>('');
 
   // Form State
   const [formType, setFormType] = useState('Cuti Tahunan');
@@ -266,30 +324,120 @@ export default function EssLeaveOverhaulPage() {
   // Leave Requests state
   const [requests, setRequests] = useState<LeaveRequestItem[]>(defaultHistoricalLeaves);
 
-  // Fetch live approvals from API and sync with employee view
+  // Set real formatted Indonesian date
+  useEffect(() => {
+    const now = new Date();
+    try {
+      const formatted = new Intl.DateTimeFormat('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(now);
+      setTodayDateString(formatted);
+    } catch {
+      setTodayDateString('Hari ini');
+    }
+  }, []);
+
+  // Fetch live approvals & live attendance from API and sync with employee view
   const fetchLiveLeaveData = useCallback(async (isManual = false) => {
     try {
       if (isManual) setIsRefreshing(true);
-      const res = await fetch('/api/v1/approvals?all=true');
-      if (res.ok) {
-        const json = await res.json();
+      const [approvalsRes, attendanceRes] = await Promise.all([
+        fetch('/api/v1/approvals?all=true'),
+        fetch('/api/v1/attendance'),
+      ]);
+
+      let backendAllLeaves: any[] = [];
+      if (approvalsRes.ok) {
+        const json = await approvalsRes.json();
         if (Array.isArray(json.data)) {
-          const backendItems: LeaveRequestItem[] = json.data
-            .filter((item: any) => item.type === 'cuti' || !item.type || item.leaveType)
+          backendAllLeaves = json.data;
+          const myNik = (currentUser?.employeeNumber || 'NX-2021008').toLowerCase();
+          const myName = (currentUser?.fullName || 'Rian Pratama').toLowerCase();
+
+          // Filter leave requests specifically for this logged-in employee
+          const myLeaves = json.data
+            .filter((item: any) => {
+              if (item.type && item.type !== 'cuti' && !item.leaveType) return false;
+              const itemNik = (item.nik || '').toLowerCase();
+              const itemName = (item.name || '').toLowerCase();
+              const isMine =
+                itemNik === myNik ||
+                itemName.includes('rian') ||
+                item.id === 'req-cuti-05';
+              return isMine;
+            })
             .map(mapApprovalToEssItem);
 
           setRequests((prev) => {
-            const backendIds = new Set(backendItems.map((b) => b.id));
-            const remainingHist = defaultHistoricalLeaves.filter((h) => !backendIds.has(h.id));
-            return [...backendItems, ...remainingHist];
+            const myBackendIds = new Set(myLeaves.map((b: LeaveRequestItem) => b.id));
+            const remainingHist = defaultHistoricalLeaves.filter((h) => !myBackendIds.has(h.id));
+            return [...myLeaves, ...remainingHist];
           });
         }
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
-        setLastSyncedAt(timeStr);
-        if (isManual) {
-          showToast('✓ Data permohonan berhasil disinkronkan secara real-time.');
-        }
+      }
+
+      if (attendanceRes.ok) {
+        const attJson = await attendanceRes.json();
+        const records: any[] = attJson.data?.records || [];
+
+        // Synchronize Squad Core Architecture live attendance dynamically
+        setSquadRoster((prev) =>
+          prev.map((member) => {
+            const mName = member.name.toLowerCase();
+            const att = records.find(
+              (r: any) =>
+                (r.employeeName && r.employeeName.toLowerCase().includes(mName)) ||
+                (r.employeeId && r.employeeId.toLowerCase() === member.id.toLowerCase())
+            );
+            const leave = backendAllLeaves.find(
+              (l: any) =>
+                l.status === 'APPROVED' &&
+                (l.name && l.name.toLowerCase().includes(mName))
+            );
+
+            if (leave) {
+              const isSick = leave.typeCategory === 'sakit' || leave.leaveType?.toLowerCase().includes('sakit');
+              return {
+                ...member,
+                status: isSick ? 'SAKIT' : 'CUTI',
+                statusLabel: isSick ? `Sakit (${leave.durationDays || 1} Hari)` : `Cuti (${leave.durationDays || 1} Hari)`,
+                badgeClass: isSick
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-purple-50 text-purple-700 border-purple-200',
+                notes: leave.title,
+              };
+            }
+
+            if (att) {
+              const isWfh = att.workLocation === 'WFH' || att.status === 'WFH';
+              const isDinas = att.status === 'DINAS_LUAR';
+              return {
+                ...member,
+                status: isWfh ? 'WFH' : isDinas ? 'OFF' : 'WFO',
+                statusLabel: isWfh ? 'WFH (Remote)' : isDinas ? 'Dinas Luar' : 'WFO (Pusat)',
+                badgeClass: isWfh
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : isDinas
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                checkInTime: att.checkInTime || att.time,
+                location: att.location,
+              };
+            }
+
+            return member;
+          })
+        );
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+      setLastSyncedAt(timeStr);
+      if (isManual) {
+        showToast('✓ Data permohonan & roster tim berhasil disinkronkan secara real-time.');
       }
     } catch {
       // ignore
@@ -298,22 +446,37 @@ export default function EssLeaveOverhaulPage() {
         setTimeout(() => setIsRefreshing(false), 500);
       }
     }
-  }, []);
+  }, [currentUser?.employeeNumber, currentUser?.fullName]);
 
   // Multi-device real-time SSE stream hook for ESS
   useApprovalsRealtime({
     playAudioAlert: true,
     onLeaveSubmitted: (newItem) => {
       if (newItem.type === 'lembur' && !newItem.leaveType) return;
-      const mapped = mapApprovalToEssItem(newItem);
-      setRequests((prev) => [mapped, ...prev.filter((r) => r.id !== mapped.id)]);
-      setRecentlyUpdatedId(mapped.id);
-      setTimeout(() => setRecentlyUpdatedId(null), 4000);
+      const myNik = (currentUser?.employeeNumber || 'NX-2021008').toLowerCase();
+      const myName = (currentUser?.fullName || 'Rian Pratama').toLowerCase();
+      const isMine =
+        (newItem.nik && newItem.nik.toLowerCase() === myNik) ||
+        (newItem.name && newItem.name.toLowerCase().includes(myName));
+
+      if (isMine) {
+        const mapped = mapApprovalToEssItem(newItem);
+        setRequests((prev) => [mapped, ...prev.filter((r) => r.id !== mapped.id)]);
+        setRecentlyUpdatedId(mapped.id);
+        setTimeout(() => setRecentlyUpdatedId(null), 4000);
+        showToast(`✓ Pengajuan ${mapped.type} (${mapped.refNo}) terkirim & menunggu persetujuan.`);
+      } else {
+        // Refresh team attendance in case teammate submitted leave
+        fetchLiveLeaveData();
+      }
       const now = new Date();
       setLastSyncedAt(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB');
-      showToast(`✓ Pengajuan ${mapped.type} (${mapped.refNo}) terkirim & menunggu persetujuan.`);
     },
     onLeaveActioned: ({ id, status }) => {
+      if ((status as string) === 'CANCELLED') {
+        setRequests((prev) => prev.filter((r) => r.id !== id));
+        return;
+      }
       const isApproved = status === 'APPROVED';
       const isRejected = status === 'REJECTED';
       setRequests((prev) =>
@@ -327,7 +490,7 @@ export default function EssLeaveOverhaulPage() {
               steps: [
                 r.steps[0] || {
                   title: 'Pengajuan Mandiri',
-                  person: 'Rian Pratama',
+                  person: currentUser.fullName,
                   time: r.submittedAt,
                   status: 'COMPLETED',
                 },
@@ -362,11 +525,79 @@ export default function EssLeaveOverhaulPage() {
           ? 'ℹ️ Pengajuan Cuti Anda telah DITOLAK oleh HR Admin.'
           : 'Status pengajuan cuti Anda telah diperbarui.'
       );
+      fetchLiveLeaveData();
     },
     onRefresh: () => {
       fetchLiveLeaveData();
     },
   });
+
+  // Cross-tab real-time synchronization via BroadcastChannel
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('nexora_live_sync');
+      channel.onmessage = (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === 'APPROVAL_STATUS_CHANGED' && data.id) {
+          const { id, status } = data;
+          if (status === 'CANCELLED') {
+            setRequests((prev) => prev.filter((r) => r.id !== id));
+            return;
+          }
+          const isApproved = status === 'APPROVED';
+          const isRejected = status === 'REJECTED';
+
+          setRequests((prev) =>
+            prev.map((r) => {
+              if (r.id === id) {
+                return {
+                  ...r,
+                  status: isApproved ? 'APPROVED' : isRejected ? 'REJECTED' : 'PENDING',
+                  statusBadge: isApproved ? 'Disetujui HR & Atasan' : isRejected ? 'Ditolak oleh HRD' : 'Menunggu Verifikasi HRD',
+                  completedAt: isApproved ? 'Hari ini, Selesai' : isRejected ? 'Hari ini, Ditolak' : undefined,
+                  steps: [
+                    r.steps[0] || { title: 'Pengajuan Mandiri', person: currentUser.fullName, time: r.submittedAt, status: 'COMPLETED' },
+                    r.steps[1] || { title: 'Atasan Langsung', person: 'Arya Wibowo (VP Eng)', time: 'Terverifikasi', status: 'COMPLETED' },
+                    {
+                      title: 'HR Operations',
+                      person: 'Dewi Lestari, S.Psi',
+                      time: isApproved ? 'Disetujui HRD' : isRejected ? 'Ditolak HRD' : 'Menunggu Verifikasi',
+                      status: isApproved ? 'COMPLETED' : isRejected ? 'REJECTED' : 'IN_PROGRESS',
+                    },
+                  ],
+                };
+              }
+              return r;
+            })
+          );
+        }
+
+        if (data.type === 'NEW_APPROVAL_REQUEST' && data.request) {
+          const req = data.request;
+          const myNik = (currentUser?.employeeNumber || 'NX-2021008').toLowerCase();
+          const myName = (currentUser?.fullName || 'Rian Pratama').toLowerCase();
+          const isMine =
+            (req.nik && req.nik.toLowerCase() === myNik) ||
+            (req.name && req.name.toLowerCase().includes(myName));
+
+          if (isMine) {
+            setRequests((prev) => [req, ...prev.filter((r) => r.id !== req.id)]);
+          }
+        }
+
+        if (data.type === 'ATTENDANCE_LOGGED' || data.type === 'ATTENDANCE_RESET') {
+          fetchLiveLeaveData();
+        }
+      };
+    } catch {}
+
+    return () => {
+      channel?.close();
+    };
+  }, [currentUser.employeeNumber, currentUser.fullName, fetchLiveLeaveData]);
 
   // Load live approvals on mount
   useEffect(() => {
@@ -377,35 +608,49 @@ export default function EssLeaveOverhaulPage() {
   useEffect(() => {
     const pending = requests.filter((r) => r.status === 'PENDING').length;
     const approvedAnnual = requests
-      .filter((r) => r.status === 'APPROVED' && r.type.includes('Tahunan'))
+      .filter((r) => r.status === 'APPROVED' && (r.type.includes('Tahunan') || r.title.includes('Tahunan')))
       .reduce((sum, r) => sum + (r.durationDays || 0), 0);
     const approvedSick = requests
       .filter((r) => r.status === 'APPROVED' && (r.type.includes('Sakit') || r.title.includes('Sakit')))
       .reduce((sum, r) => sum + (r.durationDays || 0), 0);
+    const approvedJoint = requests
+      .filter((r) => r.status === 'APPROVED' && (r.type.includes('Bersama') || r.title.includes('Bersama')))
+      .reduce((sum, r) => sum + (r.durationDays || 0), 0);
 
-    setBalances((prev) => ({
-      ...prev,
-      pendingCount: pending,
+    const annualTotal = 12;
+    const annualRemaining = Math.max(0, annualTotal - approvedAnnual);
+
+    setBalances({
+      annualTotal,
       annualUsed: approvedAnnual,
-      annualRemaining: Math.max(0, prev.annualTotal - approvedAnnual),
+      annualRemaining,
+      jointHoliday: Math.max(2, approvedJoint),
       sickUsed: Math.max(1, approvedSick),
-    }));
+      pendingCount: pending,
+    });
   }, [requests]);
 
   // Cancel Pending Request
-  const handleCancelPending = (id: string) => {
+  const handleCancelPending = async (id: string) => {
     const target = requests.find((r) => r.id === id);
     if (!target) return;
 
     if (window.confirm(`Yakin ingin membatalkan pengajuan "${target.title}"? Kuota cuti akan dikembalikan.`)) {
-      setRequests(requests.filter((r) => r.id !== id));
-      setBalances((prev) => ({
-        ...prev,
-        annualRemaining: prev.annualRemaining + target.durationDays,
-        annualUsed: Math.max(0, prev.annualUsed - target.durationDays),
-        pendingCount: Math.max(0, prev.pendingCount - 1),
-      }));
+      setRequests((prev) => prev.filter((r) => r.id !== id));
       showToast(`✓ Pengajuan ${target.refNo} berhasil dibatalkan. Kuota ${target.durationDays} hari telah dikembalikan.`);
+
+      // Send DELETE request to API
+      try {
+        await fetch(`/api/v1/approvals?id=${id}`, {
+          method: 'DELETE',
+        });
+      } catch {}
+
+      try {
+        const ch = new BroadcastChannel('nexora_live_sync');
+        ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'CANCELLED' });
+        ch.close();
+      } catch {}
     }
   };
 
@@ -424,7 +669,14 @@ export default function EssLeaveOverhaulPage() {
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      const newRefNo = `LV-2025-00${Math.floor(50 + Math.random() * 40)}`;
+      if (formType === 'Cuti Tahunan' && diffDays > balances.annualRemaining) {
+        showToast(`Permohonan ${diffDays} hari melebihi sisa saldo cuti (${balances.annualRemaining} hari).`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const currentYear = new Date().getFullYear();
+      const newRefNo = `LV-${currentYear}-${Math.floor(1000 + Math.random() * 9000)}`;
       const title = formTitle || `${formType}: Permohonan Pribadi`;
 
       const newReq: LeaveRequestItem = {
@@ -436,10 +688,10 @@ export default function EssLeaveOverhaulPage() {
         endDate: formEndDate,
         durationDays: diffDays,
         handover: formHandover || 'Nadia Wijaya',
-        notes: formNotes || 'Pengajuan cuti operasional mandiri.',
+        notes: formNotes || 'Pengajuan permohonan mandiri via ESS.',
         status: 'PENDING',
-        statusBadge: 'Menunggu Verifikasi',
-        submittedAt: 'Hari ini',
+        statusBadge: 'Menunggu Verifikasi HRD',
+        submittedAt: 'Hari ini, Baru saja',
         steps: [
           {
             title: 'Pengajuan Mandiri',
@@ -462,13 +714,7 @@ export default function EssLeaveOverhaulPage() {
         ],
       };
 
-      setRequests([newReq, ...requests]);
-      setBalances((prev) => ({
-        ...prev,
-        annualRemaining: Math.max(0, prev.annualRemaining - (formType === 'Cuti Tahunan' ? diffDays : 0)),
-        annualUsed: prev.annualUsed + (formType === 'Cuti Tahunan' ? diffDays : 0),
-        pendingCount: prev.pendingCount + 1,
-      }));
+      setRequests((prev) => [newReq, ...prev]);
 
       // Broadcast and notify HR Admin
       const remainingAfter = Math.max(0, balances.annualRemaining - (formType === 'Cuti Tahunan' ? diffDays : 0));
@@ -476,6 +722,8 @@ export default function EssLeaveOverhaulPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: newReq.id,
+          refNo: newReq.refNo,
           name: currentUser.fullName,
           nik: currentUser.employeeNumber,
           role: currentUser.designation,
@@ -515,6 +763,10 @@ export default function EssLeaveOverhaulPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Dynamic Sprint Backlog Coverage
+  const squadActiveCount = squadRoster.filter((m) => m.status === 'WFO' || m.status === 'WFH').length;
+  const squadCoverage = Math.round((squadActiveCount / (squadRoster.length || 1)) * 100);
 
   // Filter items
   const filteredRequests = requests.filter((r) => {
@@ -598,7 +850,7 @@ export default function EssLeaveOverhaulPage() {
           <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
             <div className="hidden lg:flex items-center gap-1.5 text-xs font-semibold text-slate-600">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span>Senin, 24 Maret 2025</span>
+              <span>{todayDateString || 'Hari ini'}</span>
             </div>
 
             <NotificationBellDropdown portal="ess" />
@@ -655,12 +907,12 @@ export default function EssLeaveOverhaulPage() {
                   Beranda Saya
                 </Link>
                 <span>&gt;</span>
-                <span className="text-slate-800 font-bold">Cuti & Izin Saya</span>
+                <span className="text-slate-800 font-bold">Cuti &amp; Izin Saya</span>
               </div>
 
               {/* Title */}
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                Cuti & Izin Saya
+                Cuti &amp; Izin Saya
               </h1>
 
               {/* Subtitle */}
@@ -725,15 +977,15 @@ export default function EssLeaveOverhaulPage() {
 
               <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
                 <span>Terpakai {balances.annualUsed} hari</span>
-                <span className="text-rose-600 font-bold">Hangus 31 Des 2025</span>
+                <span className="text-rose-600 font-bold">Hangus 31 Des {new Date().getFullYear()}</span>
               </div>
             </div>
 
-            {/* Card 2: Cuti Bersama 2025 */}
+            {/* Card 2: Cuti Bersama */}
             <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                  CUTI BERSAMA 2025
+                  CUTI BERSAMA {new Date().getFullYear()}
                 </span>
                 <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
                   <Calendar className="w-4 h-4" />
@@ -802,8 +1054,10 @@ export default function EssLeaveOverhaulPage() {
               <div className="w-full bg-slate-100 h-1.5 rounded-full" />
 
               <div className="flex items-center gap-1.5 text-[11px] text-amber-700 font-semibold truncate">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
-                <span className="truncate">Menunggu Persetujuan Atasan Langsung</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${balances.pendingCount > 0 ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'} flex-shrink-0`} />
+                <span className="truncate">
+                  {balances.pendingCount > 0 ? 'Menunggu Persetujuan Atasan Langsung' : 'Semua Permohonan Selesai / Terverifikasi'}
+                </span>
               </div>
             </div>
           </div>
@@ -1278,61 +1532,33 @@ export default function EssLeaveOverhaulPage() {
                   </div>
                 </div>
 
-                {/* Squad Members List matching screenshot */}
+                {/* Dynamic Squad Members List synced with live attendance */}
                 <div className="space-y-3">
-                  {/* Nadia Wijaya */}
-                  <div className="flex items-center justify-between gap-2.5 py-1">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                        NW
+                  {squadRoster.map((member) => (
+                    <div key={member.id} className="flex items-center justify-between gap-2.5 py-1">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-2xs">
+                          {member.initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{member.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {member.role}
+                            {member.checkInTime ? ` • ${member.checkInTime}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">Nadia Wijaya</p>
-                        <p className="text-[10px] text-slate-400 truncate">Senior Backend Go</p>
-                      </div>
+                      <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border flex-shrink-0 ${member.badgeClass}`}>
+                        {member.statusLabel}
+                      </span>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">
-                      WFO (Pusat)
-                    </span>
-                  </div>
-
-                  {/* Dimas Surya */}
-                  <div className="flex items-center justify-between gap-2.5 py-1">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                        DS
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">Dimas Surya</p>
-                        <p className="text-[10px] text-slate-400 truncate">DevOps Specialist</p>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex-shrink-0">
-                      WFH (Remote)
-                    </span>
-                  </div>
-
-                  {/* Farhan Harahap */}
-                  <div className="flex items-center justify-between gap-2.5 py-1">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                        FH
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">Farhan Harahap</p>
-                        <p className="text-[10px] text-slate-400 truncate">Database Admin</p>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex-shrink-0">
-                      Sakit (1 Hari)
-                    </span>
-                  </div>
+                  ))}
                 </div>
 
                 {/* Footer Coverage & Link */}
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                   <span className="text-[11px] text-slate-500 font-medium">
-                    Sprint Backlog Coverage: <strong className="text-slate-800">92%</strong>
+                    Sprint Backlog Coverage: <strong className="text-slate-800">{squadCoverage}%</strong>
                   </span>
                   <button
                     type="button"
@@ -1587,10 +1813,10 @@ export default function EssLeaveOverhaulPage() {
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2 text-xs">
               <p className="font-bold text-slate-800">Ringkasan Dokumen:</p>
               <ul className="space-y-1 text-slate-600">
-                <li>• Karyawan: <strong>Rian Pratama, S.Kom (NX-2021008)</strong></li>
-                <li>• Periode: <strong>Tahun Anggaran 2025</strong></li>
-                <li>• Total Kuota: <strong>12 Hari</strong> (Sisa: 8 Hari)</li>
-                <li>• Riwayat Terlampir: <strong>3 Catatan Permohonan</strong></li>
+                <li>• Karyawan: <strong>{currentUser.fullName} ({currentUser.employeeNumber})</strong></li>
+                <li>• Periode: <strong>Tahun Anggaran {new Date().getFullYear()}</strong></li>
+                <li>• Total Kuota: <strong>{balances.annualTotal} Hari</strong> (Sisa: {balances.annualRemaining} Hari)</li>
+                <li>• Riwayat Terlampir: <strong>{requests.length} Catatan Permohonan</strong></li>
               </ul>
             </div>
 
@@ -1754,34 +1980,20 @@ export default function EssLeaveOverhaulPage() {
               </button>
             </div>
 
-            <div className="space-y-2 text-xs divide-y divide-slate-100">
-              <div className="pt-2 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-900">Nadia Wijaya</p>
-                  <p className="text-[10px] text-slate-400">Senior Backend Go</p>
+            <div className="space-y-2 text-xs divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
+              {squadRoster.map((member) => (
+                <div key={member.id} className="pt-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 truncate">{member.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      {member.role} {member.location ? `• ${member.location}` : ''}
+                    </p>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border flex-shrink-0 ${member.badgeClass}`}>
+                    {member.statusLabel}
+                  </span>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  WFO (SCBD)
-                </span>
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-900">Dimas Surya</p>
-                  <p className="text-[10px] text-slate-400">DevOps Specialist</p>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  WFH (Remote)
-                </span>
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-900">Farhan Harahap</p>
-                  <p className="text-[10px] text-slate-400">Database Admin</p>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                  Sakit (1 Hari)
-                </span>
-              </div>
+              ))}
             </div>
 
             <div className="pt-3 flex items-center justify-end">

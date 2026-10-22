@@ -470,6 +470,7 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const hours = now.getHours();
     const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
     const timeStr =
       body.time ||
       `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} WIB`;
