@@ -197,7 +197,7 @@ export default function EmployeeProfilePage() {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const maxDim = 600;
+          const maxDim = 320;
           let width = img.width;
           let height = img.height;
           if (width > height) {
@@ -219,7 +219,7 @@ export default function EmployeeProfilePage() {
             return;
           }
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.88));
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
         };
         img.onerror = reject;
         img.src = event.target?.result as string;
@@ -259,13 +259,20 @@ export default function EmployeeProfilePage() {
         }),
       });
 
-      // Broadcast update for employee role across tabs
+      // Broadcast update for employee role across tabs & to admin HR
       try {
         const channel = new BroadcastChannel('nexora_live_sync');
         channel.postMessage({
           type: 'PROFILE_UPDATED',
           role: 'EMPLOYEE',
           profile: updated,
+          employee: updated,
+        });
+        channel.postMessage({
+          type: 'EMPLOYEE_UPDATED',
+          role: 'EMPLOYEE',
+          employee: updated,
+          data: updated,
         });
         channel.close();
       } catch {}
@@ -318,6 +325,13 @@ export default function EmployeeProfilePage() {
           type: 'PROFILE_UPDATED',
           role: 'EMPLOYEE',
           profile: updated,
+          employee: updated,
+        });
+        channel.postMessage({
+          type: 'EMPLOYEE_UPDATED',
+          role: 'EMPLOYEE',
+          employee: updated,
+          data: updated,
         });
         channel.close();
       } catch {}
@@ -503,20 +517,17 @@ export default function EmployeeProfilePage() {
                 {/* Avatar with Online Dot & Upload Camera Overlay */}
                 <div className="relative group flex-shrink-0">
                   <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-blue-900 border-2 border-white/40 shadow-lg">
-                    {profileData.avatarUrl ? (
+                    {profileData.avatarUrl || currentUser.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={profileData.avatarUrl}
+                        src={profileData.avatarUrl || currentUser.avatarUrl}
                         alt={profileData.fullName}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"
-                        alt={profileData.fullName}
-                        className="w-full h-full object-cover"
-                      />
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-800 text-white font-extrabold text-2xl sm:text-3xl">
+                        {profileData.fullName ? profileData.fullName.slice(0, 2).toUpperCase() : 'RP'}
+                      </div>
                     )}
                   </div>
 

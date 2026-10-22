@@ -15,6 +15,7 @@ export interface CurrentUser {
   designation: string;
   avatarUrl: string;
   initials: string;
+  phone?: string;
 }
 
 const DEFAULT_USER: CurrentUser = {
@@ -28,7 +29,7 @@ const DEFAULT_USER: CurrentUser = {
   primaryRole: 'EMPLOYEE',
   department: 'Technology & Engineering',
   designation: 'Lead Backend Architect',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+  avatarUrl: '',
   initials: 'RP',
 };
 
@@ -68,7 +69,12 @@ function parseStoredUser(): CurrentUser {
     const primaryRole = merged.primaryRole || roles[0] || 'EMPLOYEE';
     const department = merged.department || DEFAULT_USER.department;
     const designation = merged.designation || merged.role || DEFAULT_USER.designation;
-    const avatarUrl = merged.avatarUrl || merged.avatar_url || DEFAULT_USER.avatarUrl;
+    const avatarUrl =
+      typeof merged.avatarUrl === 'string'
+        ? merged.avatarUrl
+        : typeof merged.avatar_url === 'string'
+        ? merged.avatar_url
+        : '';
     const initials = getInitials(fullName);
 
     return {
@@ -103,7 +109,41 @@ export function useCurrentUser() {
   useEffect(() => {
     refreshUser();
 
-    // Listen to changes in localStorage from other tabs or components
+    // 1. Fetch live profile from database on mount to guarantee persistence across deploys / devices
+    let isMounted = true;
+    const fetchLiveUser = async () => {
+      try {
+        const res = await fetch('/api/v1/profile?role=employee&employeeNumber=NX-2021008');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data && isMounted) {
+            setUser((prev) => {
+              const nextAvatar = json.data.avatarUrl !== undefined ? json.data.avatarUrl : prev.avatarUrl;
+              const updated: CurrentUser = {
+                ...prev,
+                fullName: json.data.fullName || prev.fullName,
+                department: json.data.department || prev.department,
+                designation: json.data.designation || prev.designation,
+                email: json.data.email || prev.email,
+                phone: json.data.phone || (prev as any).phone,
+                avatarUrl: nextAvatar,
+              };
+              if (json.data.fullName) {
+                updated.initials = getInitials(json.data.fullName);
+              }
+              try {
+                localStorage.setItem('nexora_user', JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+          }
+        }
+      } catch {}
+    };
+
+    fetchLiveUser();
+
+    // 2. Listen to changes in localStorage from other tabs or components
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'nexora_user' || e.key === 'nexora_employee_profile') {
         refreshUser();
@@ -112,7 +152,7 @@ export function useCurrentUser() {
 
     window.addEventListener('storage', handleStorage);
 
-    // Listen to BroadcastChannel events
+    // 3. Listen to BroadcastChannel events
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('nexora_live_sync');
@@ -122,12 +162,29 @@ export function useCurrentUser() {
           event.data?.type === 'PROFILE_UPDATED' ||
           event.data?.type === 'EMPLOYEE_UPDATED'
         ) {
-          refreshUser();
+          if (event.data?.profile || event.data?.user) {
+            const p = event.data.profile || event.data.user;
+            setUser((prev) => {
+              const nextAvatar = p.avatarUrl !== undefined ? p.avatarUrl : prev.avatarUrl;
+              const next: CurrentUser = {
+                ...prev,
+                ...p,
+                avatarUrl: nextAvatar,
+              };
+              if (p.fullName) {
+                next.initials = getInitials(p.fullName);
+              }
+              return next;
+            });
+          } else {
+            refreshUser();
+          }
         }
       };
     } catch {}
 
     return () => {
+      isMounted = false;
       window.removeEventListener('storage', handleStorage);
       if (channel) {
         channel.close();

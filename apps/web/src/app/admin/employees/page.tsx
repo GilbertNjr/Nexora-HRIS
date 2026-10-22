@@ -47,6 +47,7 @@ export interface EmployeeItem {
   joinDate: string;
   bankName?: string;
   accountNumber?: string;
+  avatarUrl?: string | null;
 }
 
 export default function EmployeesPage() {
@@ -113,6 +114,7 @@ export default function EmployeesPage() {
             joinDate: emp.joinDate ? emp.joinDate.split('T')[0] : new Date().toISOString().split('T')[0],
             bankName: emp.bankAccounts?.[0]?.bankName || emp.bankName,
             accountNumber: emp.bankAccounts?.[0]?.accountNumber || emp.accountNumber,
+            avatarUrl: emp.avatarUrl || emp.avatar_url || null,
           }));
 
           setEmployees(mapped);
@@ -143,6 +145,47 @@ export default function EmployeesPage() {
     }
 
     fetchEmployees();
+
+    // BroadcastChannel for instant cross-tab real-time live sync
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('nexora_live_sync');
+      channel.onmessage = (event) => {
+        const msg = event.data;
+        if (!msg || !msg.type) return;
+
+        if (
+          msg.type === 'PROFILE_UPDATED' ||
+          msg.type === 'EMPLOYEE_UPDATED' ||
+          msg.type === 'EMPLOYEES_UPDATED'
+        ) {
+          const empData = msg.employee || msg.profile || msg.data;
+          if (empData && empData.employeeNumber) {
+            setEmployees((prev) =>
+              prev.map((e) =>
+                e.employeeNumber.toLowerCase() === empData.employeeNumber.toLowerCase()
+                  ? {
+                      ...e,
+                      fullName: empData.fullName || e.fullName,
+                      avatarUrl:
+                        empData.avatarUrl !== undefined ? empData.avatarUrl : e.avatarUrl,
+                      department: empData.department || e.department,
+                      designation: empData.designation || e.designation,
+                      phone: empData.phone || e.phone,
+                      email: empData.email || e.email,
+                    }
+                  : e
+              )
+            );
+          }
+          fetchEmployees();
+        }
+      };
+    } catch {}
+
+    return () => {
+      if (channel) channel.close();
+    };
   }, [fetchEmployees]);
 
   // 3. Multi-device Real-Time SSE Stream Hook (Cross-device sync without refresh!)
@@ -154,6 +197,22 @@ export default function EmployeesPage() {
     },
     onEmployeeUpdated: (updatedEmp) => {
       showToast(`⚡ Data karyawan ${updatedEmp.fullName || updatedEmp.firstName} diperbarui secara real-time.`);
+      if (updatedEmp && updatedEmp.employeeNumber) {
+        setEmployees((prev) =>
+          prev.map((e) =>
+            e.employeeNumber.toLowerCase() === updatedEmp.employeeNumber.toLowerCase()
+              ? {
+                  ...e,
+                  fullName: updatedEmp.fullName || e.fullName,
+                  avatarUrl:
+                    updatedEmp.avatarUrl !== undefined ? updatedEmp.avatarUrl : e.avatarUrl,
+                  department: updatedEmp.department || e.department,
+                  designation: updatedEmp.designation || e.designation,
+                }
+              : e
+          )
+        );
+      }
       fetchEmployees();
     },
     onEmployeeDeleted: () => {
@@ -509,11 +568,28 @@ export default function EmployeesPage() {
                         {emp.employeeNumber}
                       </td>
 
-                      {/* Nama Karyawan */}
+                      {/* Nama Karyawan dengan Foto Profil Real-Time */}
                       <td className="py-4 px-6">
-                        <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                          {emp.fullName}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-100 border border-slate-200/90 shadow-2xs flex-shrink-0 flex items-center justify-center">
+                            {emp.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={emp.avatarUrl}
+                                alt={emp.fullName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center">
+                                {emp.firstName ? emp.firstName[0] : emp.fullName.slice(0, 1)}
+                                {emp.lastName ? emp.lastName[0] : ''}
+                              </div>
+                            )}
+                          </div>
+                          <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            {emp.fullName}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Jabatan */}
@@ -631,11 +707,22 @@ export default function EmployeesPage() {
               <X className="w-5 h-5" />
             </button>
 
-            {/* Profile Header */}
+            {/* Profile Header with Avatar */}
             <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold text-lg flex items-center justify-center shadow-md">
-                {viewEmployee.firstName[0]}
-                {viewEmployee.lastName ? viewEmployee.lastName[0] : ''}
+              <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold text-lg flex items-center justify-center shadow-md flex-shrink-0 border border-slate-200">
+                {viewEmployee.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={viewEmployee.avatarUrl}
+                    alt={viewEmployee.fullName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <>
+                    {viewEmployee.firstName[0]}
+                    {viewEmployee.lastName ? viewEmployee.lastName[0] : ''}
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-slate-900">{viewEmployee.fullName}</h3>

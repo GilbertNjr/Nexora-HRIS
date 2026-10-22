@@ -270,9 +270,11 @@ export async function PUT(request: NextRequest) {
     broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
 
     // E. Broadcast Real-Time Employee Event so HR Admin screen updates live!
-    if (savedRecord) {
-      broadcastEmployeeEvent('EMPLOYEE_UPDATED', savedRecord);
-    }
+    const recordToBroadcast = savedRecord || {
+      ...updatedEmployee,
+      id: updatedEmployee.employeeNumber,
+    };
+    broadcastEmployeeEvent('EMPLOYEE_UPDATED', recordToBroadcast);
 
     return NextResponse.json(
       {

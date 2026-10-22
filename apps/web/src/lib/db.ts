@@ -80,7 +80,7 @@ const DEFAULT_EMPLOYEES: EmployeeRecord[] = [
     religion: 'Islam',
     taxStatus: 'Kawin (K/1)',
     taxDependents: '1 Tanggungan',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    avatarUrl: null,
     bankName: 'BCA',
     accountNumber: '8830192841',
     accountHolder: 'Rian Pratama',
@@ -248,9 +248,7 @@ export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
             religion: 'Islam',
             taxStatus: 'Kawin (K/1)',
             taxDependents: '1 Anak Terdaftar',
-            avatarUrl:
-              r.avatar_url ||
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+            avatarUrl: r.avatar_url || null,
             bankName: r.bank_name || 'BCA',
             accountNumber: r.account_number || '8830192841',
             basicSalary: 15000000,
@@ -349,9 +347,7 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
     religion: data.religion || 'Islam',
     taxStatus: data.taxStatus || 'Lajang (TK/0)',
     taxDependents: data.taxDependents || 'Tidak Ada',
-    avatarUrl:
-      data.avatarUrl ||
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    avatarUrl: data.avatarUrl || null,
     bankName: data.bankName || 'BCA',
     accountNumber: data.accountNumber || '',
     accountHolder: data.accountHolder || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
