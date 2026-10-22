@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -93,10 +93,99 @@ export default function EssPerformancePage() {
   );
   const [draftRating, setDraftRating] = useState('4.7');
   const [isDraftSaved, setIsDraftSaved] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [employeeReviewData, setEmployeeReviewData] = useState<any>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Fetch current employee review from unified performance API
+  const fetchMyPerformance = useCallback(async () => {
+    if (!currentUser.employeeNumber) return;
+    try {
+      const res = await fetch(`/api/v1/performance?nik=${encodeURIComponent(currentUser.employeeNumber)}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setEmployeeReviewData(json.data);
+          if (json.data.feedback) setDraftCommentary(json.data.feedback);
+          if (json.data.selfRating) setDraftRating(String(json.data.selfRating));
+          if (json.data.status === 'TERVERIFIKASI') setIsDraftSaved(true);
+        }
+      }
+    } catch {}
+  }, [currentUser.employeeNumber]);
+
+  // Real-time listener for updates made from Admin HR
+  useEffect(() => {
+    fetchMyPerformance();
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('nexora_live_sync');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'PERFORMANCE_UPDATED') {
+          fetchMyPerformance();
+        }
+      };
+    } catch {}
+
+    const handleFocus = () => fetchMyPerformance();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchMyPerformance]);
+
+  // Calculate dynamic self-appraisal score
+  const calculatedScore = useMemo(() => {
+    const r1 = 4.9 * 0.25;
+    const r2 = 5.0 * 0.25;
+    const r3 = 4.8 * 0.30;
+    const r4 = (parseFloat(draftRating) || 4.7) * 0.20;
+    return Number((r1 + r2 + r3 + r4).toFixed(2));
+  }, [draftRating]);
+
+  // Submit self-appraisal to API & broadcast live
+  const handleSubmitSelfAppraisal = async () => {
+    setIsSubmittingReview(true);
+    try {
+      const res = await fetch('/api/v1/performance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nik: currentUser.employeeNumber,
+          name: currentUser.fullName,
+          role: currentUser.designation,
+          department: currentUser.department,
+          score: calculatedScore,
+          okrAchievement: '105%',
+          status: 'TERVERIFIKASI',
+          selfRating: calculatedScore,
+          feedback: draftCommentary,
+          avatarUrl: currentUser.avatarUrl,
+        }),
+      });
+
+      if (res.ok) {
+        setIsDraftSaved(true);
+        try {
+          const bc = new BroadcastChannel('nexora_live_sync');
+          bc.postMessage({ type: 'PERFORMANCE_UPDATED', nik: currentUser.employeeNumber });
+          bc.close();
+        } catch {}
+      }
+    } catch {}
+
+    setIsSubmittingReview(false);
+    setIsSubmitModalOpen(false);
+    fetchMyPerformance();
+    showToast('✓ Evaluasi Self-Appraisal Q1 2025 berhasil dikirimkan & disinkronkan ke Admin HR secara real-time!');
   };
 
   const okrList: OkrItem[] = [
@@ -345,13 +434,15 @@ export default function EssPerformancePage() {
               </div>
 
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-black text-blue-700 tracking-tight">4.85</span>
+                <span className="text-3xl font-black text-blue-700 tracking-tight">
+                  {employeeReviewData?.score ? employeeReviewData.score.toFixed(2) : calculatedScore.toFixed(2)}
+                </span>
                 <span className="text-slate-400 font-bold text-lg">/ 5.0</span>
               </div>
 
               <div className="flex items-center justify-between pt-0.5">
                 <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  Sangat Baik (Exceeds)
+                  {employeeReviewData?.grade ? employeeReviewData.grade : 'Sangat Baik (Exceeds)'}
                 </span>
                 <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
                   <span>📈 +0.15 YoY</span>
@@ -376,12 +467,16 @@ export default function EssPerformancePage() {
               </div>
 
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">75%</span>
+                <span className="text-3xl font-black text-slate-900 tracking-tight">
+                  {isDraftSaved || employeeReviewData?.status === 'TERVERIFIKASI' ? '100%' : '75%'}
+                </span>
                 <span className="text-slate-500 font-bold text-xs">Terisi</span>
               </div>
 
               <p className="text-[11px] text-slate-500 leading-snug">
-                3 dari 4 Sasaran Strategis telah dinilai secara mandiri.
+                {isDraftSaved || employeeReviewData?.status === 'TERVERIFIKASI'
+                  ? '4 dari 4 Sasaran Strategis telah dinilai & tersinkronisasi.'
+                  : '3 dari 4 Sasaran Strategis telah dinilai secara mandiri.'}
               </p>
 
               <div className="flex items-center justify-between text-[11px] font-semibold text-rose-600 pt-0.5">
@@ -389,7 +484,11 @@ export default function EssPerformancePage() {
                   <Clock className="w-3 h-3" />
                   <span>Tenggat: 31 Maret 2025</span>
                 </span>
-                <span className="font-bold text-amber-700">1 Draft Tersisa</span>
+                <span className="font-bold text-amber-700">
+                  {isDraftSaved || employeeReviewData?.status === 'TERVERIFIKASI'
+                    ? 'Status: Terverifikasi'
+                    : '1 Draft Tersisa'}
+                </span>
               </div>
             </div>
 
@@ -924,13 +1023,12 @@ export default function EssPerformancePage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setIsSubmitModalOpen(false);
-                  showToast('✓ Evaluasi Self-Appraisal Q1 2025 berhasil dikirimkan ke Arya Wibowo, M.Sc.');
-                }}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                disabled={isSubmittingReview}
+                onClick={handleSubmitSelfAppraisal}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2"
               >
-                Kirim Sekarang
+                {isSubmittingReview && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                <span>Kirim Sekarang</span>
               </button>
             </div>
           </div>

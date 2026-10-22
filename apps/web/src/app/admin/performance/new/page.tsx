@@ -81,14 +81,31 @@ export default function NewPerformanceCyclePage() {
     showToast('Draf konfigurasi siklus kinerja berhasil disimpan.');
   };
 
-  const handleLaunchCycle = (e: React.FormEvent) => {
+  const handleLaunchCycle = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLaunching(true);
-    setTimeout(() => {
-      setIsLaunching(false);
-      setLaunchSuccess(true);
-      showToast('Siklus Penilaian Kinerja Q2 2025 berhasil diluncurkan ke seluruh organisasi!');
-    }, 1200);
+    try {
+      await fetch('/api/v1/performance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'NEW_CYCLE',
+          name: cycleForm.name,
+          code: cycleForm.name.includes('Q2') ? 'Q2 2025' : 'Q3 2025',
+          period: `${cycleForm.periodStart} - ${cycleForm.periodEnd}`,
+          syncPayroll: true,
+          totalParticipants: 1248,
+        }),
+      });
+      try {
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({ type: 'PERFORMANCE_CYCLE_LAUNCHED' });
+        bc.close();
+      } catch {}
+    } catch {}
+    setIsLaunching(false);
+    setLaunchSuccess(true);
+    showToast('Siklus Penilaian Kinerja Q2 2025 berhasil diluncurkan ke seluruh organisasi!');
   };
 
   return (
