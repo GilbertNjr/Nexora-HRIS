@@ -175,7 +175,7 @@ export default function AdminLeavePage() {
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('Bulan Ini');
+  const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [selectedDept, setSelectedDept] = useState('Semua Departemen');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -286,7 +286,68 @@ export default function AdminLeavePage() {
     };
   }, [fetchLiveLeaveData]);
 
-  const today = useMemo(() => new Date(), []);
+  // Real-time Current Clock Date
+  const [today, setToday] = useState<Date>(() => new Date());
+
+  // Real-time Calendar Clock: Auto rollover at midnight & month transition without manual intervention
+  useEffect(() => {
+    const syncCalendarWithRealTime = () => {
+      const now = new Date();
+      setToday((prevToday) => {
+        const hasDayChanged = prevToday.toDateString() !== now.toDateString();
+        const hasMonthChanged =
+          prevToday.getMonth() !== now.getMonth() ||
+          prevToday.getFullYear() !== now.getFullYear();
+
+        if (hasDayChanged || hasMonthChanged) {
+          // If viewing current month, advance calendar view automatically
+          setCalendarMonth((prevCalMonth) => {
+            const wasViewingCurrentMonth =
+              prevCalMonth.getFullYear() === prevToday.getFullYear() &&
+              prevCalMonth.getMonth() === prevToday.getMonth();
+
+            if (wasViewingCurrentMonth) {
+              return new Date(now.getFullYear(), now.getMonth(), 1);
+            }
+            return prevCalMonth;
+          });
+
+          // If the selected day was today, keep selected day tracking today
+          setSelectedCalendarDate((prevSel) => {
+            const wasSelectedToday = prevSel.toDateString() === prevToday.toDateString();
+            return wasSelectedToday ? now : prevSel;
+          });
+
+          return now;
+        }
+        return prevToday;
+      });
+    };
+
+    const interval = setInterval(syncCalendarWithRealTime, 10000);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        syncCalendarWithRealTime();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, []);
+
+  const isCurrentMonthActive = useMemo(() => {
+    return (
+      calendarMonth.getFullYear() === today.getFullYear() &&
+      calendarMonth.getMonth() === today.getMonth()
+    );
+  }, [calendarMonth, today]);
 
   // Filter requests by status
   const pendingRequests = useMemo(
@@ -499,6 +560,7 @@ export default function AdminLeavePage() {
 
   const handleResetToToday = () => {
     const now = new Date();
+    setToday(now);
     setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedCalendarDate(now);
   };
@@ -528,14 +590,22 @@ export default function AdminLeavePage() {
       });
   }, [requests, rosterDeptFilter, rosterSearch]);
 
-  // Form State for Manual Submission Modal
-  const [manualForm, setManualForm] = useState({
+  const getTodayIso = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Form State for Manual Submission Modal (Real-time dynamic dates)
+  const [manualForm, setManualForm] = useState(() => ({
     employeeName: 'Budi Santoso (NX-201944)',
     leaveType: 'Cuti Tahunan',
-    startDate: '2025-04-02',
-    endDate: '2025-04-04',
+    startDate: getTodayIso(),
+    endDate: getTodayIso(),
     reason: '',
-  });
+  }));
 
   // Filtered Requests Logic
   const filteredRequests = useMemo(() => {
@@ -551,6 +621,26 @@ export default function AdminLeavePage() {
       if (filterStatusPill === 'APPROVED' && r.status !== 'APPROVED') return false;
       if (filterStatusPill === 'HAS_DOC' && !r.documentName) return false;
 
+      // Real-time Month filter
+      if (selectedMonth === 'THIS_MONTH') {
+        const reqDate = parseFlexibleDate(r.startDate);
+        if (reqDate && (reqDate.getMonth() !== today.getMonth() || reqDate.getFullYear() !== today.getFullYear())) {
+          return false;
+        }
+      } else if (selectedMonth === 'LAST_MONTH') {
+        const reqDate = parseFlexibleDate(r.startDate);
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        if (reqDate && (reqDate.getMonth() !== lastMonth.getMonth() || reqDate.getFullYear() !== lastMonth.getFullYear())) {
+          return false;
+        }
+      } else if (selectedMonth === 'LAST_3_MONTHS') {
+        const reqDate = parseFlexibleDate(r.startDate);
+        const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+        if (reqDate && reqDate < threeMonthsAgo) {
+          return false;
+        }
+      }
+
       // Search term
       if (searchTerm) {
         const query = searchTerm.toLowerCase();
@@ -562,7 +652,7 @@ export default function AdminLeavePage() {
 
       return true;
     });
-  }, [requests, activeTab, filterStatusPill, searchTerm]);
+  }, [requests, activeTab, filterStatusPill, searchTerm, selectedMonth, today]);
 
   // Approval Handlers (Synchronized to Backend & All Devices)
   const handleApprove = async (id: string, name: string) => {
@@ -632,6 +722,10 @@ export default function AdminLeavePage() {
     e.preventDefault();
     const name = manualForm.employeeName.split(' (')[0];
     const nik = manualForm.employeeName.match(/\((.*?)\)/)?.[1] || 'NX-202500';
+    const sDate = parseFlexibleDate(manualForm.startDate) || new Date();
+    const eDate = parseFlexibleDate(manualForm.endDate) || sDate;
+    const durationDays = Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
     const newReqItem = {
       name,
       nik,
@@ -640,13 +734,13 @@ export default function AdminLeavePage() {
       avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200',
       type: 'cuti',
       leaveType: manualForm.leaveType,
-      typeCategory: manualForm.leaveType.includes('Sakit') ? 'sakit' : 'tahunan',
+      typeCategory: manualForm.leaveType.toLowerCase().includes('sakit') ? 'sakit' : manualForm.leaveType.toLowerCase().includes('khusus') ? 'khusus' : 'tahunan',
       title: `Pengajuan Manual: ${manualForm.leaveType}`,
       highlightType: manualForm.leaveType,
-      detail: `3 Hari: ${manualForm.startDate} s/d ${manualForm.endDate}`,
+      detail: `${durationDays} Hari: ${manualForm.startDate} s/d ${manualForm.endDate}`,
       startDate: manualForm.startDate,
       endDate: manualForm.endDate,
-      durationDays: 3,
+      durationDays,
       remainingQuota: 9,
       totalQuota: 12,
       reason: manualForm.reason || 'Pengajuan manual oleh HR Operations',
@@ -977,7 +1071,7 @@ export default function AdminLeavePage() {
               />
             </div>
 
-            {/* Bulan Dropdown */}
+            {/* Bulan Dropdown - Real-time Dynamic */}
             <div className="relative">
               <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
@@ -985,10 +1079,14 @@ export default function AdminLeavePage() {
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="w-full appearance-none pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white cursor-pointer"
               >
-                <option value="Bulan Ini: Mar">Bulan Ini: Mar</option>
-                <option value="Bulan Lalu: Feb">Bulan Lalu: Feb</option>
-                <option value="Januari 2025">Januari 2025</option>
-                <option value="Semua Periode">Semua Periode</option>
+                <option value="ALL">Semua Periode</option>
+                <option value="THIS_MONTH">
+                  Bulan Ini ({today.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })})
+                </option>
+                <option value="LAST_MONTH">
+                  Bulan Lalu ({new Date(today.getFullYear(), today.getMonth() - 1, 1).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })})
+                </option>
+                <option value="LAST_3_MONTHS">3 Bulan Terakhir</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -1299,16 +1397,33 @@ export default function AdminLeavePage() {
           {/* RIGHT COLUMN: Kalender Cuti & Absen Hari Ini (4 cols on lg) */}
           {/* ========================================================= */}
           <div className="lg:col-span-4 space-y-4">
-            {/* Card 1: Kalender Cuti Departemen */}
+            {/* Card 1: Kalender Cuti Departemen - Real-Time Dynamic Synchronization */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-xs font-bold text-slate-900 leading-tight">
-                    Kalender Cuti Departemen
-                  </h3>
+                  <div className="relative">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    {isCurrentMonthActive && (
+                      <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-bold text-slate-900 leading-tight">
+                        Kalender Cuti Departemen
+                      </h3>
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                        title="Kalender real-time aktif: otomatis berganti bulan & hari mengikuti kalender nyata tanpa perlu reload"
+                      >
+                        <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping" />
+                        Live Real-Time
+                      </span>
+                    </div>
+                  </div>
                 </div>
+
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -1318,9 +1433,29 @@ export default function AdminLeavePage() {
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/70 px-2.5 py-0.5 rounded-lg capitalize">
-                    {currentMonthName}
-                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleResetToToday}
+                    title={
+                      isCurrentMonthActive
+                        ? 'Bulan ini (Waktu Nyata) • Klik untuk reset ke Hari Ini'
+                        : 'Klik untuk kembali ke Bulan & Hari Ini (Real-Time)'
+                    }
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-lg capitalize transition-all flex items-center gap-1.5 ${
+                      isCurrentMonthActive
+                        ? 'text-blue-700 bg-blue-50 border border-blue-200/70 hover:bg-blue-100/70'
+                        : 'text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                    }`}
+                  >
+                    <span>{currentMonthName}</span>
+                    {!isCurrentMonthActive && (
+                      <span className="text-[9px] bg-amber-200/80 text-amber-900 px-1 rounded font-bold">
+                        Kembali
+                      </span>
+                    )}
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleNextMonth}
@@ -1352,20 +1487,22 @@ export default function AdminLeavePage() {
 
                     let cellStyle = 'text-slate-700 hover:bg-slate-100';
                     if (!cell.isCurrentMonth) {
-                      cellStyle = isWeekend ? 'text-rose-200 hover:bg-slate-50' : 'text-slate-300 hover:bg-slate-50';
+                      cellStyle = isWeekend ? 'text-rose-300 hover:bg-slate-50' : 'text-slate-300 hover:bg-slate-50';
                     } else if (cell.isSelected) {
-                      cellStyle = 'bg-[#1D4ED8] text-white font-bold shadow-xs';
+                      cellStyle = cell.isToday
+                        ? 'bg-[#1D4ED8] text-white font-extrabold ring-2 ring-blue-300 shadow-xs'
+                        : 'bg-[#1D4ED8] text-white font-bold shadow-xs';
                     } else if (hasApproved) {
                       cellStyle = 'bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 border border-blue-200/50';
                     } else if (cell.isToday) {
-                      cellStyle = 'text-blue-700 font-extrabold ring-1.5 ring-blue-500 bg-blue-50/40 hover:bg-blue-100/50';
+                      cellStyle = 'text-blue-700 font-extrabold ring-1.5 ring-blue-500 bg-blue-50/50 hover:bg-blue-100/50';
                     } else if (isWeekend) {
                       cellStyle = 'text-rose-500 hover:bg-rose-50/60';
                     }
 
                     const tooltipText = [
                       cell.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-                      cell.isToday ? '(Hari Ini)' : '',
+                      cell.isToday ? '(Hari Ini - Real-Time)' : '',
                       hasApproved ? `• ${cell.approvedLeaves.length} cuti disetujui: ${cell.approvedLeaves.map((l) => l.name).join(', ')}` : '',
                       hasPending ? `• ${cell.pendingLeaves.length} menunggu approval` : '',
                     ]
@@ -1376,7 +1513,12 @@ export default function AdminLeavePage() {
                       <button
                         key={`${cell.dayNumber}-${idx}`}
                         type="button"
-                        onClick={() => setSelectedCalendarDate(cell.date)}
+                        onClick={() => {
+                          setSelectedCalendarDate(cell.date);
+                          if (!cell.isCurrentMonth) {
+                            setCalendarMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
+                          }
+                        }}
                         title={tooltipText}
                         className={`relative p-1.5 rounded-lg transition-all flex flex-col items-center justify-center h-8 text-[11px] ${cellStyle}`}
                       >
@@ -1409,10 +1551,10 @@ export default function AdminLeavePage() {
                       <button
                         type="button"
                         onClick={handleResetToToday}
-                        className="text-[9px] font-semibold text-blue-600 hover:underline"
+                        className="text-[9px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-0.5"
                         title="Kembali ke Hari Ini"
                       >
-                        • Hari Ini
+                        • Kembali ke Hari Ini
                       </button>
                     )}
                   </div>
