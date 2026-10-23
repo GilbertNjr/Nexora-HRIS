@@ -147,7 +147,6 @@ export default function EmployeeDashboardOverhaulPage() {
   const [isPayslipModalOpen, setIsPayslipModalOpen] = useState(false);
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
   const [isWfhPreferenceModalOpen, setIsWfhPreferenceModalOpen] = useState(false);
-  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDownloadingDoc, setIsDownloadingDoc] = useState<string | null>(null);
 
@@ -257,18 +256,6 @@ export default function EmployeeDashboardOverhaulPage() {
   const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
   const [activeQuota, setActiveQuota] = useState(12);
 
-  // Backend Team Attendance
-  const [teamMembers, setTeamMembers] = useState([
-    { id: '1', initials: 'RP', name: 'Rian Pratama (Anda)', role: 'Lead Backend', status: 'WFO Lt. 7', color: 'blue' },
-    { id: '2', initials: 'NW', name: 'Nadia Wijaya', role: 'Senior Go Developer', status: 'WFO Lt. 7', color: 'blue' },
-    { id: '3', initials: 'DS', name: 'Dimas Surya', role: 'Database Engineer', status: 'WFH', color: 'purple' },
-    { id: '4', initials: 'FH', name: 'Farhan Harahap', role: 'Backend Engineer', status: 'Cuti Sakit', color: 'amber' },
-    { id: '5', initials: 'AN', name: 'Ahmad Nur', role: 'DevOps Specialist', status: 'WFO Lt. 7', color: 'blue' },
-    { id: '6', initials: 'SL', name: 'Siti Lestari', role: 'QA Automation', status: 'WFH', color: 'purple' },
-    { id: '7', initials: 'BK', name: 'Bambang Kurnia', role: 'API Security', status: 'WFO Lt. 7', color: 'blue' },
-    { id: '8', initials: 'RT', name: 'Riko Tan', role: 'Junior Backend', status: 'WFO Lt. 7', color: 'blue' },
-  ]);
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
@@ -314,19 +301,6 @@ export default function EmployeeDashboardOverhaulPage() {
                     location: isWfh ? 'WFH (Tervalidasi)' : 'WFO (SCBD)',
                   }
                 : item
-            )
-          );
-
-          // Dynamically sync Rian Pratama in team roster
-          setTeamMembers((prev) =>
-            prev.map((m) =>
-              m.id === '1'
-                ? {
-                    ...m,
-                    status: isWfh ? 'WFH' : 'WFO Lt. 7',
-                    color: isWfh ? 'purple' : 'blue',
-                  }
-                : m
             )
           );
         } else {
@@ -1271,73 +1245,9 @@ export default function EmployeeDashboardOverhaulPage() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN (4 COLS) matching screenshot with full unclipped content */}
+            {/* RIGHT COLUMN (4 COLS) - Private Individual Documents & Tools */}
             <div className="lg:col-span-4 space-y-6 flex flex-col">
-              {/* CARD 1: KEHADIRAN TIM BACKEND matching screenshot */}
-              <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900">
-                      Kehadiran Tim Backend
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {teamMembers.filter((m) => !m.status.includes('Cuti')).length} dari {teamMembers.length} Anggota Aktif Hari Ini
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                    <Users className="w-4 h-4" />
-                  </div>
-                </div>
-
-                {/* Team Members List */}
-                <div className="space-y-3">
-                  {teamMembers.slice(0, 4).map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between gap-2.5 py-1"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                          {member.initials}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">
-                            {member.name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {member.role}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold flex-shrink-0 ${
-                          member.color === 'blue'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : member.color === 'purple'
-                            ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
-                      >
-                        {member.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* View Roster Button matching screenshot */}
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsRosterModalOpen(true)}
-                    className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-colors text-center"
-                  >
-                    Lihat Roster Tim Lengkap
-                  </button>
-                </div>
-              </div>
-
-              {/* CARD 2: PINTASAN DOKUMEN MANDIRI (Fully unclipped with generous container & complete items!) */}
+              {/* PINTASAN DOKUMEN MANDIRI (Akses Cepat Dokumen Personal Karyawan) */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div>
@@ -1864,20 +1774,6 @@ export default function EmployeeDashboardOverhaulPage() {
                     localStorage.setItem('nexora_weekly_wfh_preferences', JSON.stringify(prefMap));
                   } catch {}
 
-                  // Sync team roster member 1 (Rian)
-                  const isWfoToday = weeklySchedule.find((i) => i.isToday)?.type === 'WFO';
-                  setTeamMembers((prev) =>
-                    prev.map((m) =>
-                      m.id === '1'
-                        ? {
-                            ...m,
-                            status: isWfoToday ? 'WFO Lt. 7' : 'WFH',
-                            color: isWfoToday ? 'blue' : 'purple',
-                          }
-                        : m
-                    )
-                  );
-
                   // Broadcast live sync
                   try {
                     const bc = new BroadcastChannel('nexora_live_sync');
@@ -1914,72 +1810,7 @@ export default function EmployeeDashboardOverhaulPage() {
         </div>
       )}
 
-      {/* MODAL 5: LIHAT ROSTER TIM LENGKAP */}
-      {isRosterModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
-                    Roster Kehadiran Tim Backend
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Total 8 Anggota Divisi Engineering</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="max-h-80 overflow-y-auto space-y-2.5 pr-1 divide-y divide-slate-100 text-xs">
-              {teamMembers.map((member) => (
-                <div key={member.id} className="pt-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center">
-                      {member.initials}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{member.name}</p>
-                      <p className="text-[10px] text-slate-400">{member.role}</p>
-                    </div>
-                  </div>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold ${
-                      member.color === 'blue'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : member.color === 'purple'
-                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}
-                  >
-                    {member.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-2 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all active:scale-95"
-              >
-                Tutup Roster
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 6: SLIP GAJI DIGITAL MARET */}
+      {/* MODAL 5: SLIP GAJI DIGITAL */}
       {isPayslipModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
