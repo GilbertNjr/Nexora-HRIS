@@ -420,17 +420,49 @@ export async function GET(request: NextRequest) {
   const employeeName = searchParams.get('employeeName') || searchParams.get('name');
 
   const data = getStoredAttendance();
+  let emps: any[] = [];
   try {
-    const emps = await getEmployeesFromDb();
-    if (Array.isArray(emps) && emps.length > 0) {
-      data.totalEmployees = Math.max(1248, emps.length);
+    emps = await getEmployeesFromDb();
+  } catch {}
+
+  const totalEmployees = Array.isArray(emps) && emps.length > 0 ? emps.length : (data.totalEmployees || 1);
+  data.totalEmployees = totalEmployees;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayRecords = (data.records || []).filter((r) => r.date === todayStr);
+
+  const todayOnTime = todayRecords.filter((r) => r.status === 'TEPAT_WAKTU' || r.status === 'WFH').length;
+  const todayLate = todayRecords.filter((r) => r.status === 'TERLAMBAT').length;
+  const todayDinas = todayRecords.filter((r) => r.status === 'DINAS_LUAR').length;
+  const todayPresent = todayOnTime + todayLate + todayDinas;
+
+  let todayLeave = 0;
+  try {
+    const APPROVALS_FILE = path.join(STORAGE_DIR, 'nexora_approvals.json');
+    if (fs.existsSync(APPROVALS_FILE)) {
+      const approvals = JSON.parse(fs.readFileSync(APPROVALS_FILE, 'utf-8'));
+      if (Array.isArray(approvals)) {
+        todayLeave = approvals.filter(
+          (a: any) =>
+            a.status === 'APPROVED' &&
+            a.startDate &&
+            a.endDate &&
+            todayStr >= a.startDate &&
+            todayStr <= a.endDate
+        ).length;
+      }
     }
   } catch {}
 
-  const absentCount = Math.max(0, data.totalEmployees - data.presentCount - (data.leaveCount || 26));
+  data.onTimeCount = todayOnTime;
+  data.lateCount = todayLate;
+  data.leaveCount = todayLeave;
+  data.presentCount = todayPresent;
+
+  const absentCount = Math.max(0, data.totalEmployees - data.presentCount - data.leaveCount);
   const attendanceRate = data.totalEmployees > 0
-    ? Number(((data.onTimeCount / data.totalEmployees) * 100).toFixed(1))
-    : 94.7;
+    ? Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1))
+    : 0;
 
   let employeeStats = null;
   if (employeeId || employeeName) {
@@ -463,7 +495,7 @@ export async function POST(request: NextRequest) {
     try {
       const emps = await getEmployeesFromDb();
       if (Array.isArray(emps) && emps.length > 0) {
-        data.totalEmployees = Math.max(1248, emps.length);
+        data.totalEmployees = emps.length;
       }
     } catch {}
 
@@ -584,19 +616,25 @@ export async function POST(request: NextRequest) {
         };
         data.records.unshift(targetRecord);
 
-        data.presentCount += 1;
-        if (finalStatus === 'TERLAMBAT') {
-          data.lateCount += 1;
-        } else {
-          data.onTimeCount += 1;
-        }
       }
     }
 
+    const todayStr = dateStr;
+    const todayRecords = (data.records || []).filter((r) => r.date === todayStr);
+    const todayOnTime = todayRecords.filter((r) => r.status === 'TEPAT_WAKTU' || r.status === 'WFH').length;
+    const todayLate = todayRecords.filter((r) => r.status === 'TERLAMBAT').length;
+    const todayDinas = todayRecords.filter((r) => r.status === 'DINAS_LUAR').length;
+
+    data.onTimeCount = todayOnTime;
+    data.lateCount = todayLate;
+    data.presentCount = todayOnTime + todayLate + todayDinas;
+
     data.records = data.records.slice(0, 60);
 
-    const absentCount = Math.max(0, data.totalEmployees - data.presentCount - (data.leaveCount || 26));
-    const attendanceRate = Number(((data.onTimeCount / data.totalEmployees) * 100).toFixed(1));
+    const absentCount = Math.max(0, data.totalEmployees - data.presentCount - (data.leaveCount || 0));
+    const attendanceRate = data.totalEmployees > 0
+      ? Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1))
+      : 0;
 
     saveStoredAttendance(data);
 

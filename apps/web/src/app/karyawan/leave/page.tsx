@@ -365,8 +365,7 @@ export default function EssLeaveOverhaulPage() {
               const itemName = (item.name || '').toLowerCase();
               const isMine =
                 itemNik === myNik ||
-                itemName.includes('rian') ||
-                item.id === 'req-cuti-05';
+                (itemName && myName && itemName.includes(myName.split(' ')[0]));
               return isMine;
             })
             .map(mapApprovalToEssItem);

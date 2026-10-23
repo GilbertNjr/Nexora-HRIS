@@ -216,34 +216,88 @@ export default function AdminDashboardPage() {
   // Fetch live metrics from unified APIs
   const fetchLiveMetrics = React.useCallback(async () => {
     try {
-      // Employee headcount
-      const empRes = await fetch('/api/v1/employees?limit=1');
+      // 1. Employee headcount, breakdown, payroll & department distribution
+      const empRes = await fetch('/api/v1/employees?limit=200');
       if (empRes.ok) {
         const json = await empRes.json();
-        if (json.data?.meta?.total !== undefined) {
-          setMetrics((prev) => ({
-            ...prev,
-            totalEmployees: json.data.meta.total,
-            activeEmployees: json.data.meta.total,
-          }));
-        }
+        const items: any[] = json.data?.items || [];
+        const total = json.data?.meta?.total !== undefined ? json.data.meta.total : items.length;
+
+        const permanent = items.filter((e) => e.employmentType === 'PERMANENT').length;
+        const contract = items.filter(
+          (e) => e.employmentType === 'CONTRACT_PKWT' || e.employmentType === 'CONTRACT'
+        ).length;
+        const probation = items.filter((e) => e.employmentType === 'PROBATION').length;
+
+        // Estimated Payroll: sum basicSalary + transportAllowance + mealAllowance
+        const totalPayroll = items.reduce((acc, emp) => {
+          const basic = Number(emp.basicSalary) || 0;
+          const transport = Number(emp.transportAllowance) || 0;
+          const meal = Number(emp.mealAllowance) || 0;
+          return acc + basic + transport + meal;
+        }, 0);
+
+        const payrollFormatted =
+          totalPayroll > 0
+            ? new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                maximumFractionDigits: 0,
+              }).format(totalPayroll)
+            : 'Rp 0';
+
+        // Dynamic Department distribution
+        const deptMap: Record<string, number> = {};
+        items.forEach((emp) => {
+          const dept = emp.department || 'Operasional';
+          deptMap[dept] = (deptMap[dept] || 0) + 1;
+        });
+
+        const barColors = [
+          'bg-blue-600',
+          'bg-indigo-600',
+          'bg-purple-600',
+          'bg-emerald-600',
+          'bg-amber-500',
+          'bg-teal-500',
+        ];
+
+        const deptList = Object.entries(deptMap).map(([name, count], idx) => ({
+          name,
+          count,
+          percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+          barColor: barColors[idx % barColors.length],
+        }));
+
+        setDepartments(deptList);
+
+        setMetrics((prev) => ({
+          ...prev,
+          totalEmployees: total,
+          activeEmployees: total,
+          permanentCount: permanent,
+          contractCount: contract,
+          probationCount: probation,
+          estimatedPayroll: payrollFormatted,
+        }));
       }
 
-      // Attendance stats
+      // 2. Attendance stats (Dynamic today)
       const attRes = await fetch('/api/v1/attendance');
       if (attRes.ok) {
         const json = await attRes.json();
         if (json.data) {
           setMetrics((prev) => ({
             ...prev,
-            onTimeCount: json.data.onTimeCount || prev.onTimeCount,
-            lateCount: json.data.lateCount || prev.lateCount,
-            attendanceRate: json.data.attendanceRate || prev.attendanceRate,
+            onTimeCount: json.data.onTimeCount ?? prev.onTimeCount,
+            lateCount: json.data.lateCount ?? prev.lateCount,
+            leaveCount: json.data.leaveCount ?? prev.leaveCount,
+            attendanceRate: json.data.attendanceRate ?? prev.attendanceRate,
           }));
         }
       }
 
-      // Approvals list (Real-time sync)
+      // 3. Approvals list (Real-time sync)
       const appRes = await fetch('/api/v1/approvals');
       if (appRes.ok) {
         const json = await appRes.json();
@@ -257,7 +311,31 @@ export default function AdminDashboardPage() {
           }));
         }
       }
-    } catch (err) {
+
+      // 4. System Audit Activities (Live feed)
+      const auditRes = await fetch('/api/v1/audit?limit=5');
+      if (auditRes.ok) {
+        const json = await auditRes.json();
+        if (Array.isArray(json.data)) {
+          const mapped = json.data.slice(0, 5).map((log: any) => {
+            let dotColor = 'bg-blue-500';
+            if (log.module === 'LEAVE') dotColor = 'bg-amber-500';
+            else if (log.module === 'ATTENDANCE') dotColor = 'bg-emerald-500';
+            else if (log.module === 'PAYROLL') dotColor = 'bg-indigo-500';
+            else if (log.module === 'AUTH') dotColor = 'bg-rose-500';
+
+            return {
+              id: log.id,
+              title: (log.action || 'Aktivitas Sistem').replace(/_/g, ' '),
+              desc: `${log.userName || 'Pegawai'} • ${log.module || 'SDM'}`,
+              time: log.timestamp || 'Baru saja',
+              dotColor,
+            };
+          });
+          setRecentActivities(mapped);
+        }
+      }
+    } catch {
       // Keep resilient fallback
     }
   }, []);
@@ -315,7 +393,7 @@ export default function AdminDashboardPage() {
     fetchLiveMetrics();
     const interval = setInterval(fetchLiveMetrics, 6000);
 
-    // BroadcastChannel for instant (<5ms) cross-tab live synchronization for attendance
+    // BroadcastChannel for instant (<5ms) cross-tab live synchronization
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('nexora_live_sync');
@@ -331,24 +409,34 @@ export default function AdminDashboardPage() {
 
         // When employee clocks in from ESS portal
         if (msg.type === 'EMPLOYEE_CLOCKED_IN') {
-          setMetrics((prev) => {
-            const newOnTime = msg.status === 'TEPAT_WAKTU' ? prev.onTimeCount + 1 : prev.onTimeCount;
-            const newLate = msg.status === 'TERLAMBAT' ? prev.lateCount + 1 : prev.lateCount;
-            const totalPres = newOnTime + newLate;
-            const newRate = Number(((totalPres / prev.totalEmployees) * 100).toFixed(1));
-            return {
-              ...prev,
-              onTimeCount: newOnTime,
-              lateCount: newLate,
-              attendanceRate: newRate,
-            };
-          });
-
+          fetchLiveMetrics();
           showToast(
             `⚡ Presensi Baru Real-Time: ${msg.employeeName} baru saja Clock-In pukul ${msg.time} (${
               msg.status === 'TEPAT_WAKTU' ? 'Tepat Waktu' : 'Terlambat'
             })!`
           );
+        }
+
+        // When employee submits leave or attendance is recorded/reset
+        if (
+          msg.type === 'NEW_APPROVAL_REQUEST' ||
+          msg.type === 'APPROVAL_SUBMITTED' ||
+          msg.type === 'LEAVE_SUBMITTED'
+        ) {
+          fetchLiveMetrics();
+          showToast(
+            `🔔 Pengajuan Real-Time Baru: ${msg.request?.name || msg.item?.name || 'Karyawan'} baru saja mengajukan permohonan!`
+          );
+        }
+
+        if (
+          msg.type === 'APPROVAL_STATUS_CHANGED' ||
+          msg.type === 'LEAVE_ACTIONED' ||
+          msg.type === 'ATTENDANCE_RECORDED' ||
+          msg.type === 'ATTENDANCE_LOGGED' ||
+          msg.type === 'ATTENDANCE_RESET'
+        ) {
+          fetchLiveMetrics();
         }
       };
     } catch {
@@ -357,6 +445,7 @@ export default function AdminDashboardPage() {
 
     return () => {
       if (channel) channel.close();
+      clearInterval(interval);
     };
   }, [fetchLiveMetrics]);
 
@@ -599,8 +688,24 @@ export default function AdminDashboardPage() {
                 <span className="text-3xl font-extrabold text-[#0F172A] tracking-tight">
                   {metrics.attendanceRate}%
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                  Optimal
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    metrics.attendanceRate >= 90
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : metrics.attendanceRate >= 70
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : metrics.attendanceRate > 0
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {metrics.attendanceRate >= 90
+                    ? 'Optimal'
+                    : metrics.attendanceRate >= 70
+                    ? 'Normal'
+                    : metrics.attendanceRate > 0
+                    ? 'Perhatian'
+                    : 'Belum Absen'}
                 </span>
               </div>
 
@@ -615,16 +720,37 @@ export default function AdminDashboardPage() {
                 </span>
                 <span className="flex items-center gap-1 text-rose-600 font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                  {metrics.leaveCount} Izin
+                  {metrics.leaveCount || 0} Izin
                 </span>
               </div>
             </div>
 
             {/* Segmented Progress Bar */}
             <div className="h-1.5 w-full bg-slate-100 rounded-full mt-4 flex overflow-hidden gap-0.5">
-              <div className="h-full bg-emerald-500 rounded-l-full" style={{ width: '92%' }} />
-              <div className="h-full bg-amber-500" style={{ width: '5%' }} />
-              <div className="h-full bg-rose-500 rounded-r-full" style={{ width: '3%' }} />
+              <div
+                className="h-full bg-emerald-500 rounded-l-full transition-all duration-500"
+                style={{ width: `${metrics.attendanceRate}%` }}
+              />
+              <div
+                className="h-full bg-amber-500 transition-all duration-500"
+                style={{
+                  width: `${
+                    metrics.totalEmployees > 0
+                      ? Math.round((metrics.lateCount / metrics.totalEmployees) * 100)
+                      : 0
+                  }%`,
+                }}
+              />
+              <div
+                className="h-full bg-rose-500 rounded-r-full transition-all duration-500"
+                style={{
+                  width: `${
+                    metrics.totalEmployees > 0
+                      ? Math.round(((metrics.leaveCount || 0) / metrics.totalEmployees) * 100)
+                      : 0
+                  }%`,
+                }}
+              />
             </div>
           </div>
 
