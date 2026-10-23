@@ -200,12 +200,16 @@ export default function AdminLeavePage() {
 
   // Base Dataset (Initialized empty until employee submits leave)
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [employeeCount, setEmployeeCount] = useState<number>(1);
 
   // Fetch live leave requests from unified API
   const fetchLiveLeaveData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setIsRefreshing(true);
     try {
-      const res = await fetch(`/api/v1/approvals?all=true&t=${Date.now()}`, { cache: 'no-store' });
+      const [res, empRes] = await Promise.all([
+        fetch(`/api/v1/approvals?all=true&t=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/v1/attendance?t=${Date.now()}`, { cache: 'no-store' }),
+      ]);
       if (res.ok) {
         const json = await res.json();
         if (Array.isArray(json.data)) {
@@ -213,6 +217,12 @@ export default function AdminLeavePage() {
             .filter((item: any) => item.type === 'cuti' || !item.type || item.leaveType)
             .map(mapApprovalToLeave);
           setRequests(cutiItems);
+        }
+      }
+      if (empRes.ok) {
+        const empJson = await empRes.json();
+        if (typeof empJson.data?.totalEmployees === 'number' && empJson.data.totalEmployees > 0) {
+          setEmployeeCount(empJson.data.totalEmployees);
         }
       }
       if (isManualRefresh) {
@@ -329,26 +339,23 @@ export default function AdminLeavePage() {
     [approvedRequests]
   );
 
-  // Dynamic Headcount and Quota Utilization
-  const totalHeadcount = useMemo(
-    () => Math.max(26, requests.length + 20),
-    [requests]
-  );
+  // Dynamic Headcount and Quota Utilization from real active database employees
+  const totalHeadcount = Math.max(1, employeeCount);
   const totalApprovedDays = useMemo(
     () => approvedRequests.reduce((sum, r) => sum + (r.durationDays || 1), 0),
     [approvedRequests]
   );
   const utilizationRate = useMemo(
-    () => Math.min(100, Math.round((totalApprovedDays / (totalHeadcount * 12)) * 100)),
+    () => totalApprovedDays === 0 ? 0 : Math.min(100, Math.round((totalApprovedDays / (totalHeadcount * 12)) * 100)),
     [totalApprovedDays, totalHeadcount]
   );
   const avgDaysTaken = useMemo(
-    () => (totalApprovedDays / totalHeadcount).toFixed(1),
+    () => totalApprovedDays === 0 ? '0.0' : (totalApprovedDays / totalHeadcount).toFixed(1),
     [totalApprovedDays, totalHeadcount]
   );
   const avgRemainingDays = useMemo(
-    () => (12 - Number(avgDaysTaken)).toFixed(1),
-    [avgDaysTaken]
+    () => totalApprovedDays === 0 ? '12.0' : (12 - Number(avgDaysTaken)).toFixed(1),
+    [totalApprovedDays, avgDaysTaken]
   );
   const currentQuarterStr = useMemo(
     () => `Kuartal ${Math.floor(today.getMonth() / 3) + 1} ${today.getFullYear()} Normal`,
@@ -751,20 +758,27 @@ export default function AdminLeavePage() {
               <span className="text-sm font-semibold text-slate-700">Pengajuan</span>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('PENDING');
-                  setFilterStatusPill('PENDING_HRD');
-                }}
-                className="w-full flex items-center justify-between text-xs font-semibold text-amber-800 bg-amber-50/70 hover:bg-amber-100/70 px-3 py-1.5 rounded-xl transition-colors"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span>{pendingCount} Perlu Tindakan Segera</span>
+              {pendingCount === 0 ? (
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50/80 px-3 py-1.5 rounded-xl border border-emerald-200/60">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>✓ Tidak Ada Antrean Menunggu</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('PENDING');
+                    setFilterStatusPill('PENDING_HRD');
+                  }}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-amber-800 bg-amber-50/70 hover:bg-amber-100/70 px-3 py-1.5 rounded-xl transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>{pendingCount} Perlu Tindakan Segera</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -780,16 +794,18 @@ export default function AdminLeavePage() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {activeLeavesToday.length > 0 ? activeLeavesToday.length : approvedCount}
+                {activeLeavesToday.length}
               </span>
               <span className="text-sm font-semibold text-slate-700">Karyawan</span>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-medium">
-              <span>
-                {activeLeavesToday.length > 0 ? tahunanToday : approvedTahunan} Tahunan •{' '}
-                {activeLeavesToday.length > 0 ? sakitToday : approvedSakit} Sakit •{' '}
-                {activeLeavesToday.length > 0 ? khususToday : approvedKhusus} Dispensasi
-              </span>
+              {activeLeavesToday.length === 0 ? (
+                <span className="text-slate-400">Belum ada karyawan cuti hari ini</span>
+              ) : (
+                <span>
+                  {tahunanToday} Tahunan • {sakitToday} Sakit • {khususToday} Dispensasi
+                </span>
+              )}
             </div>
           </div>
 
@@ -837,13 +853,24 @@ export default function AdminLeavePage() {
               <span className="text-sm font-semibold text-slate-700">Kasus Tercatat</span>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
-                <Check className="w-3 h-3 text-emerald-600" />
-                <span>{allSickLeaves.length === 0 ? '0%' : `${verifiedPercent}%`} Terverifikasi SKD</span>
-              </div>
-              <span className="text-slate-400 text-[11px]">
-                {allSickLeaves.length === 0 ? 'Belum Ada Klaim Sakit' : unverifiedSickCount > 0 ? `${unverifiedSickCount} Kasus Tanpa Bukti` : 'Semua Terverifikasi'}
-              </span>
+              {allSickLeaves.length === 0 ? (
+                <div className="flex items-center justify-between w-full">
+                  <span className="inline-flex items-center gap-1 text-slate-500 text-[11px] font-medium">
+                    ✓ Belum ada klaim izin sakit bulan ini
+                  </span>
+                  <span className="text-[11px] text-slate-400">0% SKD</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>{verifiedPercent}% Terverifikasi SKD</span>
+                  </div>
+                  <span className="text-slate-400 text-[11px]">
+                    {unverifiedSickCount > 0 ? `${unverifiedSickCount} Kasus Tanpa Bukti` : 'Semua Terverifikasi'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

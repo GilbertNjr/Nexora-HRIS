@@ -132,8 +132,82 @@ const initialSquadMembers: SquadMember[] = [
   },
 ];
 
-// Historical default leave records (Initialized empty for clean real-time dynamic behavior)
-const defaultHistoricalLeaves: LeaveRequestItem[] = [];
+// Historical default leave records
+const defaultHistoricalLeaves: LeaveRequestItem[] = [
+  {
+    id: 'hist-01',
+    refNo: 'SK-2025-0019',
+    type: 'Izin Sakit',
+    title: 'Izin Sakit: Gejala ISPA & Demam',
+    startDate: '14 Feb',
+    endDate: '14 Feb 2025',
+    durationDays: 1,
+    handover: 'Handover Tiket Support',
+    notes:
+      'Mengalami demam tinggi dan radang tenggorokan setelah dinas luar. Dokter merekomendasikan istirahat penuh 1 hari.',
+    status: 'APPROVED',
+    statusBadge: 'Disetujui HR & Atasan',
+    submittedAt: '14 Feb 2025',
+    completedAt: '15 Feb 2025',
+    documentUrl: '#',
+    documentName: 'Surat_Dokter_Klinik_Mitra.pdf',
+    steps: [
+      {
+        title: 'Pengajuan Mandiri',
+        person: 'Rian Pratama',
+        time: '14 Feb, 07:30 WIB',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'Atasan Langsung',
+        person: 'Arya Wibowo (VP Eng)',
+        time: '14 Feb, 08:15 WIB',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'HR Operations',
+        person: 'Dewi Lestari, S.Psi',
+        time: '15 Feb, 10:00 WIB',
+        status: 'COMPLETED',
+      },
+    ],
+  },
+  {
+    id: 'hist-02',
+    refNo: 'LV-2025-0003',
+    type: 'Cuti Bersama',
+    title: 'Cuti Bersama Tahun Baru 2025',
+    startDate: '02 Jan',
+    endDate: '02 Jan 2025',
+    durationDays: 1,
+    handover: 'Sistem Terjadwal Otomatis',
+    notes: 'Libur resmi cuti bersama nasional pergantian tahun kalender.',
+    status: 'APPROVED',
+    statusBadge: 'Otomatis Disetujui',
+    submittedAt: '02 Jan 2025',
+    completedAt: '02 Jan 2025',
+    steps: [
+      {
+        title: 'Sistem Terjadwal',
+        person: 'Master HRIS Nexora',
+        time: '02 Jan, 00:00 WIB',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'Atasan Langsung',
+        person: 'Arya Wibowo (VP Eng)',
+        time: '02 Jan, 00:00 WIB (Otomatis)',
+        status: 'COMPLETED',
+      },
+      {
+        title: 'HR Operations',
+        person: 'Dewi Lestari, S.Psi',
+        time: '02 Jan, 08:00 WIB',
+        status: 'COMPLETED',
+      },
+    ],
+  },
+];
 
 function mapApprovalToEssItem(item: any): LeaveRequestItem {
   const isApproved = item.status === 'APPROVED';
@@ -229,7 +303,7 @@ export default function EssLeaveOverhaulPage() {
     annualUsed: 0,
     annualRemaining: 12,
     jointHoliday: 2,
-    sickUsed: 0,
+    sickUsed: 1,
     pendingCount: 0,
   });
 
@@ -346,8 +420,8 @@ export default function EssLeaveOverhaulPage() {
                 badgeClass: isWfh
                   ? 'bg-blue-50 text-blue-700 border-blue-200'
                   : isDinas
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                  : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200',
                 checkInTime: att.checkInTime || att.time,
                 location: att.location,
               };
@@ -447,8 +521,8 @@ export default function EssLeaveOverhaulPage() {
         isApproved
           ? '🎉 Selamat! Pengajuan Cuti Anda telah DISETUJUI oleh HR Admin!'
           : isRejected
-          ? 'ℹ️ Pengajuan Cuti Anda telah DITOLAK oleh HR Admin.'
-          : 'Status pengajuan cuti Anda telah diperbarui.'
+            ? 'ℹ️ Pengajuan Cuti Anda telah DITOLAK oleh HR Admin.'
+            : 'Status pengajuan cuti Anda telah diperbarui.'
       );
       fetchLiveLeaveData();
     },
@@ -517,7 +591,7 @@ export default function EssLeaveOverhaulPage() {
           fetchLiveLeaveData();
         }
       };
-    } catch {}
+    } catch { }
 
     return () => {
       channel?.close();
@@ -549,8 +623,8 @@ export default function EssLeaveOverhaulPage() {
       annualTotal,
       annualUsed: approvedAnnual,
       annualRemaining,
-      jointHoliday: 2,
-      sickUsed: approvedSick,
+      jointHoliday: Math.max(2, approvedJoint),
+      sickUsed: Math.max(1, approvedSick),
       pendingCount: pending,
     });
   }, [requests]);
@@ -569,13 +643,13 @@ export default function EssLeaveOverhaulPage() {
         await fetch(`/api/v1/approvals?id=${id}`, {
           method: 'DELETE',
         });
-      } catch {}
+      } catch { }
 
       try {
         const ch = new BroadcastChannel('nexora_live_sync');
         ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'CANCELLED' });
         ch.close();
-      } catch {}
+      } catch { }
     }
   };
 
@@ -668,13 +742,13 @@ export default function EssLeaveOverhaulPage() {
           reason: newReq.notes || newReq.title || 'Keperluan Pribadi',
           quotaMeta: `Sisa Kuota: ${remainingAfter} Hari`,
         }),
-      }).catch(() => {});
+      }).catch(() => { });
 
       try {
         const ch = new BroadcastChannel('nexora_live_sync');
         ch.postMessage({ type: 'NEW_APPROVAL_REQUEST', request: newReq });
         ch.close();
-      } catch {}
+      } catch { }
 
       setIsApplyModalOpen(false);
       setFormTitle('');
@@ -994,19 +1068,17 @@ export default function EssLeaveOverhaulPage() {
               <button
                 type="button"
                 onClick={() => setActiveFilter('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
-                  activeFilter === 'all'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeFilter === 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+                  }`}
               >
                 <span>Semua Pengajuan</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
-                    activeFilter === 'all'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-slate-200 text-slate-700'
-                  }`}
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${activeFilter === 'all'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-200 text-slate-700'
+                    }`}
                 >
                   {requests.length}
                 </span>
@@ -1015,20 +1087,18 @@ export default function EssLeaveOverhaulPage() {
               <button
                 type="button"
                 onClick={() => setActiveFilter('pending')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
-                  activeFilter === 'pending'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeFilter === 'pending'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+                  }`}
               >
                 <span>Menunggu Persetujuan</span>
                 {balances.pendingCount > 0 && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
-                      activeFilter === 'pending'
-                        ? 'bg-white/20 text-white'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${activeFilter === 'pending'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-amber-100 text-amber-800'
+                      }`}
                   >
                     {balances.pendingCount}
                   </span>
@@ -1038,19 +1108,17 @@ export default function EssLeaveOverhaulPage() {
               <button
                 type="button"
                 onClick={() => setActiveFilter('approved')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
-                  activeFilter === 'approved'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeFilter === 'approved'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+                  }`}
               >
                 <span>Disetujui</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
-                    activeFilter === 'approved'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-emerald-100 text-emerald-800'
-                  }`}
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${activeFilter === 'approved'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-emerald-100 text-emerald-800'
+                    }`}
                 >
                   {requests.filter((r) => r.status === 'APPROVED').length}
                 </span>
@@ -1121,27 +1189,24 @@ export default function EssLeaveOverhaulPage() {
                 filteredRequests.map((item) => (
                   <div
                     key={item.id}
-                    className={`bg-white rounded-3xl p-6 sm:p-7 border transition-all duration-300 relative overflow-hidden space-y-5 ${
-                      recentlyUpdatedId === item.id
-                        ? 'ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-500/10'
-                        : 'shadow-2xs hover:shadow-md'
-                    } ${
-                      item.status === 'PENDING'
+                    className={`bg-white rounded-3xl p-6 sm:p-7 border transition-all duration-300 relative overflow-hidden space-y-5 ${recentlyUpdatedId === item.id
+                      ? 'ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-500/10'
+                      : 'shadow-2xs hover:shadow-md'
+                      } ${item.status === 'PENDING'
                         ? 'border-slate-200/90 hover:border-amber-300/80'
                         : item.status === 'REJECTED'
-                        ? 'border-slate-200/90 hover:border-rose-300/80'
-                        : 'border-slate-200/90 hover:border-emerald-300/80'
-                    }`}
+                          ? 'border-slate-200/90 hover:border-rose-300/80'
+                          : 'border-slate-200/90 hover:border-emerald-300/80'
+                      }`}
                   >
                     {/* Sleek Inner Status Accent Bar (Preserves rounded corners without glitching) */}
                     <div
-                      className={`absolute left-0 top-6 bottom-6 w-1.5 rounded-r-full transition-colors ${
-                        item.status === 'PENDING'
-                          ? 'bg-amber-500'
-                          : item.status === 'REJECTED'
+                      className={`absolute left-0 top-6 bottom-6 w-1.5 rounded-r-full transition-colors ${item.status === 'PENDING'
+                        ? 'bg-amber-500'
+                        : item.status === 'REJECTED'
                           ? 'bg-rose-500'
                           : 'bg-emerald-500'
-                      }`}
+                        }`}
                     />
 
                     {/* Header Row: Badges & Right Actions */}
@@ -1149,13 +1214,12 @@ export default function EssLeaveOverhaulPage() {
                       <div className="flex flex-wrap items-center gap-2.5">
                         {/* Status Badge */}
                         <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-2xs transition-all ${
-                            item.status === 'PENDING'
-                              ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
-                              : item.status === 'REJECTED'
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shadow-2xs transition-all ${item.status === 'PENDING'
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
+                            : item.status === 'REJECTED'
                               ? 'bg-rose-50 text-rose-800 border border-rose-200/80'
                               : 'bg-emerald-50 text-emerald-800 border border-emerald-200/80'
-                          }`}
+                            }`}
                         >
                           {item.status === 'PENDING' ? (
                             <span className="relative flex h-2 w-2">
@@ -1172,13 +1236,12 @@ export default function EssLeaveOverhaulPage() {
 
                         {/* Leave Type Pill */}
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                            item.type.includes('Sakit') || item.title.includes('Sakit')
-                              ? 'bg-rose-50/70 text-rose-700 border-rose-200/80'
-                              : item.type.includes('Bersama')
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${item.type.includes('Sakit') || item.title.includes('Sakit')
+                            ? 'bg-rose-50/70 text-rose-700 border-rose-200/80'
+                            : item.type.includes('Bersama')
                               ? 'bg-purple-50/70 text-purple-700 border-purple-200/80'
                               : 'bg-blue-50/70 text-blue-700 border-blue-200/80'
-                          }`}
+                            }`}
                         >
                           {item.type.includes('Sakit') || item.title.includes('Sakit') ? (
                             <HeartPulse className="w-3 h-3 text-rose-500" />
@@ -1341,28 +1404,26 @@ export default function EssLeaveOverhaulPage() {
                           return (
                             <div
                               key={idx}
-                              className={`p-3.5 rounded-2xl border transition-all relative flex flex-col justify-between space-y-3 ${
-                                isCompleted
-                                  ? 'bg-gradient-to-br from-emerald-50/40 to-teal-50/20 border-emerald-200/90 shadow-2xs'
-                                  : isInProgress
+                              className={`p-3.5 rounded-2xl border transition-all relative flex flex-col justify-between space-y-3 ${isCompleted
+                                ? 'bg-gradient-to-br from-emerald-50/40 to-teal-50/20 border-emerald-200/90 shadow-2xs'
+                                : isInProgress
                                   ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/20 shadow-xs'
                                   : isRejected
-                                  ? 'bg-rose-50/50 border-rose-200 text-rose-900 shadow-2xs'
-                                  : 'bg-slate-50/60 border-slate-200/70 text-slate-500'
-                              }`}
+                                    ? 'bg-rose-50/50 border-rose-200 text-rose-900 shadow-2xs'
+                                    : 'bg-slate-50/60 border-slate-200/70 text-slate-500'
+                                }`}
                             >
                               {/* Top Step Header */}
                               <div className="flex items-start gap-3">
                                 <div
-                                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold transition-all shadow-2xs ${
-                                    isCompleted
-                                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
-                                      : isInProgress
+                                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold transition-all shadow-2xs ${isCompleted
+                                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
+                                    : isInProgress
                                       ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white'
                                       : isRejected
-                                      ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white'
-                                      : 'bg-slate-200 text-slate-400'
-                                  }`}
+                                        ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white'
+                                        : 'bg-slate-200 text-slate-400'
+                                    }`}
                                 >
                                   {isCompleted ? (
                                     <Check className="w-4 h-4 stroke-[3]" />
@@ -1381,23 +1442,22 @@ export default function EssLeaveOverhaulPage() {
                                       {st.title}
                                     </p>
                                     <span
-                                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${
-                                        isCompleted
-                                          ? 'bg-emerald-100 text-emerald-800'
-                                          : isInProgress
+                                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${isCompleted
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : isInProgress
                                           ? 'bg-amber-100 text-amber-800'
                                           : isRejected
-                                          ? 'bg-rose-100 text-rose-800'
-                                          : 'bg-slate-200/80 text-slate-600'
-                                      }`}
+                                            ? 'bg-rose-100 text-rose-800'
+                                            : 'bg-slate-200/80 text-slate-600'
+                                        }`}
                                     >
                                       {isCompleted
                                         ? 'Selesai'
                                         : isInProgress
-                                        ? 'Proses'
-                                        : isRejected
-                                        ? 'Ditolak'
-                                        : 'Antrean'}
+                                          ? 'Proses'
+                                          : isRejected
+                                            ? 'Ditolak'
+                                            : 'Antrean'}
                                     </span>
                                   </div>
                                   <p className="text-[11px] text-slate-600 font-semibold truncate mt-0.5">
@@ -1414,15 +1474,14 @@ export default function EssLeaveOverhaulPage() {
                                     <span>Waktu:</span>
                                   </span>
                                   <span
-                                    className={`font-semibold ${
-                                      isCompleted
-                                        ? 'text-emerald-700'
-                                        : isInProgress
+                                    className={`font-semibold ${isCompleted
+                                      ? 'text-emerald-700'
+                                      : isInProgress
                                         ? 'text-amber-700 font-bold'
                                         : isRejected
-                                        ? 'text-rose-700'
-                                        : 'text-slate-400'
-                                    }`}
+                                          ? 'text-rose-700'
+                                          : 'text-slate-400'
+                                      }`}
                                   >
                                     {st.time}
                                   </span>

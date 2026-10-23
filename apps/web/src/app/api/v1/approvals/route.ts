@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { broadcastApprovalEvent } from '@/lib/approvalsSSE';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
+import {
+  getLeaveRequestsFromDb,
+  saveLeaveRequestToDb,
+  updateLeaveRequestStatusInDb,
+} from '@/lib/leaveDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -84,11 +90,26 @@ export async function GET(request: NextRequest) {
   const includeAll = searchParams.get('all') === 'true';
   const approvals = getStoredApprovals();
 
-  if (includeAll) {
-    return NextResponse.json({ success: true, data: approvals }, { status: 200 });
+  // Load real persistent leave requests from Neon PostgreSQL
+  let dbLeaves: ApprovalItem[] = [];
+  try {
+    dbLeaves = await getLeaveRequestsFromDb();
+  } catch (err) {
+    console.warn('[approvals/GET] Could not load from DB:', err);
   }
 
-  const pending = approvals.filter(
+  let merged = approvals;
+  if (Array.isArray(dbLeaves) && dbLeaves.length > 0) {
+    const dbIds = new Set(dbLeaves.map((d) => d.id));
+    const remaining = approvals.filter((a) => !dbIds.has(a.id));
+    merged = [...dbLeaves, ...remaining];
+  }
+
+  if (includeAll) {
+    return NextResponse.json({ success: true, data: merged }, { status: 200 });
+  }
+
+  const pending = merged.filter(
     (a) => a.status === 'PENDING' || a.status === 'PENDING_HRD' || a.status === 'PENDING_SPV'
   );
   return NextResponse.json({ success: true, data: pending }, { status: 200 });
@@ -107,10 +128,13 @@ export async function POST(request: NextRequest) {
       .map((n: string) => n[0])
       .join('')
       .slice(0, 2)
-      .toUpperCase() || 'RP';
+    const generatedId =
+      body.id && body.id.includes('-') && body.id.length === 36
+        ? body.id
+        : crypto.randomUUID();
 
     const newItem: ApprovalItem = {
-      id: body.id || `req-${Date.now()}`,
+      id: generatedId,
       name,
       nik: body.nik || 'NX-2021008',
       role: body.role || 'Lead Backend Architect • Technology',
@@ -145,6 +169,13 @@ export async function POST(request: NextRequest) {
 
     const updated = [newItem, ...approvals];
     saveStoredApprovals(updated);
+
+    // Persist permanently to Neon PostgreSQL
+    try {
+      await saveLeaveRequestToDb(newItem);
+    } catch (dbErr) {
+      console.error('[approvals/POST] Error persisting to Neon DB:', dbErr);
+    }
 
     // 1. Broadcast real-time SSE event to all connected devices / browsers
     broadcastApprovalEvent('LEAVE_SUBMITTED', newItem);
@@ -234,23 +265,47 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // Update in Neon PostgreSQL
+    let dbUpdated = false;
+    try {
+      dbUpdated = await updateLeaveRequestStatusInDb(
+        id,
+        status === 'APPROVED' ? 'APPROVED' : 'REJECTED'
+      );
+    } catch (dbErr) {
+      console.error('[approvals/PATCH] Error updating Neon DB status:', dbErr);
+    }
+
     const approvals = getStoredApprovals();
     const index = approvals.findIndex((a) => a.id === id);
-    if (index === -1) {
+    let targetItem: ApprovalItem | null = null;
+    if (index !== -1) {
+      approvals[index].status = status;
+      saveStoredApprovals(approvals);
+      targetItem = approvals[index];
+    } else {
+      try {
+        const dbLeaves = await getLeaveRequestsFromDb();
+        const found = dbLeaves.find((d) => d.id === id);
+        if (found) {
+          targetItem = { ...found, status };
+          saveStoredApprovals([targetItem, ...approvals]);
+        }
+      } catch {}
+    }
+
+    if (!targetItem && !dbUpdated) {
       return NextResponse.json(
         { success: false, error: { message: 'Data pengajuan tidak ditemukan' } },
         { status: 404 }
       );
     }
 
-    approvals[index].status = status;
-    saveStoredApprovals(approvals);
-
     // Broadcast SSE update event to all connected devices
     broadcastApprovalEvent('LEAVE_ACTIONED', {
       id,
       status,
-      item: approvals[index],
+      item: targetItem || { id, status },
     });
 
     // Dispatch audit log for leave decision
