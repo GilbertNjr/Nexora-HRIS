@@ -108,8 +108,21 @@ export default function EmployeeAttendancePage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Live Digital Clock state
-  const [liveTime, setLiveTime] = useState('14:15:24 WIB');
-  const [liveDate, setLiveDate] = useState('Senin, 24 Maret 2025');
+  const [liveTime, setLiveTime] = useState(() =>
+    new Date().toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }) + ' WIB'
+  );
+  const [liveDate, setLiveDate] = useState(() =>
+    new Date().toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  );
 
   // Work Location State (WFO, WFH, Dinas)
   const [workLocation, setWorkLocation] = useState<'WFO' | 'WFH' | 'DINAS'>('WFO');
@@ -126,18 +139,18 @@ export default function EmployeeAttendancePage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Check-In / Check-Out Status
-  const [isCheckedIn, setIsCheckedIn] = useState(true);
-  const [checkInTimeStr, setCheckInTimeStr] = useState('07:51 WIB');
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [checkInTimeStr, setCheckInTimeStr] = useState('-- : -- WIB');
   const [isTodayLate, setIsTodayLate] = useState(false);
   const [hasClockedOut, setHasClockedOut] = useState(false);
   const [clockOutTimeStr, setClockOutTimeStr] = useState('-- : -- : -- WIB');
 
   // Real-Time Monthly KPI Stats
   const [attendanceStats, setAttendanceStats] = useState<MonthlyAttendanceStats>({
-    presentDays: 21,
+    presentDays: 20,
     totalWorkDays: 21,
-    attendancePercentage: 100,
-    totalEffectiveHours: 168.5,
+    attendancePercentage: 95,
+    totalEffectiveHours: 161.0,
     overtimeHours: 8.5,
     totalLateMinutes: 0,
     lateCount: 0,
@@ -145,11 +158,11 @@ export default function EmployeeAttendancePage() {
     avgCheckInTime: '08:02 WIB',
     remainingCorrectionQuota: 2,
     maxCorrectionQuota: 3,
-    isCheckedIn: true,
-    checkInTimeStr: '07:51 WIB',
+    isCheckedIn: false,
+    checkInTimeStr: '-- : -- WIB',
     hasClockedOut: false,
     clockOutTimeStr: '-- : -- : -- WIB',
-    todayStatus: 'TEPAT_WAKTU',
+    todayStatus: 'BELUM_CHECK_IN',
   });
 
   // History state
@@ -384,11 +397,11 @@ export default function EmployeeAttendancePage() {
         ? attendanceHistory
         : [
             {
-              date: '2025-03-24',
-              shiftName: 'Reguler Ramadhan (08:30-16:30)',
+              date: new Date().toISOString().split('T')[0],
+              shiftName: 'Reguler HQ (08:00 - 17:00)',
               checkIn: checkInTimeStr,
-              checkOut: hasClockedOut ? clockOutTimeStr : '16:35 WIB',
-              statusLabel: isTodayLate ? 'Terlambat' : 'Tepat Waktu',
+              checkOut: hasClockedOut ? clockOutTimeStr : '17:05 WIB',
+              statusLabel: isTodayLate ? 'Terlambat Masuk' : 'Tepat Waktu',
               workLocation: 'HQ Pacific SCBD Lt. 7',
               verificationMethod: 'Biometrik Face Scan + GPS',
               duration: '7.5 Jam',
