@@ -1427,10 +1427,13 @@ export default function AdminLeavePage() {
 
                 <div className="space-y-2">
                   {leavesOnSelectedDate.length === 0 ? (
-                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-center">
-                      <p className="text-xs font-semibold text-slate-700">Seluruh Karyawan Hadir</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        Tidak ada cuti aktif pada {formattedSelectedDateStr}
+                    <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-1.5 shadow-2xs">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-800">Seluruh Karyawan Hadir</p>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        Tidak ada cuti atau izin aktif pada {formattedSelectedDateStr}. Data tersinkronisasi otomatis saat ada permohonan yang disetujui.
                       </p>
                     </div>
                   ) : (
