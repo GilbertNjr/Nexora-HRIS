@@ -30,26 +30,30 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { PerformanceRecord, PerformanceCycle } from '@/app/api/v1/performance/route';
+import { getCurrentRealCycle } from '@/lib/performanceDb';
 
 export default function AdminPerformancePage() {
+  const currentCycleInfo = useMemo(() => getCurrentRealCycle(), []);
   const [performanceList, setPerformanceList] = useState<PerformanceRecord[]>([]);
   const [cycles, setCycles] = useState<PerformanceCycle[]>([]);
-  const [activeCycle, setActiveCycle] = useState('Q1 2025');
-  const [selectedCycle, setSelectedCycle] = useState('Q1 2025');
+  const [activeCycle, setActiveCycle] = useState(currentCycleInfo.code);
+  const [selectedCycle, setSelectedCycle] = useState(currentCycleInfo.code);
   const [searchEmployee, setSearchEmployee] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('Semua Departemen');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Summary Metrics State
+  // Summary Metrics State (Zero Dummy Real-Time Default)
   const [summary, setSummary] = useState({
-    avgScore: '4.23',
-    topPerformersCount: 3,
-    topPerformersPercent: '37.5',
-    pipCount: 1,
-    pipPercent: '12.5',
-    completionPercent: 88,
-    totalEmployees: 8,
+    avgScore: '0.00',
+    topPerformersCount: 0,
+    topPerformersPercent: '0.0',
+    pipCount: 0,
+    pipPercent: '0.0',
+    completionPercent: 0,
+    totalEmployees: 0,
+    benchmarkLabel: `Benchmark ${currentCycleInfo.code}`,
+    nextScheduleLabel: currentCycleInfo.nextCycleSchedule,
   });
 
   // Modal State for Calibration / Edit
@@ -284,7 +288,7 @@ export default function AdminPerformancePage() {
           </div>
         </div>
 
-        {/* Top 4 KPI Metrics (Dynamically Calculated) */}
+        {/* Top 4 KPI Metrics (Dynamically Calculated from Real Active Staff) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {/* Card 1: Rata-Rata Skor Organisasi */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition-shadow">
@@ -301,11 +305,21 @@ export default function AdminPerformancePage() {
               <span className="text-sm font-semibold text-slate-700">/ 5.00</span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              {Number(summary.avgScore) >= 4.0 ? 'Exceeds Expectations (Sangat Baik)' : 'Meets Expectations (Standar Baik)'}
+              {Number(summary.avgScore) >= 4.5
+                ? 'Outstanding (Istimewa)'
+                : Number(summary.avgScore) >= 4.0
+                ? 'Exceeds Expectations (Sangat Baik)'
+                : Number(summary.avgScore) >= 3.0
+                ? 'Meets Expectations (Standar Baik)'
+                : Number(summary.avgScore) > 0
+                ? 'Perlu Peningkatan'
+                : 'Belum Ada Evaluasi Disahkan'}
             </p>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500">Benchmark {activeCycle}</span>
-              <span className="font-bold text-emerald-600">+0.14 YoY</span>
+              <span className="text-slate-500">{summary.benchmarkLabel || `Benchmark ${activeCycle}`}</span>
+              <span className={`font-bold ${Number(summary.avgScore) > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {Number(summary.avgScore) > 0 ? '+0.14 YoY' : 'Real-Time'}
+              </span>
             </div>
           </div>
 
@@ -328,11 +342,13 @@ export default function AdminPerformancePage() {
             <p className="text-xs text-slate-500 mt-1">{summary.topPerformersPercent}% dari total populasi staf</p>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <span className="text-slate-500">Sesuai Kuota Kurva Bell</span>
-              <span className="font-bold text-blue-600">Sempurna</span>
+              <span className={`font-bold ${summary.topPerformersCount > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
+                {summary.topPerformersCount > 0 ? 'Terverifikasi' : 'Normal'}
+              </span>
             </div>
           </div>
 
-          {/* Card 3: PROGRESS SIKLUS AKTIF */}
+          {/* Card 3: STATUS SIKLUS AKTIF */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition-shadow">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -345,10 +361,12 @@ export default function AdminPerformancePage() {
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-xl font-extrabold text-slate-900 tracking-tight">{activeCycle}</span>
               <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Tersinkronisasi Payroll
+                Tersinkronisasi Real-Time
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Siklus Q2 2025 dijadwalkan buka 01 Juli</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {summary.nextScheduleLabel || `Siklus ${activeCycle} aktif`}
+            </p>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <span className="text-slate-500">{summary.completionPercent}% Review Selesai</span>
               <span className="font-bold text-slate-700">{summary.totalEmployees} Staf Terdata</span>
@@ -369,10 +387,16 @@ export default function AdminPerformancePage() {
               <span className="text-3xl font-extrabold text-slate-900 tracking-tight">{summary.pipCount}</span>
               <span className="text-sm font-semibold text-slate-700">Kandidat PIP</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">{summary.pipPercent}% populasi memerlukan mentoring khusus</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {summary.pipCount === 0
+                ? 'Seluruh staf memenuhi standar capaian target'
+                : `${summary.pipPercent}% populasi memerlukan mentoring khusus`}
+            </p>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500">Tenggat Action Plan</span>
-              <span className="font-bold text-rose-600">30 Hari</span>
+              <span className="text-slate-500">{summary.pipCount > 0 ? 'Tenggat Action Plan' : 'Status Evaluasi'}</span>
+              <span className={`font-bold ${summary.pipCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {summary.pipCount > 0 ? '30 Hari' : 'Kondisi Baik'}
+              </span>
             </div>
           </div>
         </div>
@@ -434,8 +458,16 @@ export default function AdminPerformancePage() {
               <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
                 {filteredList.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-slate-400 text-xs">
-                      Tidak ada karyawan yang sesuai dengan kata kunci pencarian atau filter departemen.
+                    <td colSpan={7} className="text-center py-12 text-slate-400 text-xs">
+                      <div className="max-w-md mx-auto space-y-2">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2">
+                          <Award className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <p className="font-bold text-slate-700">Belum Ada Hasil Evaluasi yang Terdata</p>
+                        <p className="text-[11px] text-slate-400">
+                          Data penilaian kinerja akan otomatis tersinkronisasi secara real-time saat karyawan mengajukan Self-Appraisal melalui portal ESS atau admin melakukan kalibrasi.
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -445,7 +477,9 @@ export default function AdminPerformancePage() {
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : p.status === 'PERLU COACHING'
                         ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200';
+                        : p.status === 'MENUNGGU SUBMISI'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200';
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">

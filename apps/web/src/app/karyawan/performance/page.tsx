@@ -64,15 +64,22 @@ export default function EssPerformancePage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Dynamic real-time date state
-  const [todayDate, setTodayDate] = useState<{ dayName: string; dayNum: string; monthYear: string }>({
-    dayName: 'Senin',
-    dayNum: '24',
-    monthYear: 'Maret 2025',
+  const [todayDate, setTodayDate] = useState<{ dayName: string; dayNum: string; monthYear: string }>(() => {
+    const now = new Date();
+    return {
+      dayName: new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(now),
+      dayNum: new Intl.DateTimeFormat('id-ID', { day: 'numeric' }).format(now),
+      monthYear: new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(now),
+    };
   });
 
   // Performance live state
   const [performanceRecord, setPerformanceRecord] = useState<PerformanceRecord | null>(null);
-  const [activeCycle, setActiveCycle] = useState('Q1 2025');
+  const [activeCycle, setActiveCycle] = useState(() => {
+    const now = new Date();
+    const q = Math.floor(now.getMonth() / 3) + 1;
+    return `Q${q} ${now.getFullYear()}`;
+  });
   const [okrList, setOkrList] = useState<OkrItem[]>([]);
   const [editingOkrId, setEditingOkrId] = useState<string | null>(null);
   const [tempRating, setTempRating] = useState<string>('4.7');
