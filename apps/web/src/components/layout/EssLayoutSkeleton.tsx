@@ -14,7 +14,6 @@ import {
   User,
   Bell,
   MapPin,
-  ShieldCheck,
   Building2,
   ExternalLink,
 } from 'lucide-react';
@@ -106,16 +105,6 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>Terhubung Real-Time HR Admin</span>
           </div>
-
-          {/* Quick link to HR Admin */}
-          <Link
-            href="/admin"
-            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-blue-700 bg-slate-100 hover:bg-blue-50 border border-slate-200 transition-all"
-            title="Buka Portal HR Admin"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-            <span>Portal HR Admin</span>
-          </Link>
 
           <NotificationBellDropdown portal="ess" />
 
@@ -240,9 +229,14 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
           <FileText className="w-5 h-5" />
           <span className="text-[10px]">Slip Gaji</span>
         </Link>
-        <Link href="/admin" className="flex flex-col items-center gap-1 text-slate-500 hover:text-blue-600">
-          <ShieldCheck className="w-5 h-5" />
-          <span className="text-[10px]">HR Admin</span>
+        <Link
+          href="/karyawan/profile"
+          className={`flex flex-col items-center gap-1 ${
+            pathname === '/karyawan/profile' ? 'text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600'
+          }`}
+        >
+          <User className="w-5 h-5" />
+          <span className="text-[10px]">Profil</span>
         </Link>
       </nav>
 
