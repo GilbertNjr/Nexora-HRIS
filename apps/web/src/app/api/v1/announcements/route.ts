@@ -30,30 +30,30 @@ const defaultAnnouncements: HrAnnouncement[] = [
   {
     id: 'ann-1',
     badge: 'PENGUMUMAN HRD',
-    docNumber: 'No. 018/HR-NOTIF/III/2025',
-    title: 'Penyesuaian Jam Operasional Ramadhan 1446 H',
+    docNumber: 'No. 018/HR-NOTIF/X/2026',
+    title: 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026',
     summary:
-      'Selama bulan suci Ramadhan, jam kepulangan karyawan dimajukan menjadi pukul 16:30 WIB. Jam istirahat dipadatkan menjadi 30 menit demi efisiensi bersama.',
+      'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.',
     content:
-      'Berdasarkan Keputusan Direksi Nomor SE/018/DIR-HR/III/2025 mengenai Penyesuaian Jam Kerja Bulan Ramadhan 1446 H:\n\n1. Jam Kerja Reguler: 08:30 WIB s/d 16:30 WIB (Senin s/d Kamis), 08:30 WIB s/d 17:00 WIB (Jumat).\n2. Waktu Istirahat: 12:00 s/d 12:30 WIB (Senin - Kamis), 11:45 s/d 13:00 WIB (Jumat Sholat Jumat).\n3. Presensi tetap wajib melalui Liveness Biometric Face Scan pada Portal ESS.\n4. Karyawan yang bertugas WFH wajib standby pada jam kerja efektif dan mengikuti daily standup pukul 08:45 WIB.',
+      'Berdasarkan Keputusan Direksi Nomor SE/018/DIR-HR/X/2026 mengenai Penyesuaian Jam Kerja & Hybrid Working Q4 2026:\n\n1. Jam Kerja Reguler: 08:30 WIB s/d 16:30 WIB (Senin s/d Kamis), 08:30 WIB s/d 17:00 WIB (Jumat).\n2. Waktu Istirahat: 12:00 s/d 13:00 WIB (Senin - Kamis), 11:30 s/d 13:00 WIB (Jumat Sholat Jumat).\n3. Presensi tetap wajib melalui Liveness Biometric Face Scan pada Portal ESS.\n4. Karyawan yang bertugas WFH wajib standby pada jam kerja efektif dan mengikuti daily standup pukul 08:45 WIB.',
     buttonText: 'Lihat SE Direksi',
     priority: 'IMPORTANT',
-    publishedAt: '24 Maret 2025, 08:00 WIB',
+    publishedAt: '20 Oktober 2026, 08:00 WIB',
     author: 'Direktur SDM & Operasional',
     isEmergency: false,
   },
   {
     id: 'ann-2',
     badge: 'SURAT EDARAN',
-    docNumber: 'No. 015/SE-DIR/II/2025',
-    title: 'Kebijakan Skema Hybrid Working WFO & WFH 2025',
+    docNumber: 'No. 015/SE-DIR/X/2026',
+    title: 'Kebijakan Skema Hybrid Working WFO & WFH 2026',
     summary:
       'Penegasan kuota WFH maksimal 2 hari per pekan dengan rasio kehadiran kantor minimal 60% per hari untuk mendukung sinergi antar departemen.',
     content:
       'Mengingat pentingnya kolaborasi tatap muka pada kuartal berjalan, manajemen menetapkan bahwa:\n\n1. Setiap anggota tim berhak mengajukan preferensi WFH maksimal 2 hari kerja dalam sepekan.\n2. Roster kerja wajib dikoordinasikan bersama Team Lead / Head of Department.\n3. Presensi WFO diverifikasi melalui Geofencing SCBD Tower Lt. 7.',
     buttonText: 'Lihat Kebijakan',
     priority: 'INFO',
-    publishedAt: '15 Februari 2025, 09:30 WIB',
+    publishedAt: '15 Oktober 2026, 09:30 WIB',
     author: 'HR Operations Lead',
     isEmergency: false,
   },

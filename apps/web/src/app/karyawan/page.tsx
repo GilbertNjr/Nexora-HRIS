@@ -51,6 +51,82 @@ import {
 import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
 
+interface WeeklyScheduleDay {
+  day: 'SENIN' | 'SELASA' | 'RABU' | 'KAMIS' | 'JUMAT';
+  date: string;
+  month: string;
+  isoDate: string;
+  type: 'WFO' | 'WFH';
+  location: string;
+  isToday: boolean;
+}
+
+const INDO_MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+function computeRealWeeklySchedule(
+  customPreferences?: Record<string, 'WFO' | 'WFH'> | null,
+  todayAttendanceType?: 'WFO' | 'WFH' | null
+): { periodStr: string; schedule: WeeklyScheduleDay[]; wfoRatio: number } {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const days: Array<'SENIN' | 'SELASA' | 'RABU' | 'KAMIS' | 'JUMAT'> = [
+    'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT'
+  ];
+  const defaultTypes: Array<'WFO' | 'WFH'> = ['WFO', 'WFH', 'WFO', 'WFO', 'WFH'];
+
+  let wfoCount = 0;
+  const schedule: WeeklyScheduleDay[] = days.map((dayName, idx) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + idx);
+    const isoDate = d.toISOString().split('T')[0];
+
+    // Accurate isToday: if weekday (Mon-Fri) exact match, if weekend (Sat/Sun) highlight Friday (day 6) or Monday (day 0)
+    const isActualToday = d.toDateString() === now.toDateString();
+    const isHighlighted = isActualToday || (dayOfWeek === 6 && idx === 4) || (dayOfWeek === 0 && idx === 0);
+
+    let type: 'WFO' | 'WFH' = customPreferences?.[isoDate] || customPreferences?.[dayName] || defaultTypes[idx];
+
+    // If today has confirmed clock-in, sync status
+    if (isActualToday && todayAttendanceType) {
+      type = todayAttendanceType;
+    }
+
+    if (type === 'WFO') wfoCount++;
+
+    return {
+      day: dayName,
+      date: String(d.getDate()),
+      month: INDO_MONTH_NAMES[d.getMonth()],
+      isoDate,
+      type,
+      location: type === 'WFH' ? 'WFH' : 'WFO (SCBD)',
+      isToday: isHighlighted,
+    };
+  });
+
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+
+  let periodStr = '';
+  if (monday.getMonth() === friday.getMonth()) {
+    periodStr = `${monday.getDate()} - ${friday.getDate()} ${INDO_MONTH_NAMES[friday.getMonth()]} ${friday.getFullYear()}`;
+  } else {
+    periodStr = `${monday.getDate()} ${INDO_MONTH_NAMES[monday.getMonth()]} - ${friday.getDate()} ${INDO_MONTH_NAMES[friday.getMonth()]} ${friday.getFullYear()}`;
+  }
+
+  const wfoRatio = Math.round((wfoCount / 5) * 100);
+
+  return { periodStr, schedule, wfoRatio };
+}
+
 export default function EmployeeDashboardOverhaulPage() {
   const router = useRouter();
   const { user: currentUser } = useCurrentUser();
@@ -95,15 +171,15 @@ export default function EmployeeDashboardOverhaulPage() {
     {
       id: 'ann-1',
       badge: 'PENGUMUMAN HRD',
-      docNumber: 'No. 018/HR-NOTIF/III/2025',
-      title: 'Penyesuaian Jam Operasional Ramadhan 1446 H',
+      docNumber: 'No. 018/HR-NOTIF/X/2026',
+      title: 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026',
       summary:
-        'Selama bulan suci Ramadhan, jam kepulangan karyawan dimajukan menjadi pukul 16:30 WIB. Jam istirahat dipadatkan menjadi 30 menit demi efisiensi bersama.',
+        'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.',
       content:
-        'Berdasarkan Keputusan Direksi Nomor SE/018/DIR-HR/III/2025 mengenai Penyesuaian Jam Kerja Bulan Ramadhan 1446 H:\n\n1. Jam Kerja Reguler: 08:30 WIB s/d 16:30 WIB (Senin s/d Kamis), 08:30 WIB s/d 17:00 WIB (Jumat).\n2. Waktu Istirahat: 12:00 s/d 12:30 WIB (Senin - Kamis), 11:45 s/d 13:00 WIB (Jumat Sholat Jumat).\n3. Presensi tetap wajib melalui Liveness Biometric Face Scan pada Portal ESS.\n4. Karyawan yang bertugas WFH wajib standby pada jam kerja efektif dan mengikuti daily standup pukul 08:45 WIB.',
+        'Berdasarkan Keputusan Direksi Nomor SE/018/DIR-HR/X/2026 mengenai Penyesuaian Jam Kerja & Hybrid Working Q4 2026:\n\n1. Jam Kerja Reguler: 08:30 WIB s/d 16:30 WIB (Senin s/d Kamis), 08:30 WIB s/d 17:00 WIB (Jumat).\n2. Waktu Istirahat: 12:00 s/d 13:00 WIB (Senin - Kamis), 11:30 s/d 13:00 WIB (Jumat Sholat Jumat).\n3. Presensi tetap wajib melalui Liveness Biometric Face Scan pada Portal ESS.\n4. Karyawan yang bertugas WFH wajib standby pada jam kerja efektif dan mengikuti daily standup pukul 08:45 WIB.',
       buttonText: 'Lihat SE Direksi',
       priority: 'IMPORTANT',
-      publishedAt: '24 Maret 2025, 08:00 WIB',
+      publishedAt: '20 Oktober 2026, 08:00 WIB',
       author: 'Dewan Direksi & HR Operations',
       isEmergency: false,
     },
@@ -157,16 +233,16 @@ export default function EmployeeDashboardOverhaulPage() {
     okrAchievement: '105%',
   });
 
-  const [weeklyPeriodStr, setWeeklyPeriodStr] = useState('');
-
-  // Weekly Schedule State (WFO / WFH)
-  const [weeklySchedule, setWeeklySchedule] = useState([
-    { day: 'SENIN', date: '20', month: 'Oktober', type: 'WFO', location: 'WFO (SCBD)', isToday: false },
-    { day: 'SELASA', date: '21', month: 'Oktober', type: 'WFH', location: 'WFH', isToday: false },
-    { day: 'RABU', date: '22', month: 'Oktober', type: 'WFO', location: 'WFO (SCBD)', isToday: false },
-    { day: 'KAMIS', date: '23', month: 'Oktober', type: 'WFO', location: 'WFO (SCBD)', isToday: true },
-    { day: 'JUMAT', date: '24', month: 'Oktober', type: 'WFH', location: 'WFH', isToday: false },
-  ]);
+  // Real-time Dynamic Weekly Schedule State (100% Calculated from Live Clock)
+  const [weeklySchedule, setWeeklySchedule] = useState<WeeklyScheduleDay[]>(() => {
+    return computeRealWeeklySchedule().schedule;
+  });
+  const [weeklyPeriodStr, setWeeklyPeriodStr] = useState<string>(() => {
+    return computeRealWeeklySchedule().periodStr;
+  });
+  const [wfoRatio, setWfoRatio] = useState<number>(() => {
+    return computeRealWeeklySchedule().wfoRatio;
+  });
 
   // Leave Form State
   const [leaveCategory, setLeaveCategory] = useState('Cuti Tahunan');
@@ -182,7 +258,7 @@ export default function EmployeeDashboardOverhaulPage() {
   const [activeQuota, setActiveQuota] = useState(12);
 
   // Backend Team Attendance
-  const [teamMembers] = useState([
+  const [teamMembers, setTeamMembers] = useState([
     { id: '1', initials: 'RP', name: 'Rian Pratama (Anda)', role: 'Lead Backend', status: 'WFO Lt. 7', color: 'blue' },
     { id: '2', initials: 'NW', name: 'Nadia Wijaya', role: 'Senior Go Developer', status: 'WFO Lt. 7', color: 'blue' },
     { id: '3', initials: 'DS', name: 'Dimas Surya', role: 'Database Engineer', status: 'WFH', color: 'purple' },
@@ -218,14 +294,41 @@ export default function EmployeeDashboardOverhaulPage() {
         );
 
         if (todayRec) {
+          const isWfh = todayRec.status === 'WFH';
           setTodayAttendance({
             hasClockedIn: true,
             checkInTime: todayRec.checkInTime || todayRec.time || '08:00 WIB',
             checkOutTime: todayRec.checkOutTime || '—',
             status: todayRec.status || 'TEPAT_WAKTU',
-            location: todayRec.location || 'SCBD Treasury Tower Lt. 32 (HQ Jakarta)',
+            location: todayRec.location || (isWfh ? 'Rumah / Remote Workspace' : 'SCBD Treasury Tower Lt. 32 (HQ Jakarta)'),
             device: todayRec.device || '((•)) Biometrik Liveness Selfie',
           });
+
+          // Dynamically sync today's card in weeklySchedule
+          setWeeklySchedule((prev) =>
+            prev.map((item) =>
+              item.isToday
+                ? {
+                    ...item,
+                    type: isWfh ? 'WFH' : 'WFO',
+                    location: isWfh ? 'WFH (Tervalidasi)' : 'WFO (SCBD)',
+                  }
+                : item
+            )
+          );
+
+          // Dynamically sync Rian Pratama in team roster
+          setTeamMembers((prev) =>
+            prev.map((m) =>
+              m.id === '1'
+                ? {
+                    ...m,
+                    status: isWfh ? 'WFH' : 'WFO Lt. 7',
+                    color: isWfh ? 'purple' : 'blue',
+                  }
+                : m
+            )
+          );
         } else {
           setTodayAttendance({
             hasClockedIn: false,
@@ -326,34 +429,19 @@ export default function EmployeeDashboardOverhaulPage() {
       daysInMonth: daysInCurrentMonth,
     });
 
-    // Dynamic Real Weekly Schedule (Monday to Friday of current week)
-    const dayOfWeek = now.getDay();
-    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
+    // Load persisted weekly schedule preferences from localStorage
+    let storedPrefs: Record<string, 'WFO' | 'WFH'> | null = null;
+    try {
+      const saved = localStorage.getItem('nexora_weekly_wfh_preferences');
+      if (saved) {
+        storedPrefs = JSON.parse(saved);
+      }
+    } catch {}
 
-    const days = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT'];
-    const scheduleItems = days.map((dayName, idx) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + idx);
-      const isToday = d.toDateString() === now.toDateString();
-      const type = idx === 1 || idx === 4 ? 'WFH' : 'WFO';
-      return {
-        day: dayName,
-        date: String(d.getDate()),
-        month: monthNames[d.getMonth()],
-        type,
-        location: type === 'WFH' ? 'WFH' : 'WFO (SCBD)',
-        isToday,
-      };
-    });
-    setWeeklySchedule(scheduleItems);
-
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
-    setWeeklyPeriodStr(
-      `${monday.getDate()} - ${friday.getDate()} ${monthNames[friday.getMonth()]} ${friday.getFullYear()}`
-    );
+    const { schedule: realSchedule, periodStr: realPeriodStr, wfoRatio: realWfoRatio } = computeRealWeeklySchedule(storedPrefs);
+    setWeeklySchedule(realSchedule);
+    setWeeklyPeriodStr(realPeriodStr);
+    setWfoRatio(realWfoRatio);
 
     // Initial real-time data load
     fetchRealtimeDashboardData();
@@ -392,6 +480,13 @@ export default function EmployeeDashboardOverhaulPage() {
           type === 'PROFILE_UPDATED'
         ) {
           fetchRealtimeDashboardData();
+        }
+
+        if (type === 'SCHEDULE_PREFERENCE_UPDATED' && event.data?.payload) {
+          const { schedule: syncSched, periodStr: syncPeriod, wfoRatio: syncRatio } = computeRealWeeklySchedule(event.data.payload);
+          setWeeklySchedule(syncSched);
+          setWeeklyPeriodStr(syncPeriod);
+          setWfoRatio(syncRatio);
         }
 
         if (event.data?.type === 'ANNOUNCEMENT_PUBLISHED' && event.data?.payload) {
@@ -1012,7 +1107,7 @@ export default function EmployeeDashboardOverhaulPage() {
                             {currentAnnouncement?.badge || 'PENGUMUMAN HRD'}
                           </span>
                           <span className="text-[11px] text-blue-200 font-medium">
-                            {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/III/2025'}
+                            {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/X/2026'}
                           </span>
 
                           {/* Live SSE / Broadcast Indicator */}
@@ -1030,12 +1125,12 @@ export default function EmployeeDashboardOverhaulPage() {
                         </div>
 
                         <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white pt-1">
-                          {currentAnnouncement?.title || 'Penyesuaian Jam Operasional Ramadhan 1446 H'}
+                          {currentAnnouncement?.title || 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026'}
                         </h3>
 
                         <p className="text-xs text-blue-100/90 leading-relaxed">
                           {currentAnnouncement?.summary ||
-                            'Selama bulan suci Ramadhan, jam kepulangan karyawan dimajukan menjadi pukul 16:30 WIB. Jam istirahat dipadatkan menjadi 30 menit demi efisiensi bersama.'}
+                            'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.'}
                         </p>
 
                         {/* Navigation dots / arrows if multiple announcements exist */}
@@ -1160,7 +1255,13 @@ export default function EmployeeDashboardOverhaulPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs text-slate-500 border-t border-slate-100">
                   <div className="flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Rasio kehadiran tim minimum WFO: <strong>60%</strong> per hari kerja.</span>
+                    <span>
+                      Rasio kehadiran tim minimum WFO: <strong>60%</strong> per hari kerja{' '}
+                      <span className={wfoRatio >= 60 ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-semibold'}>
+                        (Komitmen Anda: {wfoRatio}%)
+                      </span>
+                      .
+                    </span>
                   </div>
                   <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -1180,7 +1281,7 @@ export default function EmployeeDashboardOverhaulPage() {
                       Kehadiran Tim Backend
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      6 dari 8 Anggota Aktif Hari Ini
+                      {teamMembers.filter((m) => !m.status.includes('Cuti')).length} dari {teamMembers.length} Anggota Aktif Hari Ini
                     </p>
                   </div>
                   <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
@@ -1569,7 +1670,7 @@ export default function EmployeeDashboardOverhaulPage() {
                       {currentAnnouncement?.title || 'Surat Edaran Direksi'}
                     </h3>
                     <p className="text-[11px] text-slate-400">
-                      Nomor: {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/III/2025'}
+                      Nomor: {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/X/2026'}
                     </p>
                   </div>
                 </div>
@@ -1640,7 +1741,9 @@ export default function EmployeeDashboardOverhaulPage() {
                   <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
                     Ubah Preferensi Lokasi Kerja
                   </h3>
-                  <p className="text-[11px] text-slate-400">Atur komitmen hari WFO / WFH pekan ini</p>
+                  <p className="text-[11px] text-slate-400">
+                    Periode {weeklyPeriodStr} • Standar Minimal WFO 60%
+                  </p>
                 </div>
               </div>
               <button
@@ -1652,15 +1755,52 @@ export default function EmployeeDashboardOverhaulPage() {
               </button>
             </div>
 
+            {/* WFO Quota Status Bar */}
+            {(() => {
+              const currentWfo = weeklySchedule.filter((i) => i.type === 'WFO').length;
+              const currentPct = Math.round((currentWfo / 5) * 100);
+              const isCompliant = currentWfo >= 3;
+              return (
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/90 flex items-center justify-between gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-medium">Rasio WFO: </span>
+                    <strong className={isCompliant ? 'text-emerald-700' : 'text-amber-700'}>
+                      {currentPct}% ({currentWfo} dari 5 Hari)
+                    </strong>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${
+                      isCompliant
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}
+                  >
+                    {isCompliant ? '✓ Memenuhi Kuota' : '⚠️ Di Bawah 60%'}
+                  </span>
+                </div>
+              );
+            })()}
+
             <div className="space-y-2 text-xs">
               {weeklySchedule.map((item, index) => (
                 <div
                   key={item.day}
-                  className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50"
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                    item.isToday
+                      ? 'border-blue-300 bg-blue-50/50'
+                      : 'border-slate-200 bg-slate-50/50'
+                  }`}
                 >
-                  <span className="font-bold text-slate-800">
-                    {item.day}, {item.date} {item.month}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">
+                      {item.day}, {item.date} {item.month}
+                    </span>
+                    {item.isToday && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-600 text-white">
+                        HARI INI
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
@@ -1673,7 +1813,7 @@ export default function EmployeeDashboardOverhaulPage() {
                       className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
                         item.type === 'WFO'
                           ? 'bg-blue-600 text-white shadow-2xs'
-                          : 'bg-white text-slate-600 border border-slate-200'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       WFO
@@ -1689,7 +1829,7 @@ export default function EmployeeDashboardOverhaulPage() {
                       className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
                         item.type === 'WFH'
                           ? 'bg-purple-600 text-white shadow-2xs'
-                          : 'bg-white text-slate-600 border border-slate-200'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       WFH
@@ -1702,9 +1842,68 @@ export default function EmployeeDashboardOverhaulPage() {
             <div className="pt-2 flex items-center justify-end gap-2.5">
               <button
                 type="button"
+                onClick={() => setIsWfhPreferenceModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs active:scale-95 transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
                 onClick={() => {
+                  const wfoCount = weeklySchedule.filter((i) => i.type === 'WFO').length;
+                  const ratio = Math.round((wfoCount / 5) * 100);
+                  setWfoRatio(ratio);
+
+                  // Persist to localStorage
+                  const prefMap: Record<string, 'WFO' | 'WFH'> = {};
+                  weeklySchedule.forEach((item) => {
+                    prefMap[item.day] = item.type;
+                    if (item.isoDate) prefMap[item.isoDate] = item.type;
+                  });
+                  try {
+                    localStorage.setItem('nexora_weekly_wfh_preferences', JSON.stringify(prefMap));
+                  } catch {}
+
+                  // Sync team roster member 1 (Rian)
+                  const isWfoToday = weeklySchedule.find((i) => i.isToday)?.type === 'WFO';
+                  setTeamMembers((prev) =>
+                    prev.map((m) =>
+                      m.id === '1'
+                        ? {
+                            ...m,
+                            status: isWfoToday ? 'WFO Lt. 7' : 'WFH',
+                            color: isWfoToday ? 'blue' : 'purple',
+                          }
+                        : m
+                    )
+                  );
+
+                  // Broadcast live sync
+                  try {
+                    const bc = new BroadcastChannel('nexora_live_sync');
+                    bc.postMessage({ type: 'SCHEDULE_PREFERENCE_UPDATED', payload: prefMap });
+                    bc.close();
+                  } catch {}
+
+                  // Send audit log in background
+                  try {
+                    fetch('/api/v1/audit', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'UPDATE_WFH_PREFERENCE',
+                        actor: `${currentUser.fullName || 'Rian Pratama'} (${currentUser.designation || 'Karyawan'})`,
+                        details: `Memperbarui komitmen kerja mingguan: ${wfoCount} Hari WFO (${ratio}%), ${5 - wfoCount} Hari WFH`,
+                        category: 'ATTENDANCE',
+                        ipAddress: '10.24.1.88',
+                      }),
+                    }).catch(() => {});
+                  } catch {}
+
                   setIsWfhPreferenceModalOpen(false);
-                  showToast('✓ Preferensi jadwal WFH berhasil diperbarui & disinkronkan ke tim!');
+                  showToast(
+                    `✓ Komitmen kerja pekan ini disimpan (${ratio}% WFO)! Jadwal disinkronkan ke tim.`
+                  );
                 }}
                 className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md active:scale-95 transition-all"
               >
