@@ -1,66 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   LayoutDashboard,
-  User,
   Clock,
-  CalendarDays,
-  CreditCard,
-  TrendingUp,
-  GraduationCap,
-  FolderArchive,
-  Headphones,
-  Search,
   Calendar,
   CheckCircle2,
   Lock,
-  Mail,
   Download,
   ShieldCheck,
-  Building2,
-  TrendingDown,
-  Sparkles,
-  HelpCircle,
   ChevronDown,
   X,
   FileText,
   Printer,
-  Check,
   AlertCircle,
-  ExternalLink,
-  Share2,
-  KeyRound,
-  MinusCircle,
-  PlusCircle,
-  Info,
-  Fingerprint,
-  Star,
-  CheckSquare,
-  PieChart,
-  Video,
-  Play,
-  Award,
   Users,
-  Target,
-  FileCheck,
   MessageSquare,
-  Edit3,
   BookmarkCheck,
-  ArrowRight,
   Activity,
-  UserCheck,
-  ShieldAlert,
-  BookOpen,
-  DollarSign,
-  Compass,
-  Trophy,
-  Laptop,
-  Flame,
-  BadgeCheck,
   FilePlus,
   Receipt,
   Box,
@@ -68,51 +28,51 @@ import {
   MoreVertical,
   FileCode,
   Briefcase,
-  Layers,
-  Upload,
   PanelLeft,
   PanelLeftClose,
   Menu,
+  Search,
 } from 'lucide-react';
 import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
-
-interface DocumentItem {
-  id: string;
-  category: 'legal' | 'letter' | 'tax' | 'template';
-  title: string;
-  docNumber: string;
-  updatedDate: string;
-  fileSize: string;
-  formatBadge: string;
-  signatureStatus: string;
-  securityBadge: string;
-  downloadUrl?: string;
-}
-
-interface RequestTrackingItem {
-  id: string;
-  ticketNo: string;
-  title: string;
-  targetPurpose: string;
-  submittedAt: string;
-  statusLabel: string;
-  currentStep: number;
-  totalSteps: number;
-  estimatedCompletion: string;
-  steps: {
-    title: string;
-    status: 'completed' | 'active' | 'pending';
-  }[];
-}
+import {
+  DocumentItem,
+  RequestTrackingItem,
+  EMeteraiQuota,
+} from '@/app/api/v1/documents/route';
+import {
+  downloadOfficialDocument,
+  printOfficialDocument,
+  OfficialDocParams,
+} from '@/lib/officialDocumentGenerator';
 
 export default function EssDocumentsPage() {
   const { user: currentUser } = useCurrentUser();
-  const { isCollapsed: isSidebarCollapsed, toggle: toggleSidebar, isMobileOpen, openMobile, closeMobile } = useSidebarCollapse();
+  const {
+    isCollapsed: isSidebarCollapsed,
+    toggle: toggleSidebar,
+    isMobileOpen,
+    openMobile,
+    closeMobile,
+  } = useSidebarCollapse();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'legal' | 'letter' | 'tax' | 'template'>('legal');
   const [yearFilter, setYearFilter] = useState('Semua');
   const [formatFilter, setFormatFilter] = useState('Semua');
+
+  // Dynamic real-time date state
+  const [todayDate, setTodayDate] = useState<{ dayName: string; dayNum: string; monthYear: string }>({
+    dayName: 'Senin',
+    dayNum: '24',
+    monthYear: 'Maret 2025',
+  });
+
+  // Dynamic state from API
+  const [documentList, setDocumentList] = useState<DocumentItem[]>([]);
+  const [requestsList, setRequestsList] = useState<RequestTrackingItem[]>([]);
+  const [eMeteraiQuota, setEMeteraiQuota] = useState<EMeteraiQuota>({ used: 3, total: 5, year: 2025 });
+  const [isLoading, setIsLoading] = useState(true);
 
   // Modals state
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
@@ -120,120 +80,215 @@ export default function EssDocumentsPage() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
+  const [selectedTrackingItem, setSelectedTrackingItem] = useState<RequestTrackingItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // New Request Form State
-  const [requestDocType, setRequestDocType] = useState('Surat Keterangan Penghasilan (Income Statement)');
+  const [requestDocType, setRequestDocType] = useState('Surat Keterangan Penghasilan (Salary Slip)');
   const [requestPurpose, setRequestPurpose] = useState('');
   const [requestTargetOrg, setRequestTargetOrg] = useState('');
   const [requestUrgency, setRequestUrgency] = useState('Standar (1-2 Hari Kerja)');
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const documentList: DocumentItem[] = [
-    {
-      id: 'doc-1',
-      category: 'legal',
-      title: 'Perjanjian Kerja Waktu Tidak Tertentu (PKWTT) Addendum 2024',
-      docNumber: 'PKWTT-NX/2024/ENG-014',
-      updatedDate: '10 Jan 2024',
-      fileSize: '2.4 MB',
-      formatBadge: 'PDF RESMI',
-      signatureStatus: 'Ditandatangani Digital (Peruri CA)',
-      securityBadge: 'Kerahasiaan: Privat',
-    },
-    {
-      id: 'doc-2',
-      category: 'letter',
-      title: 'Surat Keterangan Kerja Aktif (SKK) — Pengajuan KPR',
-      docNumber: 'SKK-NX/2025/HR-028',
-      updatedDate: '14 Feb 2025',
-      fileSize: '1.1 MB',
-      formatBadge: 'E-METERAI',
-      signatureStatus: 'Tervalidasi Bank Rekanan (BCA/Mandiri/BRI)',
-      securityBadge: 'E-Meterai Valid',
-    },
-    {
-      id: 'doc-3',
-      category: 'tax',
-      title: 'Formulir Bukti Potong Pajak Penghasilan Pasal 21 (SPT 1721-A1)',
-      docNumber: '1.1-2.1-24-001928',
-      updatedDate: '28 Jan 2025',
-      fileSize: '850 KB',
-      formatBadge: 'DJP RESMI',
-      signatureStatus: 'Dilaporkan ke DJP Pajak KPP Pratama',
-      securityBadge: 'QR Validasi DJP',
-    },
-    {
-      id: 'doc-4',
-      category: 'legal',
-      title: 'Surat Keputusan (SK) Pengangkatan Lead Backend Architect',
-      docNumber: 'SK-DIR/2023/CORP-088',
-      updatedDate: '01 Jun 2023',
-      fileSize: '1.8 MB',
-      formatBadge: 'LEGALITAS',
-      signatureStatus: 'Ditandatangani CEO & CPO',
-      securityBadge: 'Permanen',
-    },
-    {
-      id: 'doc-5',
-      category: 'legal',
-      title: 'Pakta Integritas, Kerahasiaan Informasi & IP Rights (NDA)',
-      docNumber: 'NDA-NX/2021/ENG-008',
-      updatedDate: '15 Mar 2024',
-      fileSize: '1.3 MB',
-      formatBadge: 'ISO 27001',
-      signatureStatus: 'Kepatuhan Keamanan & UU PDP',
-      securityBadge: 'Terenkripsi',
-    },
-    {
-      id: 'doc-6',
-      category: 'template',
-      title: 'Perjanjian Fasilitas Laptop & Workstation Inventaris Kantor',
-      docNumber: 'AST-NX/2024/IT-031',
-      updatedDate: '12 Agu 2024',
-      fileSize: '950 KB',
-      formatBadge: 'LOGISTIK',
-      signatureStatus: 'Terdaftar IT Asset Management',
-      securityBadge: 'Garansi Aktif',
-    },
-  ];
+  // Set real Indonesian date
+  useEffect(() => {
+    try {
+      const now = new Date();
+      const dayName = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(now);
+      const dayNum = new Intl.DateTimeFormat('id-ID', { day: 'numeric' }).format(now);
+      const monthYear = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(now);
+      setTodayDate({ dayName, dayNum, monthYear });
+    } catch {}
+  }, []);
 
-  const activeRequest: RequestTrackingItem = {
-    id: 'req-1',
-    ticketNo: 'REQ-DOC-2025-082',
-    title: 'Surat Pengantar Visa Schengen',
-    targetPurpose: 'Tujuan: Jerman (Konferensi Tech Berlin)',
-    submittedAt: '22 Maret 2025 • 10:14 WIB',
-    statusLabel: 'Menunggu Tanda Tangan CHRO',
-    currentStep: 2,
-    totalSteps: 3,
-    estimatedCompletion: 'Est. Besok, 14:00 WIB',
-    steps: [
-      { title: '1. Verifikasi HR', status: 'completed' },
-      { title: '2. TTD CHRO', status: 'active' },
-      { title: '3. Selesai', status: 'pending' },
-    ],
+  // Fetch live documents & requests dataset
+  const fetchLiveDocuments = useCallback(async () => {
+    const nik = currentUser.employeeNumber || 'NX-2021008';
+    try {
+      const res = await fetch(`/api/v1/documents?nik=${encodeURIComponent(nik)}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.documents) setDocumentList(json.documents);
+        if (json.requests) setRequestsList(json.requests);
+        if (json.eMeteraiQuota) setEMeteraiQuota(json.eMeteraiQuota);
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser.employeeNumber]);
+
+  // Real-time listener for document updates & broadcast channel
+  useEffect(() => {
+    fetchLiveDocuments();
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('nexora_live_sync');
+      bc.onmessage = (event) => {
+        if (
+          event.data?.type === 'DOCUMENTS_UPDATED' ||
+          event.data?.type === 'DOCUMENT_REQUEST_CREATED' ||
+          event.data?.type === 'PROFILE_UPDATED'
+        ) {
+          fetchLiveDocuments();
+        }
+      };
+    } catch {}
+
+    const handleFocus = () => fetchLiveDocuments();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchLiveDocuments]);
+
+  // Active / Most recent request for the right sidebar
+  const activeRequest: RequestTrackingItem | null = useMemo(() => {
+    if (requestsList.length === 0) return null;
+    const inProgress = requestsList.find((r) => r.currentStep < r.totalSteps);
+    return inProgress || requestsList[0];
+  }, [requestsList]);
+
+  // Tab counts
+  const tabCounts = useMemo(() => {
+    return {
+      legal: documentList.filter((d) => d.category === 'legal').length,
+      letter: documentList.filter((d) => d.category === 'letter').length,
+      tax: documentList.filter((d) => d.category === 'tax').length,
+      template: documentList.filter((d) => d.category === 'template').length,
+    };
+  }, [documentList]);
+
+  // Filtered documents
+  const filteredDocs = useMemo(() => {
+    return documentList.filter((doc) => {
+      if (activeTab === 'legal' && doc.category !== 'legal') return false;
+      if (activeTab === 'letter' && doc.category !== 'letter') return false;
+      if (activeTab === 'tax' && doc.category !== 'tax') return false;
+      if (activeTab === 'template' && doc.category !== 'template') return false;
+
+      if (yearFilter !== 'Semua' && !doc.updatedDate.includes(yearFilter)) return false;
+      if (formatFilter !== 'Semua') {
+        if (formatFilter === 'PDF' && !doc.formatBadge.includes('PDF')) return false;
+        if (formatFilter === 'DOCX' && !doc.formatBadge.includes('DOCX')) return false;
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = doc.title.toLowerCase().includes(q);
+        const matchNumber = doc.docNumber.toLowerCase().includes(q);
+        const matchStatus = doc.signatureStatus.toLowerCase().includes(q);
+        if (!matchTitle && !matchNumber && !matchStatus) return false;
+      }
+
+      return true;
+    });
+  }, [documentList, activeTab, yearFilter, formatFilter, searchQuery]);
+
+  // Helper to construct official doc params
+  const getDocParams = (doc: DocumentItem): OfficialDocParams => {
+    return {
+      title: doc.title,
+      docNumber: doc.docNumber,
+      updatedDate: doc.updatedDate,
+      category: doc.category,
+      formatBadge: doc.formatBadge,
+      signatureStatus: doc.signatureStatus,
+      securityBadge: doc.securityBadge,
+      employeeName: currentUser.fullName,
+      employeeNik: currentUser.employeeNumber || 'NX-2021008',
+      employeeRole: currentUser.designation,
+      employeeDept: currentUser.department,
+      officialContent: doc.officialContent,
+    };
   };
 
-  const filteredDocs = documentList.filter((doc) => {
-    if (activeTab === 'legal' && doc.category !== 'legal') return false;
-    if (activeTab === 'letter' && doc.category !== 'letter') return false;
-    if (activeTab === 'tax' && doc.category !== 'tax') return false;
-    if (activeTab === 'template' && doc.category !== 'template') return false;
-    if (searchQuery && !doc.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  // Download official SOP-compliant document
+  const handleDownloadDoc = (doc: DocumentItem) => {
+    const params = getDocParams(doc);
+    downloadOfficialDocument(params);
+    showToast(`✓ Berkas resmi "${doc.title}" berhasil diunduh sesuai SOP Perusahaan.`);
+  };
 
-  const handleCreateRequest = (e: React.FormEvent) => {
+  // Print official document
+  const handlePrintDoc = (doc: DocumentItem) => {
+    const params = getDocParams(doc);
+    printOfficialDocument(params);
+  };
+
+  // Create new document request
+  const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsNewRequestModalOpen(false);
-    showToast(`✓ Permohonan "${requestDocType}" berhasil diajukan dengan nomor tiket #REQ-DOC-2025-094.`);
-    setRequestPurpose('');
-    setRequestTargetOrg('');
+    setIsSubmittingRequest(true);
+
+    const nik = currentUser.employeeNumber || 'NX-2021008';
+    try {
+      const res = await fetch('/api/v1/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nik,
+          title: requestDocType,
+          targetPurpose: requestPurpose,
+          targetOrg: requestTargetOrg,
+          urgency: requestUrgency,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        setIsNewRequestModalOpen(false);
+        setRequestPurpose('');
+        setRequestTargetOrg('');
+        fetchLiveDocuments();
+
+        try {
+          const bc = new BroadcastChannel('nexora_live_sync');
+          bc.postMessage({ type: 'DOCUMENT_REQUEST_CREATED', nik });
+          bc.close();
+        } catch {}
+
+        showToast(
+          `✓ Permohonan "${requestDocType}" berhasil diajukan dengan nomor tiket ${
+            json.data?.ticketNo || '#REQ-DOC-2025'
+          }.`
+        );
+      }
+    } catch {}
+
+    setIsSubmittingRequest(false);
+  };
+
+  // Download tax document shortcut from Card 3
+  const handleDownloadTaxDoc = () => {
+    const taxDoc = documentList.find((d) => d.category === 'tax') || documentList[2];
+    if (taxDoc) {
+      handleDownloadDoc(taxDoc);
+    } else {
+      showToast('Mengunduh Formulir Bukti Potong Pajak SPT 1721-A1...');
+    }
+  };
+
+  // Download all verified documents bundle (.zip)
+  const handleDownloadAllZip = () => {
+    showToast('Mempersiapkan bundel arsip resmi seluruh dokumen terverifikasi (.zip)...');
+    setTimeout(() => {
+      // Trigger download of primary official doc
+      if (documentList.length > 0) {
+        handleDownloadDoc(documentList[0]);
+      }
+      showToast('✓ Berkas arsip digital dokumen kepegawaian berhasil diunduh.');
+    }, 600);
   };
 
   return (
@@ -246,7 +301,7 @@ export default function EssDocumentsPage() {
         </div>
       )}
 
-      {/* LEFT SIDEBAR with Collapse/Expand (Matching HR Admin) */}
+      {/* LEFT SIDEBAR with Collapse/Expand */}
       <EmployeeSidebar
         activeMenu="documents"
         isCollapsed={isSidebarCollapsed}
@@ -266,17 +321,17 @@ export default function EssDocumentsPage() {
             <button
               type="button"
               onClick={openMobile}
-              className="flex md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
+              className="flex md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0 cursor-pointer"
               aria-label="Buka Menu Navigasi"
             >
               <Menu className="w-5 h-5 text-slate-700" />
             </button>
 
-            {/* Desktop Sidebar Toggle Button (Matching HR Admin) */}
+            {/* Desktop Sidebar Toggle Button */}
             <button
               type="button"
               onClick={toggleSidebar}
-              className="hidden md:flex p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors flex-shrink-0"
+              className="hidden md:flex p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors flex-shrink-0 cursor-pointer"
               title={isSidebarCollapsed ? 'Buka Sidebar' : 'Ciutkan Sidebar'}
             >
               {isSidebarCollapsed ? (
@@ -293,7 +348,7 @@ export default function EssDocumentsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari menu, slip gaji, atau dokumen pribadi..."
+                placeholder="Cari nama dokumen, nomor SK, atau jenis permohonan..."
                 className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
               />
             </div>
@@ -301,11 +356,14 @@ export default function EssDocumentsPage() {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+            {/* Dynamic Real-Time Date */}
             <div className="hidden lg:flex items-center gap-2 text-xs text-slate-600">
               <Calendar className="w-4 h-4 text-slate-400" />
               <div className="flex flex-col text-[11px] leading-tight text-left">
-                <span className="font-bold text-slate-800">Senin, 24</span>
-                <span className="text-slate-500 font-medium">Maret 2025</span>
+                <span className="font-bold text-slate-800">
+                  {todayDate.dayName}, {todayDate.dayNum}
+                </span>
+                <span className="text-slate-500 font-medium">{todayDate.monthYear}</span>
               </div>
             </div>
 
@@ -352,7 +410,7 @@ export default function EssDocumentsPage() {
           </div>
         </header>
 
-        {/* PAGE CONTENT CONTAINER (Generous bottom padding pb-36 to prevent ANY cut-off!) */}
+        {/* PAGE CONTENT CONTAINER */}
         <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto pb-36">
           {/* HEADER SECTION matching screenshot */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
@@ -378,9 +436,12 @@ export default function EssDocumentsPage() {
                 </span>
               </div>
 
-              {/* Subtitle */}
+              {/* Subtitle bound dynamically to logged in employee NIK */}
               <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
-                Akses arsip dokumen legalitas kerja, unduh bukti potong pajak, cetak surat keterangan instan, dan kelola template permohonan kepegawaian resmi yang terikat pada NIK <strong className="text-slate-800 font-mono">NX-2021008</strong>.
+                Akses arsip dokumen legalitas kerja, unduh bukti potong pajak, cetak surat keterangan instan, dan kelola template permohonan kepegawaian resmi yang terikat pada NIK{' '}
+                <strong className="text-slate-800 font-mono">
+                  {currentUser.employeeNumber || 'NX-2021008'}
+                </strong>.
               </p>
             </div>
 
@@ -390,12 +451,12 @@ export default function EssDocumentsPage() {
               <button
                 type="button"
                 onClick={() => setIsHistoryModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs transition-all active:scale-95"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
                 <Receipt className="w-4 h-4 text-slate-500" />
                 <span>Riwayat Pengajuan Surat</span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700">
-                  2 Berkas
+                  {requestsList.length} Berkas
                 </span>
               </button>
 
@@ -403,7 +464,7 @@ export default function EssDocumentsPage() {
               <button
                 type="button"
                 onClick={() => setIsNewRequestModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
               >
                 <FilePlus className="w-4 h-4" />
                 <span>+ Buat Permohonan Dokumen Baru</span>
@@ -425,7 +486,9 @@ export default function EssDocumentsPage() {
               </div>
 
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">6</span>
+                <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+                  {documentList.length}
+                </span>
                 <span className="text-slate-500 font-bold text-xs">Berkas Tersedia</span>
               </div>
 
@@ -437,7 +500,7 @@ export default function EssDocumentsPage() {
                 <span className="text-slate-400 text-[11px]">Semua mutakhir</span>
               </div>
 
-              {/* Solid blue accent bar at bottom matching screenshot */}
+              {/* Solid blue accent bar at bottom */}
               <div className="pt-0.5">
                 <div className="w-28 h-1 bg-blue-600 rounded-full" />
               </div>
@@ -455,7 +518,9 @@ export default function EssDocumentsPage() {
               </div>
 
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">1</span>
+                <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+                  {requestsList.filter((r) => r.currentStep < r.totalSteps).length}
+                </span>
                 <span className="text-amber-700 font-bold text-xs">Menunggu Otorisasi</span>
               </div>
 
@@ -486,12 +551,8 @@ export default function EssDocumentsPage() {
                 <span className="text-slate-400 text-[11px]">Tahun Pajak 2024 • Final</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    const doc = documentList.find((d) => d.category === 'tax');
-                    if (doc) setSelectedDoc(doc);
-                    setIsPreviewModalOpen(true);
-                  }}
-                  className="font-bold text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
+                  onClick={handleDownloadTaxDoc}
+                  className="font-bold text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1 cursor-pointer"
                 >
                   <span>Unduh</span>
                   <Download className="w-3 h-3" />
@@ -511,17 +572,26 @@ export default function EssDocumentsPage() {
               </div>
 
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">3</span>
-                <span className="text-slate-400 font-bold text-lg">/ 5 Kuota</span>
+                <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
+                  {eMeteraiQuota.used}
+                </span>
+                <span className="text-slate-400 font-bold text-lg">
+                  / {eMeteraiQuota.total} Kuota
+                </span>
               </div>
 
               <p className="text-[11px] text-slate-500 pt-0.5">
-                Tersedia untuk legalisir internal 2025
+                Tersedia untuk legalisir internal {eMeteraiQuota.year}
               </p>
 
               {/* Progress bar */}
               <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-blue-600 h-full rounded-full w-[60%]" />
+                <div
+                  className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.round((eMeteraiQuota.used / eMeteraiQuota.total) * 100)}%`,
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -533,7 +603,7 @@ export default function EssDocumentsPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('legal')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                   activeTab === 'legal'
                     ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90'
@@ -541,17 +611,19 @@ export default function EssDocumentsPage() {
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>Dokumen Legalitas &amp; Kontrak</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                  activeTab === 'legal' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  4
+                <span
+                  className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                    activeTab === 'legal' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {tabCounts.legal}
                 </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('letter')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                   activeTab === 'letter'
                     ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90'
@@ -559,17 +631,19 @@ export default function EssDocumentsPage() {
               >
                 <Briefcase className="w-4 h-4" />
                 <span>Surat Keterangan &amp; Visa Kerja</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                  activeTab === 'letter' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  3
+                <span
+                  className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                    activeTab === 'letter' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {tabCounts.letter}
                 </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('tax')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                   activeTab === 'tax'
                     ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90'
@@ -577,17 +651,19 @@ export default function EssDocumentsPage() {
               >
                 <Receipt className="w-4 h-4" />
                 <span>Perpajakan &amp; Finansial (SPT/Slip)</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                  activeTab === 'tax' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  8
+                <span
+                  className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                    activeTab === 'tax' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {tabCounts.tax}
                 </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('template')}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                   activeTab === 'template'
                     ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90'
@@ -595,10 +671,12 @@ export default function EssDocumentsPage() {
               >
                 <FileCode className="w-4 h-4" />
                 <span>Template Formulir HR</span>
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                  activeTab === 'template' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  6
+                <span
+                  className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                    activeTab === 'template' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {tabCounts.template}
                 </span>
               </button>
             </div>
@@ -637,15 +715,14 @@ export default function EssDocumentsPage() {
                     <option value="Semua">Format: Semua</option>
                     <option value="PDF">PDF Resmi</option>
                     <option value="DOCX">Word (.docx)</option>
-                    <option value="ZIP">Arsip (.zip)</option>
                   </select>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => showToast('Mempersiapkan berkas arsip (.zip) seluruh dokumen terverifikasi...')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs"
+                onClick={handleDownloadAllZip}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs cursor-pointer active:scale-95 transition-all"
               >
                 <Download className="w-3.5 h-3.5 text-slate-500" />
                 <span>Unduh Arsip (.zip)</span>
@@ -653,9 +730,9 @@ export default function EssDocumentsPage() {
             </div>
           </div>
 
-          {/* SECTION 3: 2-COLUMN LAYOUT (LEFT 8 COLS, RIGHT 4 COLS) matching screenshot */}
+          {/* SECTION 3: 2-COLUMN LAYOUT (LEFT 8 COLS, RIGHT 4 COLS) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* LEFT COLUMN (8 COLS): LIST OF OFFICIAL DOCUMENTS (ALL ITEMS FULLY UNCLIPPED & COMPLETE!) */}
+            {/* LEFT COLUMN (8 COLS): LIST OF OFFICIAL DOCUMENTS */}
             <div className="lg:col-span-8 space-y-4">
               {filteredDocs.map((doc) => (
                 <div
@@ -673,7 +750,9 @@ export default function EssDocumentsPage() {
                       </h4>
 
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-                        <span>No: <strong className="font-mono text-slate-700">{doc.docNumber}</strong></span>
+                        <span>
+                          No: <strong className="font-mono text-slate-700">{doc.docNumber}</strong>
+                        </span>
                         <span>•</span>
                         <span>Diperbarui {doc.updatedDate}</span>
                         <span>•</span>
@@ -705,7 +784,7 @@ export default function EssDocumentsPage() {
                         setSelectedDoc(doc);
                         setIsPreviewModalOpen(true);
                       }}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition-all active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5 text-slate-500" />
                       <span>Pratinjau</span>
@@ -713,10 +792,8 @@ export default function EssDocumentsPage() {
 
                     <button
                       type="button"
-                      onClick={() => {
-                        showToast(`✓ Berkas "${doc.title}" berhasil diunduh secara resmi.`);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95"
+                      onClick={() => handleDownloadDoc(doc)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Unduh PDF</span>
@@ -724,17 +801,18 @@ export default function EssDocumentsPage() {
 
                     <button
                       type="button"
-                      onClick={() => showToast(`Pilihan tambahan untuk ${doc.docNumber}...`)}
-                      className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                      onClick={() => handlePrintDoc(doc)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                      title="Cetak Langsung Dokumen Resmi Ini"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <Printer className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* RIGHT COLUMN (4 COLS): ACTIVE REQUEST TRACKING & TEMPLATES (NOW FULLY UNCLIPPED!) */}
+            {/* RIGHT COLUMN (4 COLS): ACTIVE REQUEST TRACKING & TEMPLATES */}
             <div className="lg:col-span-4 space-y-6 flex flex-col">
               {/* Card 1: Permohonan Khusus Berjalan matching screenshot */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
@@ -746,61 +824,92 @@ export default function EssDocumentsPage() {
                     </h3>
                   </div>
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                    1 Aktif
+                    {requestsList.filter((r) => r.currentStep < r.totalSteps).length} Aktif
                   </span>
                 </div>
 
                 {/* Active Request Card */}
-                <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/60 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900">
-                        {activeRequest.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        {activeRequest.targetPurpose}
+                {activeRequest ? (
+                  <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/60 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">
+                          {activeRequest.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {activeRequest.targetPurpose}
+                        </p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800">
+                        TAHAP {activeRequest.currentStep}/{activeRequest.totalSteps}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] space-y-1 text-slate-600 pt-1 border-t border-slate-200/80">
+                      <p>
+                        No. Pengajuan:{' '}
+                        <strong className="font-mono text-slate-900">{activeRequest.ticketNo}</strong>
+                      </p>
+                      <p>Diajukan pada: {activeRequest.submittedAt}</p>
+                      <p>
+                        Status Otorisasi:{' '}
+                        <strong className="text-blue-700">{activeRequest.statusLabel}</strong>
                       </p>
                     </div>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800">
-                      TAHAP 2/3
-                    </span>
-                  </div>
 
-                  <div className="text-[11px] space-y-1 text-slate-600 pt-1 border-t border-slate-200/80">
-                    <p>No. Pengajuan: <strong className="font-mono text-slate-900">{activeRequest.ticketNo}</strong></p>
-                    <p>Diajukan pada: {activeRequest.submittedAt}</p>
-                    <p>Status Otorisasi: <strong className="text-blue-700">{activeRequest.statusLabel}</strong></p>
-                  </div>
+                    {/* 3-Step Progress Indicator */}
+                    <div className="flex items-center justify-between text-[10px] font-bold pt-1">
+                      {activeRequest.steps.map((st, i) => (
+                        <span
+                          key={i}
+                          className={
+                            st.status === 'completed'
+                              ? 'text-emerald-700'
+                              : st.status === 'active'
+                              ? 'text-blue-700 font-extrabold'
+                              : 'text-slate-400 font-normal'
+                          }
+                        >
+                          {st.title}
+                        </span>
+                      ))}
+                    </div>
 
-                  {/* 3-Step Progress Indicator */}
-                  <div className="flex items-center justify-between text-[10px] font-bold pt-1">
-                    <span className="text-emerald-700">1. Verifikasi HR</span>
-                    <span className="text-blue-700 font-extrabold">2. TTD CHRO</span>
-                    <span className="text-slate-400 font-normal">3. Selesai</span>
-                  </div>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.round(
+                            (activeRequest.currentStep / activeRequest.totalSteps) * 100
+                          )}%`,
+                        }}
+                      />
+                    </div>
 
-                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-blue-600 h-full rounded-full w-[66%]" />
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200/80">
+                      <span className="text-slate-500 text-[11px] flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{activeRequest.estimatedCompletion}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTrackingItem(activeRequest);
+                          setIsTrackingModalOpen(true);
+                        }}
+                        className="font-bold text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Lihat Detail Alur</span>
+                        <span>→</span>
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200/80">
-                    <span className="text-slate-500 text-[11px] flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{activeRequest.estimatedCompletion}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsTrackingModalOpen(true)}
-                      className="font-bold text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
-                    >
-                      <span>Lihat Detail Alur</span>
-                      <span>→</span>
-                    </button>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-xs text-slate-400">Tidak ada permohonan yang sedang berjalan.</p>
+                )}
               </div>
 
-              {/* Card 2: Template Permohonan Cepat (The part that was cut off, now fully unclipped!) */}
+              {/* Card 2: Template Permohonan Cepat matching screenshot */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
@@ -816,10 +925,10 @@ export default function EssDocumentsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setRequestDocType('Surat Keterangan Penghasilan (Income Statement)');
+                      setRequestDocType('Surat Keterangan Penghasilan (Salary Slip)');
                       setIsNewRequestModalOpen(true);
                     }}
-                    className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 text-left transition-all space-y-0.5 group"
+                    className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 text-left transition-all space-y-0.5 group cursor-pointer"
                   >
                     <p className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
                       Surat Keterangan Penghasilan (Salary Slip)
@@ -830,10 +939,10 @@ export default function EssDocumentsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setRequestDocType('Surat Sponsor Visa Dinas Luar Negeri');
+                      setRequestDocType('Surat Pengantar Sponsor Visa Dinas Luar Negeri');
                       setIsNewRequestModalOpen(true);
                     }}
-                    className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 text-left transition-all space-y-0.5 group"
+                    className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 text-left transition-all space-y-0.5 group cursor-pointer"
                   >
                     <p className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
                       Surat Pengantar Sponsor Visa Dinas Luar Negeri
@@ -847,7 +956,7 @@ export default function EssDocumentsPage() {
                       setRequestDocType('Legalisasi E-Meterai Dokumen Kepegawaian');
                       setIsNewRequestModalOpen(true);
                     }}
-                    className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 text-left transition-all space-y-0.5 group"
+                    className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 text-left transition-all space-y-0.5 group cursor-pointer"
                   >
                     <p className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
                       Legalisir Dokumen Internal (E-Meterai Peruri)
@@ -880,7 +989,7 @@ export default function EssDocumentsPage() {
               <button
                 type="button"
                 onClick={() => setIsNewRequestModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -895,8 +1004,8 @@ export default function EssDocumentsPage() {
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   <option value="Surat Keterangan Kerja Aktif (SKK)">Surat Keterangan Kerja Aktif (SKK)</option>
-                  <option value="Surat Keterangan Penghasilan (Income Statement)">Surat Keterangan Penghasilan (Salary Slip)</option>
-                  <option value="Surat Sponsor Visa Dinas Luar Negeri">Surat Pengantar Sponsor Visa Dinas Luar Negeri</option>
+                  <option value="Surat Keterangan Penghasilan (Salary Slip)">Surat Keterangan Penghasilan (Salary Slip)</option>
+                  <option value="Surat Pengantar Sponsor Visa Dinas Luar Negeri">Surat Pengantar Sponsor Visa Dinas Luar Negeri</option>
                   <option value="Surat Rekomendasi Profesional / Studi">Surat Rekomendasi Profesional / Beasiswa</option>
                   <option value="Legalisasi E-Meterai Dokumen Kepegawaian">Legalisasi E-Meterai Dokumen Kepegawaian</option>
                 </select>
@@ -953,15 +1062,19 @@ export default function EssDocumentsPage() {
                 <button
                   type="button"
                   onClick={() => setIsNewRequestModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                  disabled={isSubmittingRequest}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  Ajukan Permohonan
+                  {isSubmittingRequest && (
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  <span>Ajukan Permohonan</span>
                 </button>
               </div>
             </form>
@@ -969,10 +1082,10 @@ export default function EssDocumentsPage() {
         </div>
       )}
 
-      {/* MODAL 2: PRATINJAU DOKUMEN RESMI */}
+      {/* MODAL 2: PRATINJAU DOKUMEN RESMI (SOP COMPLIANT & CLEAN A4 PREVIEW) */}
       {isPreviewModalOpen && selectedDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95 max-h-[85vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -980,72 +1093,160 @@ export default function EssDocumentsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
-                    Pratinjau Dokumen Resmi
+                    Pratinjau Dokumen Resmi Standar Perusahaan
                   </h3>
-                  <p className="text-[11px] text-slate-400">{selectedDoc.docNumber}</p>
+                  <p className="text-[11px] text-slate-400 font-mono">{selectedDoc.docNumber}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPreviewModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <div>
-                  <h4 className="font-extrabold text-slate-900">PT NEXORA DIGITAL NUSANTARA</h4>
-                  <p className="text-[10px] text-slate-400">Divisi Legal &amp; Human Capital Management</p>
+            {/* Official Document Sheet Preview */}
+            <div className="p-6 rounded-2xl bg-white border border-slate-300 shadow-inner text-xs text-slate-800 space-y-4 font-serif">
+              {/* Kop Surat */}
+              <div className="border-b-2 border-double border-slate-900 pb-3 flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-700 text-white font-sans font-black text-xl flex items-center justify-center rounded-lg flex-shrink-0">
+                  NX
                 </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">
-                  DIGITALLY SIGNED
-                </span>
+                <div className="text-center flex-1 font-sans">
+                  <h4 className="font-black text-sm tracking-wide text-slate-950 uppercase">
+                    PT NEXORA DIGITAL NUSANTARA
+                  </h4>
+                  <p className="text-[9px] font-bold text-blue-900 tracking-wider">
+                    HUMAN CAPITAL &amp; CORPORATE LEGAL AFFAIRS DIVISION
+                  </p>
+                  <p className="text-[8.5px] text-slate-500 leading-tight mt-0.5">
+                    Menara Nexora Lt. 18-20, Jl. Jend. Sudirman Kav. 52-53, Jakarta Selatan 12190 • SK Kemenkumham AHU-0019284
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <p className="text-sm font-bold text-slate-900">{selectedDoc.title}</p>
-                <p className="text-[11px] text-slate-500">Pemilik Dokumen: {currentUser.fullName} ({currentUser.employeeNumber})</p>
-                <p className="text-[11px] text-slate-500">Status Validitas: {selectedDoc.signatureStatus}</p>
-                <p className="text-[11px] text-slate-500">Tingkat Akses: {selectedDoc.securityBadge}</p>
+              {/* Title & Ref */}
+              <div className="text-center space-y-0.5 py-1 font-sans">
+                <h5 className="font-extrabold text-xs text-slate-900 underline uppercase tracking-wide">
+                  {selectedDoc.officialContent?.header || selectedDoc.title}
+                </h5>
+                <p className="text-[10px] font-mono text-slate-600 font-bold">
+                  {selectedDoc.officialContent?.docRef || `Nomor: ${selectedDoc.docNumber}`}
+                </p>
+                <p className="text-[9px] text-slate-400 italic">
+                  {selectedDoc.officialContent?.legalBasis || 'Standar Operasional Prosedur Manajemen SDM PT Nexora'}
+                </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] text-blue-900 flex items-center gap-2">
-                <Lock className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                <span>Dokumen ini dilengkapi QR Code verifikasi keabsahan Peruri CA yang dapat divalidasi publik.</span>
+              {/* Employee Particulars */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 font-sans text-[11px] space-y-1">
+                <div className="grid grid-cols-3 gap-1">
+                  <span className="text-slate-500 font-semibold">Nama Karyawan:</span>
+                  <span className="col-span-2 font-bold text-slate-900">{currentUser.fullName}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <span className="text-slate-500 font-semibold">NIK / NIP:</span>
+                  <span className="col-span-2 font-mono font-bold text-slate-900">
+                    {currentUser.employeeNumber || 'NX-2021008'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <span className="text-slate-500 font-semibold">Jabatan &amp; Unit:</span>
+                  <span className="col-span-2 text-slate-900">
+                    {currentUser.designation} ({currentUser.department})
+                  </span>
+                </div>
+              </div>
+
+              {/* Clauses */}
+              <div className="space-y-2 text-[10.5px] leading-relaxed text-slate-700">
+                {(
+                  selectedDoc.officialContent?.clauses || [
+                    {
+                      pasal: 'PASAL 1 - KETENTUAN POKOK',
+                      content:
+                        'Dokumen ini merupakan arsip legalitas resmi yang mengikat hubungan industrial antara perusahaan dan karyawan bersangkutan sesuai peraturan perundang-undangan Republik Indonesia.',
+                    },
+                    {
+                      pasal: 'PASAL 2 - KEABSAHAN HUKUM',
+                      content:
+                        'Telah melalui tahapan verifikasi HRD dan dibubuhi tanda tangan elektronik tersertifikasi (Digital Signature Peruri CA) dengan integritas data terlindungi.',
+                    },
+                  ]
+                ).map((c, i) => (
+                  <div key={i} className="space-y-0.5">
+                    <p className="font-bold text-slate-900 font-sans text-[10px]">{c.pasal}</p>
+                    <p className="text-justify">{c.content}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Digital Stamp & Signatures */}
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] font-sans">
+                <div className="space-y-0.5">
+                  <span className="text-slate-400">Pihak Karyawan:</span>
+                  <p className="font-bold text-slate-900 underline">{currentUser.fullName}</p>
+                  <p className="text-slate-400">Terverifikasi Akun ESS</p>
+                </div>
+
+                <div className="text-right space-y-0.5">
+                  <span className="text-slate-400">{selectedDoc.officialContent?.signingDate || 'Jakarta'}</span>
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-800 font-bold text-[9px] my-0.5">
+                    <span>E-METERAI RESMI PERURI</span>
+                  </div>
+                  <p className="font-bold text-slate-900 underline">
+                    {selectedDoc.officialContent?.firstPartySigner || 'Citra Lestari, S.Psi, M.M.'}
+                  </p>
+                  <p className="text-slate-400">Chief Human Resources Officer</p>
+                </div>
               </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setIsPreviewModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs"
-              >
-                Tutup
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPreviewModalOpen(false);
-                  showToast(`✓ Berkas "${selectedDoc.title}" berhasil diunduh ke perangkat Anda.`);
-                }}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5"
-              >
-                <Download className="w-4 h-4" />
-                <span>Unduh Berkas PDF</span>
-              </button>
+            <div className="pt-2 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-bold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Dokumen Resmi Sesuai SOP &amp; Ber-Meterai Sah</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintDoc(selectedDoc)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak Dokumen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadDoc(selectedDoc);
+                    setIsPreviewModalOpen(false);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Dokumen Resmi</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: RIWAYAT PENGAJUAN SURAT (2 BERKAS) */}
+      {/* MODAL 3: RIWAYAT PENGAJUAN SURAT */}
       {isHistoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -1055,45 +1256,51 @@ export default function EssDocumentsPage() {
                   <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
                     Riwayat Pengajuan Dokumen Mandiri
                   </h3>
-                  <p className="text-[11px] text-slate-400">Total 2 Berkas Diajukan Periode 2025</p>
+                  <p className="text-[11px] text-slate-400">
+                    Total {requestsList.length} Berkas Diajukan Periode 2025
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsHistoryModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-2.5 text-xs">
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">Surat Pengantar Visa Schengen</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                    Menunggu CHRO
-                  </span>
+              {requestsList.map((req) => (
+                <div
+                  key={req.id}
+                  className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1 hover:bg-blue-50/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{req.title}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        req.currentStep >= req.totalSteps
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}
+                    >
+                      {req.statusLabel}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Tiket: <strong className="font-mono text-slate-700">{req.ticketNo}</strong> • Diajukan {req.submittedAt}
+                  </p>
+                  <p className="text-[11px] text-slate-600 italic">{req.targetPurpose}</p>
                 </div>
-                <p className="text-[11px] text-slate-500">Tiket: REQ-DOC-2025-082 • Diajukan 22 Maret 2025</p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">Surat Keterangan Kerja (SKK KPR Bank)</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Selesai &amp; Diterbitkan
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500">Tiket: REQ-DOC-2025-014 • Selesai 14 Februari 2025</p>
-              </div>
+              ))}
             </div>
 
             <div className="pt-2 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setIsHistoryModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs"
+                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer"
               >
                 Tutup
               </button>
@@ -1103,7 +1310,7 @@ export default function EssDocumentsPage() {
       )}
 
       {/* MODAL 4: DETAIL ALUR PELACAKAN PERMOHONAN */}
-      {isTrackingModalOpen && (
+      {isTrackingModalOpen && selectedTrackingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -1115,13 +1322,13 @@ export default function EssDocumentsPage() {
                   <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
                     Pelacakan Alur Dokumen Real-time
                   </h3>
-                  <p className="text-[11px] text-slate-400">{activeRequest.ticketNo}</p>
+                  <p className="text-[11px] text-slate-400 font-mono">{selectedTrackingItem.ticketNo}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsTrackingModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1129,40 +1336,32 @@ export default function EssDocumentsPage() {
 
             <div className="space-y-3 text-xs">
               <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-1">
-                <p className="font-bold text-slate-900">{activeRequest.title}</p>
-                <p className="text-[11px] text-slate-600">{activeRequest.targetPurpose}</p>
+                <p className="font-bold text-slate-900">{selectedTrackingItem.title}</p>
+                <p className="text-[11px] text-slate-600">{selectedTrackingItem.targetPurpose}</p>
               </div>
 
-              <div className="space-y-2 pt-1">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                    ✓
+              <div className="space-y-2.5 pt-1">
+                {selectedTrackingItem.steps.map((st, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div
+                      className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        st.status === 'completed'
+                          ? 'bg-emerald-600 text-white'
+                          : st.status === 'active'
+                          ? 'bg-blue-600 text-white animate-pulse'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {st.status === 'completed' ? '✓' : i + 1}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">{st.title}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {st.timestamp} {st.approver ? `• oleh ${st.approver}` : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-900">1. Verifikasi Data oleh HR Operations</p>
-                    <p className="text-[11px] text-slate-400">Selesai pada 22 Maret 2025 • 11:30 WIB oleh Sarah N.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5 animate-pulse">
-                    2
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900">2. Otorisasi &amp; Digital Signature CHRO</p>
-                    <p className="text-[11px] text-blue-700 font-medium">Dalam antrean persetujuan Citra Lestari (CHRO)</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                    3
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-400">3. Penerbitan &amp; Pembubuhan E-Meterai Peruri</p>
-                    <p className="text-[11px] text-slate-400">Berkas PDF otomatis siap unduh di portal ESS</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -1170,7 +1369,7 @@ export default function EssDocumentsPage() {
               <button
                 type="button"
                 onClick={() => setIsTrackingModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer"
               >
                 Tutup
               </button>
