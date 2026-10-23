@@ -118,8 +118,8 @@ export default function AdminAttendancePage() {
     const fetchAttendanceApi = async () => {
       try {
         const [res, appRes] = await Promise.all([
-          fetch('/api/v1/attendance'),
-          fetch('/api/v1/approvals'),
+          fetch(`/api/v1/attendance?t=${Date.now()}`, { cache: 'no-store' }),
+          fetch(`/api/v1/approvals?t=${Date.now()}`, { cache: 'no-store' }),
         ]);
 
         if (res.ok) {
@@ -332,6 +332,14 @@ export default function AdminAttendancePage() {
 
         if (msg.type === 'EMPLOYEE_CLOCKED_IN' || msg.type === 'ATTENDANCE_RECORDED') {
           processLiveAttendance(msg);
+        } else if (
+          msg.type === 'NEW_APPROVAL_REQUEST' ||
+          msg.type === 'APPROVAL_STATUS_CHANGED' ||
+          msg.type === 'LEAVE_SUBMITTED' ||
+          msg.type === 'LEAVE_STATUS_CHANGED' ||
+          msg.type === 'OVERTIME_REQUESTED'
+        ) {
+          fetchAttendanceApi();
         }
       };
     } catch {
@@ -340,6 +348,7 @@ export default function AdminAttendancePage() {
 
     // 3. Server-Sent Events (SSE) for multi-device live sync
     let sse: EventSource | null = null;
+    let approvalSse: EventSource | null = null;
     try {
       sse = new EventSource('/api/v1/employees/stream');
       sse.addEventListener('ATTENDANCE_RECORDED', (e: MessageEvent) => {
@@ -353,6 +362,16 @@ export default function AdminAttendancePage() {
       });
     } catch {}
 
+    try {
+      approvalSse = new EventSource('/api/v1/approvals/stream');
+      const handleApprovalEvent = () => {
+        fetchAttendanceApi();
+      };
+      approvalSse.addEventListener('APPROVAL_CREATED', handleApprovalEvent);
+      approvalSse.addEventListener('APPROVAL_STATUS_CHANGED', handleApprovalEvent);
+      approvalSse.addEventListener('APPROVAL_DELETED', handleApprovalEvent);
+    } catch {}
+
     // 4. Background ticker every 15s to keep counters accurate
     const ticker = setInterval(() => {
       fetchAttendanceApi();
@@ -362,6 +381,7 @@ export default function AdminAttendancePage() {
       clearInterval(ticker);
       if (channel) channel.close();
       if (sse) sse.close();
+      if (approvalSse) approvalSse.close();
     };
   }, []);
 
@@ -369,8 +389,8 @@ export default function AdminAttendancePage() {
     setIsRefreshing(true);
     try {
       const [res, appRes] = await Promise.all([
-        fetch('/api/v1/attendance'),
-        fetch('/api/v1/approvals'),
+        fetch(`/api/v1/attendance?t=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/v1/approvals?t=${Date.now()}`, { cache: 'no-store' }),
       ]);
 
       if (res.ok) {
@@ -724,8 +744,12 @@ export default function AdminAttendancePage() {
                 />
               </div>
             </div>
-            <div className="pt-3 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold mt-3">
-              +1.2% dr kemarin
+            <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 font-medium mt-3">
+              {kpiSummary.presentCount === 0 ? (
+                <span>Belum ada presensi masuk hari ini</span>
+              ) : (
+                <span className="text-emerald-600 font-semibold">{kpiSummary.presentCount} hadir terverifikasi</span>
+              )}
             </div>
           </div>
 
@@ -737,7 +761,7 @@ export default function AdminAttendancePage() {
                   TERLAMBAT & IZIN AWAL
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
-                  Rata-rata 14 mnt
+                  {kpiSummary.lateCount === 0 ? '0 mnt' : 'Rata-rata 14 mnt'}
                 </span>
               </div>
               <div className="flex items-baseline gap-1.5">
@@ -749,7 +773,9 @@ export default function AdminAttendancePage() {
             </div>
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] mt-3">
               <span className="text-slate-500 font-medium">
-                • {Math.round(kpiSummary.lateCount * 0.68)} dlm batas toleransi
+                {kpiSummary.lateCount === 0
+                  ? '0 kasus terlambat'
+                  : `• ${Math.round(kpiSummary.lateCount * 0.68)} dlm batas toleransi`}
               </span>
               <button
                 onClick={() => showToast('Menampilkan rincian toleransi 15 menit...')}
@@ -778,14 +804,16 @@ export default function AdminAttendancePage() {
             </div>
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] mt-3">
               <span className="text-slate-500 font-medium truncate">
-                {Math.round(kpiSummary.leaveCount * 0.54)} Cuti • {Math.round(kpiSummary.leaveCount * 0.31)} Sakit •{' '}
-                {Math.max(
-                  0,
-                  kpiSummary.leaveCount -
-                    Math.round(kpiSummary.leaveCount * 0.54) -
-                    Math.round(kpiSummary.leaveCount * 0.31)
-                )}{' '}
-                Dinas
+                {kpiSummary.leaveCount === 0 ? (
+                  'Belum ada izin/cuti aktif hari ini'
+                ) : (
+                  `${Math.round(kpiSummary.leaveCount * 0.54)} Cuti • ${Math.round(kpiSummary.leaveCount * 0.31)} Sakit • ${Math.max(
+                    0,
+                    kpiSummary.leaveCount -
+                      Math.round(kpiSummary.leaveCount * 0.54) -
+                      Math.round(kpiSummary.leaveCount * 0.31)
+                  )} Dinas`
+                )}
               </span>
               <Link
                 href="/admin/leave"
@@ -814,7 +842,7 @@ export default function AdminAttendancePage() {
             </div>
             <div className="pt-3 border-t border-rose-100 flex items-center justify-between gap-1.5 mt-3">
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                ⚠ Perlu Konfirmasi
+                {kpiSummary.absentCount === 0 ? '✓ Semua Hadir / Cuti' : '⚠ Perlu Konfirmasi'}
               </span>
               <button
                 onClick={() => setIsNudgeModalOpen(true)}
