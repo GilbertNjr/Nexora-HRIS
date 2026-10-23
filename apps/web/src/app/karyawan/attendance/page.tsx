@@ -107,22 +107,10 @@ export default function EmployeeAttendancePage() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Live Digital Clock state
-  const [liveTime, setLiveTime] = useState(() =>
-    new Date().toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }) + ' WIB'
-  );
-  const [liveDate, setLiveDate] = useState(() =>
-    new Date().toLocaleDateString('id-ID', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-  );
+  // Live Digital Clock state (initialized with safe static placeholders to prevent SSR hydration mismatch)
+  const [liveTime, setLiveTime] = useState('-- : -- : -- WIB');
+  const [liveDate, setLiveDate] = useState('');
+
 
   // Work Location State (WFO, WFH, Dinas)
   const [workLocation, setWorkLocation] = useState<'WFO' | 'WFH' | 'DINAS'>('WFO');
@@ -761,7 +749,7 @@ export default function EmployeeAttendancePage() {
           <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
             <div className="hidden lg:flex items-center gap-2 text-xs text-slate-700 font-semibold">
               <Calendar className="w-4 h-4 text-slate-400" />
-              <span>{liveDate}</span>
+              <span suppressHydrationWarning>{liveDate}</span>
             </div>
 
             <NotificationBellDropdown portal="ess" />
@@ -1128,7 +1116,10 @@ export default function EmployeeAttendancePage() {
                   </div>
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-lg sm:text-xl font-black font-mono text-slate-900 tracking-tight">
+                      <span 
+                        className="text-lg sm:text-xl font-black font-mono text-slate-900 tracking-tight"
+                        suppressHydrationWarning
+                      >
                         {liveTime}
                       </span>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
@@ -1709,7 +1700,7 @@ export default function EmployeeAttendancePage() {
             <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 space-y-2 text-xs text-blue-900">
               <p className="font-bold flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-blue-600" />
-                <span>Waktu Saat Ini: {liveTime}</span>
+                <span suppressHydrationWarning>Waktu Saat Ini: {liveTime}</span>
               </p>
               <p className="text-blue-700/90 leading-relaxed text-[11px]">
                 Pastikan seluruh pekerjaan hari ini telah tersimpan dan Anda telah menyelesaikan jam kerja

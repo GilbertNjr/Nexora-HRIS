@@ -774,7 +774,7 @@ export default function AdminRecruitmentPage() {
           <span className="text-slate-300">|</span>
           <span className="text-slate-500 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            <span suppressHydrationWarning>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
           </span>
         </nav>
 
