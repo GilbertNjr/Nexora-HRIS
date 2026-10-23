@@ -73,13 +73,13 @@ interface OvertimeItem {
 export default function AdminAttendancePage() {
   // Dynamic Real-Time KPI Summary State (Synchronized with Attendance Database & ESS Clock-in)
   const [kpiSummary, setKpiSummary] = useState({
-    totalEmployees: 1248,
-    presentCount: 1210,
-    onTimeCount: 1182,
-    lateCount: 28,
-    leaveCount: 26,
-    absentCount: 12,
-    attendanceRate: 94.7,
+    totalEmployees: 1,
+    presentCount: 0,
+    onTimeCount: 0,
+    lateCount: 0,
+    leaveCount: 0,
+    absentCount: 0,
+    attendanceRate: 0,
   });
 
   // Filter & Toolbar States
@@ -101,116 +101,11 @@ export default function AdminAttendancePage() {
   // Table selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Overtime Pending Requests State
-  const [overtimeList, setOvertimeList] = useState<OvertimeItem[]>([
-    {
-      id: 'ot-1',
-      name: 'Bambang Sutedjo',
-      department: 'Warehouse Logistik',
-      hours: '3.5 Jam',
-      timeRange: '17:00 - 20:30',
-      reason: 'Bongkar muat kontainer logistik bahan baku kloter akhir kuartal...',
-      dateBadge: 'Hari Ini',
-    },
-    {
-      id: 'ot-2',
-      name: 'Farhan Al-Ghifari',
-      department: 'IT Infrastructure',
-      hours: '2.0 Jam',
-      timeRange: '19:00 - 21:00',
-      reason: 'Maintenance server database bulanan dan update patch security cluster...',
-      dateBadge: 'Hari Ini',
-    },
-  ]);
+  // Overtime Pending Requests State (Dynamic from unified approvals API)
+  const [overtimeList, setOvertimeList] = useState<OvertimeItem[]>([]);
 
-  // Attendance Records State
-  const [records, setRecords] = useState<AttendanceRecord[]>([
-    {
-      id: 'att-1',
-      name: 'Raden Bagus Prakoso, S.Kom',
-      nik: 'NX-201844',
-      division: 'Divisi Rekayasa Cloud',
-      initials: 'RP',
-      avatarBg: 'from-blue-600 to-indigo-600',
-      shiftName: 'Reguler HQ (08:00 - 17:00)',
-      shiftHours: '08:00 - 17:00',
-      shiftNote: 'Toleransi 15 Menit',
-      checkInTime: '07:51:20',
-      checkInSourceIcon: 'globe',
-      checkInNote: '+9 menit lbh cepat',
-      checkInType: 'early',
-      checkOutTime: '17:08:15',
-      status: 'TEPAT_WAKTU',
-    },
-    {
-      id: 'att-2',
-      name: 'Siti Nurhaliza, M.M.',
-      nik: 'NX-201992',
-      division: 'People & Talent Dev',
-      initials: 'SN',
-      avatarBg: 'from-purple-600 to-pink-600',
-      shiftName: 'Reguler HQ (08:00 - 17:00)',
-      shiftHours: '08:00 - 17:00',
-      shiftNote: 'Toleransi 15 Menit',
-      checkInTime: '08:24:11',
-      checkInSourceIcon: 'building',
-      checkInNote: 'Terlambat 24 Menit',
-      checkInType: 'late',
-      checkOutTime: '—',
-      status: 'TERLAMBAT',
-    },
-    {
-      id: 'att-3',
-      name: 'Dimas Arya Pamungkas',
-      nik: 'NX-202105',
-      division: 'DevOps & Security',
-      initials: 'DA',
-      avatarBg: 'from-emerald-600 to-teal-600',
-      shiftName: 'Fleksibel Remote (WFH)',
-      shiftHours: 'Fleksibel',
-      shiftNote: 'Jadwal Rotasi Mingguan',
-      checkInTime: '08:02:40',
-      checkInSourceIcon: 'globe',
-      checkInNote: 'Selfie Validated',
-      checkInType: 'remote',
-      checkOutTime: '—',
-      status: 'WFH',
-    },
-    {
-      id: 'att-4',
-      name: 'Hendro Wibowo, S.T.',
-      nik: 'NX-201633',
-      division: 'Operasional Pabrik Cikarang',
-      initials: 'HW',
-      avatarBg: 'from-amber-600 to-orange-600',
-      shiftName: 'Shift 1 Pagi (07:00 - 15:30)',
-      shiftHours: '07:00 - 15:30',
-      shiftNote: 'Standar Pabrik',
-      checkInTime: '06:48:10',
-      checkInSourceIcon: 'cog',
-      checkInNote: 'Gate Masuk Barat',
-      checkInType: 'gate',
-      checkOutTime: '—',
-      status: 'TEPAT_WAKTU',
-    },
-    {
-      id: 'att-5',
-      name: 'Anindya Kusuma, S.E.',
-      nik: 'NX-202289',
-      division: 'Business Development & Sales',
-      initials: 'AK',
-      avatarBg: 'from-rose-600 to-red-600',
-      shiftName: 'Dinas Luar (Surabaya)',
-      shiftHours: 'Full Day',
-      shiftNote: 'Surat Tugas #ST-442',
-      checkInTime: '08:10:02',
-      checkInSourceIcon: 'pin',
-      checkInNote: 'Check-In Client Site',
-      checkInType: 'dinas',
-      checkOutTime: '—',
-      status: 'DINAS_LUAR',
-    },
-  ]);
+  // Attendance Records State (Dynamic from real-time database)
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -222,32 +117,36 @@ export default function AdminAttendancePage() {
     // 1. Fetch live attendance data from API and sync KPI stats
     const fetchAttendanceApi = async () => {
       try {
-        const res = await fetch('/api/v1/attendance');
+        const [res, appRes] = await Promise.all([
+          fetch('/api/v1/attendance'),
+          fetch('/api/v1/approvals'),
+        ]);
+
         if (res.ok) {
           const json = await res.json();
           if (json.data) {
             const d = json.data;
             if (d.totalEmployees !== undefined) {
               setKpiSummary({
-                totalEmployees: d.totalEmployees || 1248,
-                presentCount: d.presentCount || 1210,
-                onTimeCount: d.onTimeCount || 1182,
-                lateCount: d.lateCount || 28,
-                leaveCount: d.leaveCount || 26,
+                totalEmployees: d.totalEmployees || 1,
+                presentCount: d.presentCount || 0,
+                onTimeCount: d.onTimeCount || 0,
+                lateCount: d.lateCount || 0,
+                leaveCount: d.leaveCount || 0,
                 absentCount:
                   d.absentCount !== undefined
                     ? d.absentCount
-                    : Math.max(0, (d.totalEmployees || 1248) - (d.presentCount || 1210) - (d.leaveCount || 26)),
-                attendanceRate: d.attendanceRate || 94.7,
+                    : Math.max(0, (d.totalEmployees || 1) - (d.presentCount || 0) - (d.leaveCount || 0)),
+                attendanceRate: d.attendanceRate || 0,
               });
             }
 
-            if (d.records && Array.isArray(d.records) && d.records.length > 0) {
+            if (d.records && Array.isArray(d.records)) {
               const apiRecords: AttendanceRecord[] = d.records.map((r: any) => ({
                 id: r.id,
                 name: r.employeeName,
-                nik: r.employeeId || 'NX-201844',
-                division: r.department || 'Divisi Rekayasa Cloud',
+                nik: r.employeeId || 'NX-2021008',
+                division: r.department || 'Teknologi Informasi',
                 initials: r.employeeName
                   ? r.employeeName
                       .split(' ')
@@ -256,12 +155,12 @@ export default function AdminAttendancePage() {
                       .slice(0, 2)
                       .join('')
                       .toUpperCase()
-                  : 'KR',
+                  : 'RP',
                 avatarBg: r.avatarBg || 'from-blue-600 to-indigo-600',
                 avatarUrl: r.avatarUrl || null,
                 shiftName: r.shiftName || 'Reguler HQ (08:00 - 17:00)',
                 shiftHours: r.shiftHours || '08:00 - 17:00',
-                shiftNote: r.shiftNote || r.location || 'Toleransi 15 Menit',
+                shiftNote: r.shiftNote || r.location || 'Presensi Mandiri ESS (Real-Time)',
                 checkInTime: r.checkInTime || r.time,
                 checkInSourceIcon:
                   r.checkInSourceIcon || (r.workLocation === 'WFH' ? 'globe' : r.workLocation === 'Dinas' ? 'pin' : 'globe'),
@@ -270,7 +169,7 @@ export default function AdminAttendancePage() {
                   (r.status === 'TERLAMBAT'
                     ? 'Terlambat Masuk'
                     : r.status === 'TEPAT_WAKTU'
-                    ? '+9 menit lbh cepat'
+                    ? 'Tepat Waktu'
                     : 'Selfie Validated'),
                 checkInType:
                   r.status === 'TERLAMBAT'
@@ -291,6 +190,24 @@ export default function AdminAttendancePage() {
             }
           }
         }
+
+        if (appRes.ok) {
+          const appJson = await appRes.json();
+          if (Array.isArray(appJson.data)) {
+            const pendingOT = appJson.data
+              .filter((a: any) => a.type === 'lembur')
+              .map((a: any) => ({
+                id: a.id,
+                name: a.name,
+                department: a.department || 'Operasional',
+                hours: a.detail?.split('(')[0]?.trim() || '2.0 Jam',
+                timeRange: a.detail?.includes('(') ? a.detail.split('(')[1].replace(')', '').trim() : '17:00 - 19:00',
+                reason: a.reason || a.title || 'Lembur Operasional',
+                dateBadge: a.submittedDate || 'Hari Ini',
+              }));
+            setOvertimeList(pendingOT);
+          }
+        }
       } catch {
         // ignore
       }
@@ -306,13 +223,13 @@ export default function AdminAttendancePage() {
 
       if (summary) {
         setKpiSummary({
-          totalEmployees: summary.totalEmployees || 1248,
-          presentCount: summary.presentCount || 1210,
-          onTimeCount: summary.onTimeCount || 1182,
-          lateCount: summary.lateCount || 28,
-          leaveCount: summary.leaveCount || 26,
-          absentCount: summary.absentCount !== undefined ? summary.absentCount : 12,
-          attendanceRate: summary.attendanceRate || 94.7,
+          totalEmployees: summary.totalEmployees ?? 1,
+          presentCount: summary.presentCount ?? 0,
+          onTimeCount: summary.onTimeCount ?? 0,
+          lateCount: summary.lateCount ?? 0,
+          leaveCount: summary.leaveCount ?? 0,
+          absentCount: summary.absentCount !== undefined ? summary.absentCount : 0,
+          attendanceRate: summary.attendanceRate ?? 0,
         });
       } else {
         setKpiSummary((prev) => {
@@ -451,31 +368,35 @@ export default function AdminAttendancePage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const res = await fetch('/api/v1/attendance');
+      const [res, appRes] = await Promise.all([
+        fetch('/api/v1/attendance'),
+        fetch('/api/v1/approvals'),
+      ]);
+
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
           const d = json.data;
           if (d.totalEmployees !== undefined) {
             setKpiSummary({
-              totalEmployees: d.totalEmployees || 1248,
-              presentCount: d.presentCount || 1210,
-              onTimeCount: d.onTimeCount || 1182,
-              lateCount: d.lateCount || 28,
-              leaveCount: d.leaveCount || 26,
+              totalEmployees: d.totalEmployees || 1,
+              presentCount: d.presentCount || 0,
+              onTimeCount: d.onTimeCount || 0,
+              lateCount: d.lateCount || 0,
+              leaveCount: d.leaveCount || 0,
               absentCount:
                 d.absentCount !== undefined
                   ? d.absentCount
-                  : Math.max(0, (d.totalEmployees || 1248) - (d.presentCount || 1210) - (d.leaveCount || 26)),
-              attendanceRate: d.attendanceRate || 94.7,
+                  : Math.max(0, (d.totalEmployees || 1) - (d.presentCount || 0) - (d.leaveCount || 0)),
+              attendanceRate: d.attendanceRate || 0,
             });
           }
-          if (d.records && Array.isArray(d.records) && d.records.length > 0) {
+          if (d.records && Array.isArray(d.records)) {
             const apiRecords: AttendanceRecord[] = d.records.map((r: any) => ({
               id: r.id,
               name: r.employeeName,
-              nik: r.employeeId || 'NX-201844',
-              division: r.department || 'Divisi Rekayasa Cloud',
+              nik: r.employeeId || 'NX-2021008',
+              division: r.department || 'Teknologi Informasi',
               initials: r.employeeName
                 ? r.employeeName
                     .split(' ')
@@ -484,12 +405,12 @@ export default function AdminAttendancePage() {
                     .slice(0, 2)
                     .join('')
                     .toUpperCase()
-                : 'KR',
+                : 'RP',
               avatarBg: r.avatarBg || 'from-blue-600 to-indigo-600',
               avatarUrl: r.avatarUrl || null,
               shiftName: r.shiftName || 'Reguler HQ (08:00 - 17:00)',
               shiftHours: r.shiftHours || '08:00 - 17:00',
-              shiftNote: r.shiftNote || r.location || 'Toleransi 15 Menit',
+              shiftNote: r.shiftNote || r.location || 'Presensi Mandiri ESS (Real-Time)',
               checkInTime: r.checkInTime || r.time,
               checkInSourceIcon:
                 r.checkInSourceIcon || (r.workLocation === 'WFH' ? 'globe' : r.workLocation === 'Dinas' ? 'pin' : 'globe'),
@@ -498,7 +419,7 @@ export default function AdminAttendancePage() {
                 (r.status === 'TERLAMBAT'
                   ? 'Terlambat Masuk'
                   : r.status === 'TEPAT_WAKTU'
-                  ? '+9 menit lbh cepat'
+                  ? 'Tepat Waktu'
                   : 'Selfie Validated'),
               checkInType:
                 r.status === 'TERLAMBAT'
@@ -519,19 +440,57 @@ export default function AdminAttendancePage() {
           }
         }
       }
+
+      if (appRes.ok) {
+        const appJson = await appRes.json();
+        if (Array.isArray(appJson.data)) {
+          const pendingOT = appJson.data
+            .filter((a: any) => a.type === 'lembur')
+            .map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              department: a.department || 'Operasional',
+              hours: a.detail?.split('(')[0]?.trim() || '2.0 Jam',
+              timeRange: a.detail?.includes('(') ? a.detail.split('(')[1].replace(')', '').trim() : '17:00 - 19:00',
+              reason: a.reason || a.title || 'Lembur Operasional',
+              dateBadge: a.submittedDate || 'Hari Ini',
+            }));
+          setOvertimeList(pendingOT);
+        }
+      }
     } catch {}
     setIsRefreshing(false);
     showToast('Sinkronisasi Biometrik & Geofencing berhasil diperbarui!');
   };
 
-  const handleApproveOvertime = (id: string, name: string) => {
+  const handleApproveOvertime = async (id: string, name: string) => {
     setOvertimeList((prev) => prev.filter((item) => item.id !== id));
     showToast(`Lembur ${name} berhasil disetujui & dicatat ke perhitungan payroll!`);
+    try {
+      await fetch('/api/v1/approvals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'APPROVED' }),
+      });
+      const ch = new BroadcastChannel('nexora_live_sync');
+      ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'APPROVED' });
+      ch.close();
+    } catch {}
   };
 
-  const handleRejectOvertime = (id: string, name: string) => {
+  const handleRejectOvertime = async (id: string, name: string) => {
     setOvertimeList((prev) => prev.filter((item) => item.id !== id));
     showToast(`Pengajuan lembur ${name} ditolak.`);
+    try {
+      await fetch('/api/v1/approvals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'REJECTED' }),
+      });
+      const ch = new BroadcastChannel('nexora_live_sync');
+      ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'REJECTED' });
+      ch.close();
+    } catch {}
   };
 
   const toggleSelectAll = () => {
@@ -563,6 +522,41 @@ export default function AdminAttendancePage() {
 
     return matchesSearch && matchesShift;
   });
+
+  // Dynamic breakdown for Metode Check-In
+  const presentRecords = records.filter(
+    (r) => r.status && r.status !== 'BELUM_PRESENSI'
+  );
+  const totalPresentCount = presentRecords.length;
+
+  const bioCount = presentRecords.filter(
+    (r) =>
+      r.checkInSourceIcon === 'building' ||
+      r.checkInSourceIcon === 'cog' ||
+      (r.workLocation === 'WFO' && !r.checkInSourceIcon)
+  ).length;
+
+  const mobileGpsCount = presentRecords.filter(
+    (r) =>
+      r.checkInSourceIcon === 'pin' ||
+      r.workLocation === 'Dinas' ||
+      (r.location && r.location.toLowerCase().includes('gps'))
+  ).length;
+
+  const webPortalCount = presentRecords.filter(
+    (r) =>
+      r.checkInSourceIcon === 'globe' ||
+      r.workLocation === 'WFH' ||
+      (!r.checkInSourceIcon && r.workLocation !== 'WFO')
+  ).length;
+
+  const bioPercent = totalPresentCount > 0 ? Math.round((bioCount / totalPresentCount) * 100) : 0;
+  const mobilePercent = totalPresentCount > 0 ? Math.round((mobileGpsCount / totalPresentCount) * 100) : 0;
+  const webPercent = totalPresentCount > 0 ? Math.max(0, 100 - bioPercent - mobilePercent) : 0;
+
+  const circumference = 251.2;
+  const bioDash = (circumference * bioPercent) / 100;
+  const mobileDash = (circumference * mobilePercent) / 100;
 
   return (
     <AdminLayoutSkeleton
@@ -1035,9 +1029,20 @@ export default function AdminAttendancePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredRecords.map((item) => {
-                      const isSelected = selectedIds.includes(item.id);
-                      return (
+                    {filteredRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-16 text-center">
+                          <Clock className="w-10 h-10 text-slate-300 mx-auto mb-2.5 opacity-80" />
+                          <p className="text-xs font-bold text-slate-700">Belum Ada Presensi Masuk Hari Ini</p>
+                          <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                            Log presensi harian akan terisi secara otomatis & real-time saat karyawan melakukan Clock-In mandiri via portal ESS.
+                          </p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRecords.map((item) => {
+                        const isSelected = selectedIds.includes(item.id);
+                        return (
                         <tr
                           key={item.id}
                           className={`hover:bg-slate-50/70 transition-colors ${
@@ -1217,7 +1222,7 @@ export default function AdminAttendancePage() {
                           </td>
                         </tr>
                       );
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -1227,40 +1232,30 @@ export default function AdminAttendancePage() {
             <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <span>Menampilkan</span>
-                <select className="px-2 py-1 rounded-lg border border-slate-200 bg-white font-semibold text-slate-700 text-xs">
-                  <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                </select>
-                <span>dari <strong className="text-slate-800">{kpiSummary.totalEmployees.toLocaleString('id-ID')}</strong> total data presensi</span>
+                <span className="font-semibold text-slate-800">
+                  {filteredRecords.length === 0 ? '0' : `1 - ${Math.min(10, filteredRecords.length)}`}
+                </span>
+                <span>
+                  dari <strong className="text-slate-800">{filteredRecords.length.toLocaleString('id-ID')}</strong> data presensi hari ini
+                </span>
               </div>
 
               {/* Pagination controls */}
               <div className="flex items-center gap-1 font-semibold">
-                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400">
-                  |&lt;
-                </button>
-                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400">
+                <button
+                  disabled
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
+                >
                   &lt;
                 </button>
-                <button className="px-3 py-1 rounded-lg bg-blue-600 text-white">
+                <button className="px-3 py-1 rounded-lg bg-blue-600 text-white shadow-sm">
                   1
                 </button>
-                <button className="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
-                  2
-                </button>
-                <button className="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
-                  3
-                </button>
-                <span className="px-1 text-slate-400">...</span>
-                <button className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
-                  125
-                </button>
-                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
+                <button
+                  disabled
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
+                >
                   &gt;
-                </button>
-                <button className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700">
-                  &gt;|
                 </button>
               </div>
             </div>
@@ -1385,36 +1380,58 @@ export default function AdminAttendancePage() {
                       cy="50"
                       r="40"
                       fill="transparent"
-                      stroke="#E2E8F0"
+                      stroke="#F1F5F9"
                       strokeWidth="12"
                     />
-                    {/* Biometrik Kantor (62.8%) */}
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="transparent"
-                      stroke="#1D4ED8"
-                      strokeWidth="12"
-                      strokeDasharray="251.2"
-                      strokeDashoffset="93.4"
-                      className="transition-all duration-1000 ease-out"
-                    />
-                    {/* Mobile GPS (26.9%) */}
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="transparent"
-                      stroke="#0EA5E9"
-                      strokeWidth="12"
-                      strokeDasharray="251.2"
-                      strokeDashoffset="183.6"
-                      strokeDashoffset-start="93.4"
-                    />
+                    {totalPresentCount > 0 && bioPercent > 0 && (
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke="#1D4ED8"
+                        strokeWidth="12"
+                        strokeDasharray="251.2"
+                        strokeDashoffset={251.2 - bioDash}
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    )}
+                    {totalPresentCount > 0 && mobilePercent > 0 && (
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke="#0EA5E9"
+                        strokeWidth="12"
+                        strokeDasharray="251.2"
+                        strokeDashoffset={251.2 - mobileDash}
+                        style={{ transform: `rotate(${(bioPercent / 100) * 360}deg)`, transformOrigin: '50% 50%' }}
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    )}
+                    {totalPresentCount > 0 && webPercent > 0 && (
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke="#94A3B8"
+                        strokeWidth="12"
+                        strokeDasharray="251.2"
+                        strokeDashoffset={251.2 - ((circumference * webPercent) / 100)}
+                        style={{
+                          transform: `rotate(${((bioPercent + mobilePercent) / 100) * 360}deg)`,
+                          transformOrigin: '50% 50%',
+                        }}
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    )}
                   </svg>
                   <div className="absolute flex flex-col items-center text-center">
-                    <span className="text-2xl font-bold text-slate-900">1,182</span>
+                    <span className="text-2xl font-bold text-slate-900">
+                      {totalPresentCount.toLocaleString('id-ID')}
+                    </span>
                     <span className="text-[10px] text-slate-400 font-semibold uppercase">
                       Total Hadir
                     </span>
@@ -1432,7 +1449,7 @@ export default function AdminAttendancePage() {
                     </span>
                   </div>
                   <span className="font-mono font-bold text-slate-900">
-                    742 (62.8%)
+                    {bioCount} ({bioPercent}%)
                   </span>
                 </div>
 
@@ -1444,7 +1461,7 @@ export default function AdminAttendancePage() {
                     </span>
                   </div>
                   <span className="font-mono font-bold text-slate-900">
-                    318 (26.9%)
+                    {mobileGpsCount} ({mobilePercent}%)
                   </span>
                 </div>
 
@@ -1456,7 +1473,7 @@ export default function AdminAttendancePage() {
                     </span>
                   </div>
                   <span className="font-mono font-bold text-slate-900">
-                    122 (10.3%)
+                    {webPortalCount} ({webPercent}%)
                   </span>
                 </div>
               </div>
