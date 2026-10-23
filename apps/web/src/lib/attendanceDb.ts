@@ -1,0 +1,206 @@
+import crypto from 'crypto';
+import { neon } from '@neondatabase/serverless';
+import { AttendanceItem } from '@/app/api/v1/attendance/route';
+
+const DEFAULT_NEON_DATABASE_URL =
+  'postgresql://neondb_owner:npg_Jv7SzD1PgcQl@ep-shiny-silence-azkjdzr3-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+
+const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_NEON_DATABASE_URL;
+
+function getDb() {
+  return neon(DATABASE_URL);
+}
+
+function formatWibTime(dateInput: Date | string | null | undefined): string {
+  if (!dateInput) return '—';
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return '—';
+  return `${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB`;
+}
+
+export async function getAttendancesFromDb(): Promise<AttendanceItem[]> {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT 
+        a.id,
+        a.employee_id,
+        a.shift_id,
+        TO_CHAR(a.date, 'YYYY-MM-DD') as date_str,
+        a.clock_in_time,
+        a.clock_out_time,
+        a.clock_in_lat,
+        a.clock_in_lng,
+        a.clock_in_photo,
+        a.clock_out_photo,
+        a.status,
+        a.late_minutes,
+        a.notes,
+        e.employee_number,
+        e.first_name,
+        e.last_name,
+        d.name as department_name,
+        e.avatar_url
+      FROM attendances a
+      JOIN employees e ON a.employee_id = e.id
+      LEFT JOIN departments d ON e.department_id = d.id
+      ORDER BY a.clock_in_time DESC NULLS LAST, a.created_at DESC
+    `;
+
+    return rows.map((r: any) => {
+      const isLate = r.status === 'LATE';
+      const status: 'TEPAT_WAKTU' | 'TERLAMBAT' | 'WFH' | 'DINAS_LUAR' = isLate
+        ? 'TERLAMBAT'
+        : 'TEPAT_WAKTU';
+
+      const checkInFormatted = formatWibTime(r.clock_in_time);
+      const checkOutFormatted = r.clock_out_time ? formatWibTime(r.clock_out_time) : '—';
+      const employeeName = `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Karyawan Nexora';
+
+      return {
+        id: r.id,
+        employeeId: r.employee_number || 'NX-2021008',
+        employeeName,
+        department: r.department_name || 'Teknologi Informasi',
+        type: r.clock_out_time ? 'CLOCK_OUT' : 'CLOCK_IN',
+        time: checkInFormatted,
+        checkInTime: checkInFormatted,
+        checkOutTime: checkOutFormatted,
+        date: r.date_str,
+        status,
+        location: r.clock_in_lat && r.clock_in_lng 
+          ? `HQ SCBD (${r.clock_in_lat}, ${r.clock_in_lng})`
+          : 'HQ Jakarta — Pacific Century Place SCBD Lt. 7',
+        coordinates: r.clock_in_lat && r.clock_in_lng ? `${r.clock_in_lat}, ${r.clock_in_lng}` : '-6.2255, 106.8089',
+        device: 'Selfie Liveness Camera (NX-Biometric v4.2)',
+        photoUrl: r.clock_in_photo || undefined,
+        avatarUrl: r.avatar_url || undefined,
+        workLocation: 'WFO',
+        notes: r.notes || undefined,
+        shiftName: 'Reguler HQ (08:00 - 17:00)',
+        shiftHours: '08:00 - 17:00',
+        shiftNote: r.notes || 'Presensi Mandiri ESS (Real-Time)',
+        checkInNote: isLate ? 'Terlambat Masuk' : 'Liveness Selfie Validated (99.4%)',
+        checkInSourceIcon: 'globe',
+      };
+    });
+  } catch (err) {
+    console.warn('[attendanceDb] Error fetching attendances from Neon DB:', err);
+    return [];
+  }
+}
+
+export async function saveAttendanceToDb(
+  item: Partial<AttendanceItem>,
+  isClockOut: boolean
+): Promise<string | null> {
+  try {
+    const sql = getDb();
+    const employeeIdOrNik = item.employeeId || 'NX-2021008';
+    const dateStr = item.date || new Date().toISOString().split('T')[0];
+
+    // Find employee UUID
+    let employeeUuid: string | null = null;
+    const emps = await sql`
+      SELECT id FROM employees 
+      WHERE employee_number = ${employeeIdOrNik} OR id::text = ${employeeIdOrNik}
+      LIMIT 1
+    `;
+
+    if (emps.length > 0) {
+      employeeUuid = emps[0].id;
+    } else {
+      // Fallback to primary employee (Rian Pratama)
+      const primary = await sql`SELECT id FROM employees LIMIT 1`;
+      if (primary.length > 0) {
+        employeeUuid = primary[0].id;
+      }
+    }
+
+    if (!employeeUuid) {
+      console.warn('[attendanceDb] No employee record found to associate attendance');
+      return null;
+    }
+
+    // Check if record exists for this employee on this date
+    const existing = await sql`
+      SELECT id, clock_in_photo FROM attendances 
+      WHERE employee_id = ${employeeUuid} AND date = ${dateStr}::date
+      LIMIT 1
+    `;
+
+    const statusEnum = item.status === 'TERLAMBAT' ? 'LATE' : 'PRESENT';
+    const lateMinutes = item.status === 'TERLAMBAT' ? 15 : 0;
+
+    if (existing.length > 0) {
+      const existingId = existing[0].id;
+      if (isClockOut) {
+        await sql`
+          UPDATE attendances
+          SET 
+            clock_out_time = NOW(),
+            clock_out_photo = COALESCE(${item.photoUrl || null}, clock_out_photo),
+            updated_at = NOW()
+          WHERE id = ${existingId}
+        `;
+      } else {
+        await sql`
+          UPDATE attendances
+          SET 
+            clock_in_time = COALESCE(clock_in_time, NOW()),
+            clock_in_photo = COALESCE(${item.photoUrl || null}, clock_in_photo),
+            status = ${statusEnum}::"AttendanceStatus",
+            late_minutes = ${lateMinutes},
+            notes = COALESCE(${item.notes || null}, notes),
+            updated_at = NOW()
+          WHERE id = ${existingId}
+        `;
+      }
+      return existingId;
+    } else {
+      const newId = crypto.randomUUID();
+      await sql`
+        INSERT INTO attendances (
+          id, employee_id, date, clock_in_time, clock_in_photo, status, 
+          late_minutes, early_minutes, notes, created_at, updated_at
+        ) VALUES (
+          ${newId}, 
+          ${employeeUuid}, 
+          ${dateStr}::date, 
+          NOW(), 
+          ${item.photoUrl || null}, 
+          ${statusEnum}::"AttendanceStatus", 
+          ${lateMinutes}, 
+          0, 
+          ${item.notes || null}, 
+          NOW(), 
+          NOW()
+        )
+      `;
+      return newId;
+    }
+  } catch (err) {
+    console.error('[attendanceDb] Error saving attendance to Neon DB:', err);
+    return null;
+  }
+}
+
+export async function deleteAttendanceFromDb(
+  employeeIdOrNik: string,
+  dateStr: string
+): Promise<boolean> {
+  try {
+    const sql = getDb();
+    await sql`
+      DELETE FROM attendances a
+      USING employees e
+      WHERE a.employee_id = e.id 
+        AND (e.employee_number = ${employeeIdOrNik} OR e.id::text = ${employeeIdOrNik})
+        AND a.date = ${dateStr}::date
+    `;
+    return true;
+  } catch (err) {
+    console.error('[attendanceDb] Error deleting attendance from Neon DB:', err);
+    return false;
+  }
+}

@@ -132,82 +132,8 @@ const initialSquadMembers: SquadMember[] = [
   },
 ];
 
-// Historical default leave records
-const defaultHistoricalLeaves: LeaveRequestItem[] = [
-  {
-    id: 'hist-01',
-    refNo: 'SK-2025-0019',
-    type: 'Izin Sakit',
-    title: 'Izin Sakit: Gejala ISPA & Demam',
-    startDate: '14 Feb',
-    endDate: '14 Feb 2025',
-    durationDays: 1,
-    handover: 'Handover Tiket Support',
-    notes:
-      'Mengalami demam tinggi dan radang tenggorokan setelah dinas luar. Dokter merekomendasikan istirahat penuh 1 hari.',
-    status: 'APPROVED',
-    statusBadge: 'Disetujui HR & Atasan',
-    submittedAt: '14 Feb 2025',
-    completedAt: '15 Feb 2025',
-    documentUrl: '#',
-    documentName: 'Surat_Dokter_Klinik_Mitra.pdf',
-    steps: [
-      {
-        title: 'Pengajuan Mandiri',
-        person: 'Rian Pratama',
-        time: '14 Feb, 07:30 WIB',
-        status: 'COMPLETED',
-      },
-      {
-        title: 'Atasan Langsung',
-        person: 'Arya Wibowo (VP Eng)',
-        time: '14 Feb, 08:15 WIB',
-        status: 'COMPLETED',
-      },
-      {
-        title: 'HR Operations',
-        person: 'Dewi Lestari, S.Psi',
-        time: '15 Feb, 10:00 WIB',
-        status: 'COMPLETED',
-      },
-    ],
-  },
-  {
-    id: 'hist-02',
-    refNo: 'LV-2025-0003',
-    type: 'Cuti Bersama',
-    title: 'Cuti Bersama Tahun Baru 2025',
-    startDate: '02 Jan',
-    endDate: '02 Jan 2025',
-    durationDays: 1,
-    handover: 'Sistem Terjadwal Otomatis',
-    notes: 'Libur resmi cuti bersama nasional pergantian tahun kalender.',
-    status: 'APPROVED',
-    statusBadge: 'Otomatis Disetujui',
-    submittedAt: '02 Jan 2025',
-    completedAt: '02 Jan 2025',
-    steps: [
-      {
-        title: 'Sistem Terjadwal',
-        person: 'Master HRIS Nexora',
-        time: '02 Jan, 00:00 WIB',
-        status: 'COMPLETED',
-      },
-      {
-        title: 'Atasan Langsung',
-        person: 'Arya Wibowo (VP Eng)',
-        time: '02 Jan, 00:00 WIB (Otomatis)',
-        status: 'COMPLETED',
-      },
-      {
-        title: 'HR Operations',
-        person: 'Dewi Lestari, S.Psi',
-        time: '02 Jan, 08:00 WIB',
-        status: 'COMPLETED',
-      },
-    ],
-  },
-];
+// Historical default leave records (Initialized empty for clean real-time dynamic behavior)
+const defaultHistoricalLeaves: LeaveRequestItem[] = [];
 
 function mapApprovalToEssItem(item: any): LeaveRequestItem {
   const isApproved = item.status === 'APPROVED';
@@ -303,7 +229,7 @@ export default function EssLeaveOverhaulPage() {
     annualUsed: 0,
     annualRemaining: 12,
     jointHoliday: 2,
-    sickUsed: 1,
+    sickUsed: 0,
     pendingCount: 0,
   });
 
@@ -623,8 +549,8 @@ export default function EssLeaveOverhaulPage() {
       annualTotal,
       annualUsed: approvedAnnual,
       annualRemaining,
-      jointHoliday: Math.max(2, approvedJoint),
-      sickUsed: Math.max(1, approvedSick),
+      jointHoliday: 2,
+      sickUsed: approvedSick,
       pendingCount: pending,
     });
   }, [requests]);

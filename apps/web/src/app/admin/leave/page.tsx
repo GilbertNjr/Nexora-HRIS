@@ -205,7 +205,7 @@ export default function AdminLeavePage() {
   const fetchLiveLeaveData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setIsRefreshing(true);
     try {
-      const res = await fetch('/api/v1/approvals?all=true', { cache: 'no-store' });
+      const res = await fetch(`/api/v1/approvals?all=true&t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (Array.isArray(json.data)) {
@@ -805,10 +805,10 @@ export default function AdminLeavePage() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {Math.max(12, utilizationRate)}%
+                {totalApprovedDays === 0 ? 0 : utilizationRate}%
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                (Rata-rata {avgDaysTaken}/12 hari)
+                (Rata-rata {totalApprovedDays === 0 ? '0.0' : avgDaysTaken}/12 hari)
               </span>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
@@ -816,7 +816,7 @@ export default function AdminLeavePage() {
                 <TrendingUp className="w-3.5 h-3.5" />
                 <span>{currentQuarterStr}</span>
               </div>
-              <span className="text-slate-500 text-[11px]">Sisa: {avgRemainingDays} Hari/Karyawan</span>
+              <span className="text-slate-500 text-[11px]">Sisa: {totalApprovedDays === 0 ? '12.0' : avgRemainingDays} Hari/Karyawan</span>
             </div>
           </div>
 
@@ -839,10 +839,10 @@ export default function AdminLeavePage() {
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
                 <Check className="w-3 h-3 text-emerald-600" />
-                <span>{verifiedPercent}% Terverifikasi SKD</span>
+                <span>{allSickLeaves.length === 0 ? '0%' : `${verifiedPercent}%`} Terverifikasi SKD</span>
               </div>
               <span className="text-slate-400 text-[11px]">
-                {unverifiedSickCount > 0 ? `${unverifiedSickCount} Kasus Tanpa Bukti` : 'Semua Terverifikasi'}
+                {allSickLeaves.length === 0 ? 'Belum Ada Klaim Sakit' : unverifiedSickCount > 0 ? `${unverifiedSickCount} Kasus Tanpa Bukti` : 'Semua Terverifikasi'}
               </span>
             </div>
           </div>
@@ -1116,8 +1116,14 @@ export default function AdminLeavePage() {
                   <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
                     {filteredRequests.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-400">
-                          Tidak ada pengajuan cuti yang sesuai dengan kriteria filter.
+                        <td colSpan={7} className="py-16 text-center">
+                          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 shadow-xs">
+                            <CalendarCheck className="w-6 h-6" />
+                          </div>
+                          <p className="text-sm font-bold text-slate-800">Belum Ada Pengajuan Cuti Real-Time</p>
+                          <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                            Antrean permohonan cuti &amp; izin karyawan akan muncul otomatis di sini secara real-time saat karyawan mengajukan melalui portal ESS.
+                          </p>
                         </td>
                       </tr>
                     ) : (

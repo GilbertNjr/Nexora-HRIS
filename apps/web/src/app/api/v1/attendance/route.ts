@@ -5,6 +5,11 @@ import { broadcastAuditEvent } from '@/lib/auditSSE';
 import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 import { getEmployeesFromDb } from '@/lib/db';
+import {
+  getAttendancesFromDb,
+  saveAttendanceToDb,
+  deleteAttendanceFromDb,
+} from '@/lib/attendanceDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -321,6 +326,22 @@ export async function GET(request: NextRequest) {
     emps = await getEmployeesFromDb();
   } catch {}
 
+  // Synchronize from Neon PostgreSQL (ensures persistence across refresh and redeploy)
+  try {
+    const dbRecords = await getAttendancesFromDb();
+    if (Array.isArray(dbRecords) && dbRecords.length > 0) {
+      const dbKeys = new Set(
+        dbRecords.map((r) => `${(r.employeeId || '').toLowerCase()}-${r.date}`)
+      );
+      const remainingFileRecords = (data.records || []).filter(
+        (r) => !dbKeys.has(`${(r.employeeId || '').toLowerCase()}-${r.date}`)
+      );
+      data.records = [...dbRecords, ...remainingFileRecords];
+    }
+  } catch (err) {
+    console.warn('[attendance/GET] Could not load from PostgreSQL:', err);
+  }
+
   const totalEmployees = Array.isArray(emps) && emps.length > 0 ? emps.length : (data.totalEmployees || 1);
   data.totalEmployees = totalEmployees;
 
@@ -417,6 +438,9 @@ export async function POST(request: NextRequest) {
 
     if (body.type === 'RESET_TODAY') {
       const todayStr = now.toISOString().split('T')[0];
+      try {
+        await deleteAttendanceFromDb(employeeId, todayStr);
+      } catch {}
       data.records = data.records.filter((r) => {
         const isMatch =
           (r.employeeId && r.employeeId.toLowerCase() === employeeId.toLowerCase()) ||
@@ -532,6 +556,13 @@ export async function POST(request: NextRequest) {
       ? Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1))
       : 0;
 
+    // Persist permanently to Neon PostgreSQL (ensures biometric selfie photo & status survive redeploy)
+    try {
+      await saveAttendanceToDb(targetRecord, isClockOut);
+    } catch (dbErr) {
+      console.error('[attendance/POST] Error persisting to Neon DB:', dbErr);
+    }
+
     saveStoredAttendance(data);
 
     const summaryPayload = {
@@ -609,6 +640,12 @@ export async function DELETE(request: NextRequest) {
     const employeeId = searchParams.get('employeeId') || searchParams.get('nik') || 'NX-2021008';
     const employeeName = searchParams.get('employeeName') || searchParams.get('name') || 'Rian Pratama';
     const todayStr = new Date().toISOString().split('T')[0];
+
+    try {
+      await deleteAttendanceFromDb(employeeId, todayStr);
+    } catch (e) {
+      console.warn('[attendance/DELETE] Error deleting from DB:', e);
+    }
 
     const data = getStoredAttendance();
     data.records = data.records.filter((r) => {

@@ -185,12 +185,16 @@ export default function EmployeeAttendancePage() {
       const empId = currentUser.employeeNumber || 'NX-2021008';
       const empName = currentUser.fullName || 'Rian Pratama';
       const res = await fetch(
-        `/api/v1/attendance?employeeId=${encodeURIComponent(empId)}&employeeName=${encodeURIComponent(empName)}`
+        `/api/v1/attendance?employeeId=${encodeURIComponent(empId)}&employeeName=${encodeURIComponent(empName)}&t=${Date.now()}`,
+        { cache: 'no-store' }
       );
       if (res.ok) {
         const json = await res.json();
         if (json.data?.employeeStats) {
-          const s = json.data.employeeStats as MonthlyAttendanceStats & { history?: AttendanceDailyRecord[] };
+          const s = json.data.employeeStats as MonthlyAttendanceStats & {
+            history?: AttendanceDailyRecord[];
+            todayRecord?: any;
+          };
           setAttendanceStats(s);
           setIsCheckedIn(s.isCheckedIn);
           if (s.checkInTimeStr) setCheckInTimeStr(s.checkInTimeStr);
@@ -202,6 +206,9 @@ export default function EmployeeAttendancePage() {
           }
           if (Array.isArray(s.history) && s.history.length > 0) {
             setAttendanceHistory(s.history);
+          }
+          if (s.todayRecord?.photoUrl) {
+            setTodaySelfiePhoto(s.todayRecord.photoUrl);
           }
         }
       }
