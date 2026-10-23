@@ -4,7 +4,7 @@ import path from 'path';
 import { neon } from '@neondatabase/serverless';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
 import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
-import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry, recordAuditLog } from '@/lib/auditDb';
 import { getEmployeesFromDb, updateEmployeeInDb, saveEmployeeToDb } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -247,34 +247,26 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // D. Log to HR Admin Audit System
-    const now = new Date();
-    const auditLog: AuditLogEntry = {
-      id: `aud-${Date.now()}`,
-      module: 'EMPLOYEE',
-      action: 'PROFILE_UPDATED',
-      recordId: updatedEmployee.employeeNumber,
-      userName: updatedEmployee.fullName,
-      userEmail: updatedEmployee.email,
-      userNik: updatedEmployee.employeeNumber,
-      ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
-      userAgent: request.headers.get('user-agent') || 'Portal Karyawan (Web)',
-      timestamp:
-        now.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-') +
-        ' ' +
-        now.toLocaleTimeString('id-ID') +
-        ' WIB',
-      oldData: { fullName: current.fullName, phone: current.phone },
-      newData: {
-        fullName: updatedEmployee.fullName,
-        phone: updatedEmployee.phone,
-        department: updatedEmployee.department,
-        designation: updatedEmployee.designation,
-      },
-    };
-
-    saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
-    broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    // D. Log to Neon PostgreSQL Database Audit System
+    try {
+      await recordAuditLog({
+        module: 'EMPLOYEE',
+        action: 'PROFILE_UPDATED',
+        recordId: updatedEmployee.employeeNumber,
+        userName: updatedEmployee.fullName,
+        userEmail: updatedEmployee.email,
+        userNik: updatedEmployee.employeeNumber,
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Portal Karyawan (Web)',
+        oldData: { fullName: current.fullName, phone: current.phone },
+        newData: {
+          fullName: updatedEmployee.fullName,
+          phone: updatedEmployee.phone,
+          department: updatedEmployee.department,
+          designation: updatedEmployee.designation,
+        },
+      });
+    } catch {}
 
     // E. Broadcast Real-Time Employee Event so HR Admin screen updates live!
     const recordToBroadcast = savedRecord || {

@@ -25,11 +25,13 @@ import {
   RefreshCw,
   Radio,
   Plus,
+  Database,
+  History,
 } from 'lucide-react';
 
 export interface AuditLogEntry {
   id: string;
-  module: 'AUTH' | 'EMPLOYEE' | 'ATTENDANCE' | 'LEAVE' | 'PAYROLL' | 'ANNOUNCEMENTS';
+  module: 'AUTH' | 'EMPLOYEE' | 'ATTENDANCE' | 'LEAVE' | 'PAYROLL' | 'PERFORMANCE' | 'ANNOUNCEMENTS';
   action: string;
   recordId: string;
   userName: string;
@@ -38,119 +40,47 @@ export interface AuditLogEntry {
   ipAddress: string;
   userAgent: string;
   timestamp: string;
+  createdAt?: string;
   oldData: any | null;
   newData: any | null;
 }
 
-const DEFAULT_LOGS: AuditLogEntry[] = [
-  {
-    id: 'aud-001',
-    module: 'PAYROLL',
-    action: 'PAYROLL_PERIOD_LOCKED',
-    recordId: 'per-03',
-    userName: 'HR Administrator',
-    userEmail: 'admin@nexora.local',
-    userNik: 'NX-2026-0000',
-    ipAddress: '192.168.1.10',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0',
-    timestamp: '2026-09-27 10:45:12 WIB',
-    oldData: { status: 'VERIFIED' },
-    newData: { status: 'LOCKED', lockedAt: '2026-09-27T10:45:12Z', invariant: 'REQ-DEC-09' },
-  },
-  {
-    id: 'aud-002',
-    module: 'LEAVE',
-    action: 'LEAVE_APPROVAL_DECIDED',
-    recordId: 'app-101',
-    userName: 'Rina Wijaya (Head of Tech)',
-    userEmail: 'rina.wijaya@nexora.local',
-    userNik: 'NX-2026-0005',
-    ipAddress: '10.0.4.15',
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-    timestamp: '2026-09-27 09:30:00 WIB',
-    oldData: { status: 'PENDING' },
-    newData: {
-      status: 'APPROVED',
-      employee: 'Budi Santoso',
-      totalDays: 2,
-      tierLevel: 1,
-      attendanceMarked: 'ON_LEAVE',
-    },
-  },
-  {
-    id: 'aud-003',
-    module: 'ATTENDANCE',
-    action: 'CLOCK_IN_GEOFENCE_VERIFIED',
-    recordId: 'att-502',
-    userName: 'Budi Santoso',
-    userEmail: 'employee@nexora.local',
-    userNik: 'NX-2026-0001',
-    ipAddress: '114.122.35.88',
-    userAgent: 'Nexora Mobile ESS / Android 14',
-    timestamp: '2026-09-27 08:52:19 WIB',
-    oldData: null,
-    newData: {
-      distanceMeters: 25.4,
-      officeRadiusLimit: 100,
-      lateMinutes: 0,
-      status: 'PRESENT',
-      gpsCoordinates: '-6.2255, 106.8095',
-    },
-  },
-  {
-    id: 'aud-004',
-    module: 'AUTH',
-    action: 'LOGIN_SUCCESS',
-    recordId: 'usr-admin',
-    userName: 'HR Administrator',
-    userEmail: 'admin@nexora.local',
-    ipAddress: '192.168.1.10',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    timestamp: '2026-09-27 08:00:22 WIB',
-    oldData: null,
-    newData: { role: 'HR_ADMIN', portal: 'ADMIN', mfaVerified: true },
-  },
-  {
-    id: 'aud-005',
-    module: 'EMPLOYEE',
-    action: 'EMPLOYEE_CREATED_WITH_PROVISION',
-    recordId: 'emp-04',
-    userName: 'HR Administrator',
-    userEmail: 'admin@nexora.local',
-    ipAddress: '192.168.1.10',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    timestamp: '2026-09-26 16:15:40 WIB',
-    oldData: null,
-    newData: {
-      employeeNumber: 'NX-2026-0004',
-      fullName: 'Dewi Lestari',
-      department: 'Marketing & Growth',
-      designation: 'Digital Marketing Lead',
-      bankAccountEncrypted: true,
-    },
-  },
-];
+export interface AuditRetentionMeta {
+  policy: '7_DAYS_ROLLING';
+  retentionDays: number;
+  retentionHours: number;
+  totalActiveLogs: number;
+  safetyGuarantee: string;
+  lastPrunedAt?: string;
+}
 
 export default function AdminAuditPage() {
-  const [logs, setLogs] = useState<AuditLogEntry[]>(DEFAULT_LOGS);
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [retentionMeta, setRetentionMeta] = useState<AuditRetentionMeta | null>(null);
   const [selectedModule, setSelectedModule] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<AuditLogEntry | null>(null);
   const [recentNewId, setRecentNewId] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
 
-  // Fetch initial audit logs from API
+  // Fetch real-time audit logs from database API (strictly within 7-day retention)
   const fetchLogs = async () => {
     try {
       const res = await fetch('/api/v1/audit');
       if (res.ok) {
         const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (json.success && Array.isArray(json.data)) {
           setLogs(json.data);
+          if (json.meta?.retention) {
+            setRetentionMeta(json.meta.retention);
+          }
         }
       }
     } catch {
-      // Keep default logs on error
+      // Keep state on network glitch
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -190,19 +120,27 @@ export default function AdminAuditPage() {
         },
         {
           module: 'ATTENDANCE',
-          action: 'CLOCK_IN_GEOFENCE_VERIFIED',
-          userName: 'Dewi Lestari, S.Psi',
-          userEmail: 'dewi.lestari@nexora.co.id',
-          userNik: 'NX-ADMIN-001',
-          newData: { status: 'TEPAT_WAKTU', location: 'SCBD Jakarta HQ', distanceMeters: 14.2 },
+          action: 'CLOCK_IN_SELFIE_VERIFIED',
+          userName: 'Rian Pratama, S.Kom',
+          userEmail: 'rian.pratama@nexora.co.id',
+          userNik: 'NX-2021008',
+          newData: { status: 'TEPAT_WAKTU', location: 'SCBD Treasury Tower Lt. 32 (HQ Jakarta)', livenessScore: '99.4%' },
         },
         {
           module: 'LEAVE',
           action: 'LEAVE_REQUESTED',
-          userName: 'Ahmad Faiz',
-          userEmail: 'faiz@nexora.co.id',
-          userNik: 'NX-2023019',
-          newData: { leaveType: 'Cuti Tahunan', durationDays: 3, approver: 'Hendra Wijaya' },
+          userName: 'Rian Pratama, S.Kom',
+          userEmail: 'rian.pratama@nexora.co.id',
+          userNik: 'NX-2021008',
+          newData: { leaveType: 'Cuti Tahunan', durationDays: 2, reason: 'Urusan keluarga' },
+        },
+        {
+          module: 'PERFORMANCE',
+          action: 'PERFORMANCE_SELF_APPRAISAL_SUBMITTED',
+          userName: 'Rian Pratama, S.Kom',
+          userEmail: 'rian.pratama@nexora.co.id',
+          userNik: 'NX-2021008',
+          newData: { cycle: 'Q4 2026', selfRating: 4.85, okrCount: 4 },
         },
       ];
 
@@ -226,6 +164,7 @@ export default function AdminAuditPage() {
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.userNik && log.userNik.toLowerCase().includes(searchTerm.toLowerCase())) ||
       log.ipAddress.includes(searchTerm);
     return matchesModule && matchesSearch;
   });
@@ -242,8 +181,10 @@ export default function AdminAuditPage() {
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'PAYROLL':
         return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'PERFORMANCE':
+        return 'bg-cyan-50 text-cyan-700 border-cyan-200';
       case 'ANNOUNCEMENTS':
-        return 'bg-amber-50 text-amber-800 border-amber-200';
+        return 'bg-rose-50 text-rose-700 border-rose-200';
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200';
     }
@@ -268,7 +209,7 @@ export default function AdminAuditPage() {
               </span>
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Jejak audit digital append-only yang kebal manipulasi, mencatat seluruh mutasi data, login, dan otentikasi sistem secara transparan tanpa perlu refresh.
+              Jejak audit digital append-only tersimpan permanen di Neon PostgreSQL dengan siklus retensi otomatis 7 hari (168 jam). Log baru & akhir pekan terproteksi aman.
             </p>
           </div>
 
@@ -300,8 +241,25 @@ export default function AdminAuditPage() {
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Total Log Tercatat
             </span>
-            <div className="text-3xl font-extrabold text-slate-900 mt-2">{logs.length}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Append-only (Zero Mutation)</p>
+            <div className="text-3xl font-extrabold text-slate-900 mt-2">
+              {isLoading ? (
+                <span className="inline-block w-8 h-8 rounded-lg bg-slate-100 animate-pulse" />
+              ) : (
+                logs.length
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">Append-only (Retensi 7 Hari Aktif)</p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Retensi Database
+            </span>
+            <div className="text-sm font-bold text-emerald-600 mt-3 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-emerald-500" />
+              <span>7 Hari (Auto-Prune)</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">Log Baru & Weekend Terproteksi</p>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -310,20 +268,9 @@ export default function AdminAuditPage() {
             </span>
             <div className="text-sm font-bold text-blue-600 mt-3 flex items-center gap-1.5">
               <Radio className="w-4 h-4 text-emerald-500 animate-pulse" />
-              <span>SSE Stream Aktif</span>
+              <span>SSE & DB PostgreSQL</span>
             </div>
             <p className="text-[11px] text-slate-500 mt-1">Multi-client instant broadcast</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Jejak Kriptografis
-            </span>
-            <div className="text-sm font-bold text-emerald-600 mt-3 flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>SHA-256 Checksum Valid</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">Integritas data 100% utuh</p>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -331,14 +278,14 @@ export default function AdminAuditPage() {
               Standar Kepatuhan
             </span>
             <div className="text-3xl font-extrabold text-indigo-600 mt-2">100%</div>
-            <p className="text-[11px] text-slate-500 mt-1">ISO 27001 & UU PDP 2024</p>
+            <p className="text-[11px] text-slate-500 mt-1">ISO 27001 & UU PDP No. 27/2022</p>
           </div>
         </div>
 
         {/* Filters & Search Bar */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
-            {['ALL', 'AUTH', 'EMPLOYEE', 'ATTENDANCE', 'LEAVE', 'PAYROLL'].map((mod) => (
+            {['ALL', 'AUTH', 'EMPLOYEE', 'ATTENDANCE', 'LEAVE', 'PAYROLL', 'PERFORMANCE'].map((mod) => (
               <button
                 key={mod}
                 onClick={() => setSelectedModule(mod)}
@@ -380,10 +327,23 @@ export default function AdminAuditPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredLogs.length === 0 ? (
+                {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
-                      Tidak ada catatan audit yang cocok dengan kriteria pencarian.
+                    <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
+                        <span>Memuat log audit real-time dari database...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <History className="w-6 h-6 text-slate-300 mb-1" />
+                        <span className="font-semibold text-slate-600">Tidak ada catatan audit yang cocok.</span>
+                        <span className="text-[11px] text-slate-400">Log audit yang berumur lebih dari 7 hari otomatis dibersihkan oleh sistem.</span>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -414,11 +374,18 @@ export default function AdminAuditPage() {
                         </td>
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[11px]">
                               {log.userName.charAt(0)}
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-900">{log.userName}</div>
+                              <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                                <span>{log.userName}</span>
+                                {log.userNik && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 font-mono">
+                                    {log.userNik}
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-slate-400">{log.userEmail}</div>
                             </div>
                           </div>
@@ -476,22 +443,28 @@ export default function AdminAuditPage() {
               {/* Identity & Origin Metadata */}
               <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Pengguna</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Pengguna / Subjek</span>
                   <p className="font-bold text-slate-900 mt-0.5">{selectedEntry.userName}</p>
-                  <p className="text-slate-500 text-[11px]">{selectedEntry.userEmail}</p>
+                  <p className="text-slate-500 text-[11px]">{selectedEntry.userEmail} {selectedEntry.userNik ? `(${selectedEntry.userNik})` : ''}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Waktu & Tanggal</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Waktu & Tanggal (WIB)</span>
                   <p className="font-bold text-slate-900 mt-0.5 font-mono">{selectedEntry.timestamp}</p>
-                  <p className="text-slate-500 text-[11px]">Audit ID: {selectedEntry.id}</p>
+                  <p className="text-slate-500 text-[11px]">Audit UUID: {selectedEntry.id}</p>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Alamat IP</span>
                   <p className="font-mono font-bold text-slate-900 mt-0.5">{selectedEntry.ipAddress}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">User Agent</span>
-                  <p className="font-mono text-slate-700 mt-0.5 text-[10px] truncate" title={selectedEntry.userAgent}>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Record ID / Ref</span>
+                  <p className="font-mono text-slate-700 mt-0.5 text-[11px] font-semibold">
+                    {selectedEntry.recordId}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">User Agent / Client</span>
+                  <p className="font-mono text-slate-700 mt-0.5 text-[10px] break-all" title={selectedEntry.userAgent}>
                     {selectedEntry.userAgent}
                   </p>
                 </div>

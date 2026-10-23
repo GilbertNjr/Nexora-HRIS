@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
-import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry, recordAuditLog } from '@/lib/auditDb';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
@@ -142,10 +142,10 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Save and broadcast audit log
-    const currentLogs = getStoredAuditLogs();
-    saveStoredAuditLogs([auditLog, ...currentLogs.slice(0, 99)]);
-    broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+    // Save directly to Neon PostgreSQL database and broadcast real-time
+    try {
+      await recordAuditLog(auditLog);
+    } catch {}
 
     return NextResponse.json({
       success: true,

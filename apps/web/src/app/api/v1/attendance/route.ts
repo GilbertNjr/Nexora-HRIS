@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
 import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
-import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
+import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry, recordAuditLog } from '@/lib/auditDb';
 import { getEmployeesFromDb } from '@/lib/db';
 import {
   getAttendancesFromDb,
@@ -581,12 +581,15 @@ export async function POST(request: NextRequest) {
       data.records
     );
 
-    // Broadcast audit log
+    // Persist real-time audit log to Neon PostgreSQL database & broadcast
     try {
-      const auditLog: AuditLogEntry = {
-        id: `aud-${Date.now()}`,
+      await recordAuditLog({
         module: 'ATTENDANCE',
-        action: isClockOut ? 'CLOCK_OUT_RECORDED' : 'CLOCK_IN_GEOFENCE_VERIFIED',
+        action: isClockOut
+          ? 'CLOCK_OUT_RECORDED'
+          : targetRecord.photoUrl
+          ? 'CLOCK_IN_SELFIE_VERIFIED'
+          : 'CLOCK_IN_GEOFENCE_VERIFIED',
         recordId: targetRecord.id,
         userName: targetRecord.employeeName,
         userEmail: body.userEmail || `${targetRecord.employeeId}@nexora.co.id`,
@@ -601,9 +604,8 @@ export async function POST(request: NextRequest) {
           location: targetRecord.location,
           time: targetRecord.time,
         },
-      };
-      saveStoredAuditLogs([auditLog, ...getStoredAuditLogs().slice(0, 99)]);
-      broadcastAuditEvent('AUDIT_LOG_CREATED', auditLog);
+      });
+
       broadcastEmployeeEvent('ATTENDANCE_RECORDED', {
         record: targetRecord,
         summary: summaryPayload,

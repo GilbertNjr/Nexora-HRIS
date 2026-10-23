@@ -7,6 +7,7 @@ import {
   getCurrentRealCycle,
   getGradeFromScore,
 } from '@/lib/performanceDb';
+import { recordAuditLog } from '@/lib/auditDb';
 
 export interface OkrItem {
   id: string;
@@ -472,6 +473,27 @@ export async function POST(request: NextRequest) {
     } else {
       state.records.unshift(newRecord);
     }
+    // Record real-time audit log
+    try {
+      await recordAuditLog({
+        module: 'PERFORMANCE',
+        action: 'PERFORMANCE_SELF_APPRAISAL_SUBMITTED',
+        recordId: newRecord.id,
+        userName: newRecord.name,
+        userEmail: `${newRecord.nik.toLowerCase()}@nexora.co.id`,
+        userNik: newRecord.nik,
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Portal Karyawan ESS (Web)',
+        newData: {
+          cycle: newRecord.cycle,
+          score: newRecord.score,
+          grade: newRecord.grade,
+          okrAchievement: newRecord.okrAchievement,
+          status: newRecord.status,
+        },
+      });
+    } catch {}
+
     saveStoredPerformance(state);
 
     return NextResponse.json({
@@ -504,6 +526,27 @@ export async function PATCH(request: NextRequest) {
       selfRating: selfRating !== undefined ? selfRating : numScore,
       okrs,
     });
+
+    // Record real-time calibration audit log
+    try {
+      await recordAuditLog({
+        module: 'PERFORMANCE',
+        action: 'PERFORMANCE_CALIBRATED',
+        recordId: id || `perf-${nik || 'NX-2021008'}`,
+        userName: 'HR Administrator',
+        userEmail: 'admin@nexora.local',
+        userNik: 'NX-ADMIN-001',
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+        newData: {
+          nik: nik || 'NX-2021008',
+          score: numScore,
+          grade,
+          status: status || 'TERVERIFIKASI',
+          feedback,
+        },
+      });
+    } catch {}
 
     return NextResponse.json({
       success: true,
