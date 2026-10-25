@@ -163,10 +163,49 @@ export default function EmployeesPage() {
           msg.type === 'EMPLOYEE_CREATED'
         ) {
           const empData = msg.employee || msg.profile || msg.data;
-          if (empData && empData.employeeNumber) {
-            setEmployees((prev) =>
-              prev.map((e) =>
-                e.employeeNumber.toLowerCase() === empData.employeeNumber.toLowerCase()
+          if (empData && (empData.employeeNumber || empData.id)) {
+            setEmployees((prev) => {
+              const existingIdx = prev.findIndex(
+                (e) =>
+                  (empData.id && e.id === empData.id) ||
+                  (empData.employeeNumber &&
+                    e.employeeNumber.toLowerCase() === empData.employeeNumber.toLowerCase())
+              );
+
+              if (existingIdx === -1 && msg.type === 'EMPLOYEE_CREATED') {
+                // New employee: prepend to table so it appears immediately!
+                const newRow: EmployeeItem = {
+                  id: empData.id || `emp-${Date.now()}`,
+                  employeeNumber: empData.employeeNumber || `NX-${Date.now()}`,
+                  fullName:
+                    empData.fullName ||
+                    `${empData.firstName || ''} ${empData.lastName || ''}`.trim(),
+                  firstName: empData.firstName || '',
+                  lastName: empData.lastName || '',
+                  email: empData.email || null,
+                  phone: empData.phone || null,
+                  department:
+                    empData.department?.name || empData.department || 'Teknologi Informasi',
+                  designation: empData.designation?.title || empData.designation || 'Staff',
+                  employmentType: empData.employmentType || 'PERMANENT',
+                  employmentStatus: empData.employmentStatus || 'ACTIVE',
+                  joinDate:
+                    empData.joinDate || new Date().toISOString().split('T')[0],
+                  bankName: empData.bankName || 'BCA',
+                  accountNumber: empData.accountNumber || '',
+                  avatarUrl: empData.avatarUrl || null,
+                };
+                const updated = [newRow, ...prev];
+                try {
+                  localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
+                } catch {}
+                return updated;
+              }
+
+              return prev.map((e) =>
+                (empData.id && e.id === empData.id) ||
+                (empData.employeeNumber &&
+                  e.employeeNumber.toLowerCase() === empData.employeeNumber.toLowerCase())
                   ? {
                       ...e,
                       fullName: empData.fullName || e.fullName,
@@ -178,8 +217,8 @@ export default function EmployeesPage() {
                       email: empData.email || e.email,
                     }
                   : e
-              )
-            );
+              );
+            });
           }
           fetchEmployees();
         }
@@ -196,6 +235,43 @@ export default function EmployeesPage() {
     playAudioAlert: true,
     onEmployeeCreated: (newEmp) => {
       showToast(`⚡ Karyawan baru terdeteksi: ${newEmp.fullName || newEmp.firstName}`);
+      if (newEmp && (newEmp.employeeNumber || newEmp.id)) {
+        setEmployees((prev) => {
+          const exists = prev.some(
+            (e) =>
+              (newEmp.id && e.id === newEmp.id) ||
+              (newEmp.employeeNumber &&
+                e.employeeNumber.toLowerCase() === newEmp.employeeNumber.toLowerCase())
+          );
+          if (!exists) {
+            const newRow: EmployeeItem = {
+              id: newEmp.id || `emp-${Date.now()}`,
+              employeeNumber: newEmp.employeeNumber || `NX-${Date.now()}`,
+              fullName:
+                newEmp.fullName || `${newEmp.firstName || ''} ${newEmp.lastName || ''}`.trim(),
+              firstName: newEmp.firstName || '',
+              lastName: newEmp.lastName || '',
+              email: newEmp.email || null,
+              phone: newEmp.phone || null,
+              department:
+                newEmp.department?.name || newEmp.department || 'Teknologi Informasi',
+              designation: newEmp.designation?.title || newEmp.designation || 'Staff',
+              employmentType: newEmp.employmentType || 'PERMANENT',
+              employmentStatus: newEmp.employmentStatus || 'ACTIVE',
+              joinDate: newEmp.joinDate || new Date().toISOString().split('T')[0],
+              bankName: newEmp.bankName || 'BCA',
+              accountNumber: newEmp.accountNumber || '',
+              avatarUrl: newEmp.avatarUrl || null,
+            };
+            const updated = [newRow, ...prev];
+            try {
+              localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          }
+          return prev;
+        });
+      }
       fetchEmployees();
     },
     onEmployeeUpdated: (updatedEmp) => {
@@ -313,7 +389,10 @@ export default function EmployeesPage() {
       setIsSubmitting(false);
     }
 
-    const updated = [newEmp, ...employees];
+    const updated = [
+      newEmp,
+      ...employees.filter((e) => e.id !== newEmp.id && e.employeeNumber !== newEmp.employeeNumber),
+    ];
     setEmployees(updated);
     try {
       localStorage.setItem('nexora_employees_db', JSON.stringify(updated));
@@ -322,6 +401,7 @@ export default function EmployeesPage() {
     }
 
     setIsAddModalOpen(false);
+    fetchEmployees();
     // Broadcast real-time update to Admin Dashboard
     try {
       const bc = new BroadcastChannel('nexora_live_sync');

@@ -313,9 +313,25 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
   ensureStorage();
   const existing = await getEmployeesFromDb();
 
-  // Format official NIK: NX-YYYY-XXXX (e.g. NX-2026-0007)
-  const countThisYear = existing.filter((e) => e.employeeNumber?.startsWith(`NX-${year}`)).length;
-  const generatedNik = data.employeeNumber || `NX-${year}-${String(countThisYear + 1).padStart(4, '0')}`;
+  // Guaranteed Unique NIK Generation: Ensure new employees NEVER collide with or overwrite existing employees
+  let generatedNik = (data.employeeNumber || '').trim();
+  const existingEmployeeWithSameNik = generatedNik
+    ? existing.find((e) => e.employeeNumber.toLowerCase() === generatedNik.toLowerCase())
+    : null;
+
+  const isEditingExisting = Boolean(
+    data.id && existingEmployeeWithSameNik && existingEmployeeWithSameNik.id === data.id
+  );
+
+  if (!generatedNik || (existingEmployeeWithSameNik && !isEditingExisting)) {
+    let nextSeq = existing.length + 1;
+    let candidate = `NX-${year}-${String(nextSeq).padStart(4, '0')}`;
+    while (existing.some((e) => e.employeeNumber.toLowerCase() === candidate.toLowerCase())) {
+      nextSeq++;
+      candidate = `NX-${year}-${String(nextSeq).padStart(4, '0')}`;
+    }
+    generatedNik = candidate;
+  }
   const newId = generatedNik;
 
   const joinDate = data.joinDate || now.toISOString().split('T')[0];
@@ -398,13 +414,27 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
               [record.email]
             );
             if (userRes && userRes[0]?.id) {
-              userId = userRes[0].id;
+              const candidateUserId = userRes[0].id;
+              // Check if candidateUserId is already linked to another employee
+              const linkedEmpRes = await sql.query(
+                `SELECT id, employee_number FROM employees WHERE user_id = $1 LIMIT 1`,
+                [candidateUserId]
+              );
+              if (
+                !linkedEmpRes ||
+                linkedEmpRes.length === 0 ||
+                (data.id && linkedEmpRes[0]?.id === data.id) ||
+                linkedEmpRes[0]?.employee_number === record.employeeNumber
+              ) {
+                userId = candidateUserId;
+              }
+
               // Ensure role EMPLOYEE is assigned so user can log in seamlessly
               await sql.query(
                 `INSERT INTO user_roles (user_id, role_id, created_at)
                  VALUES ($1, '51c405bb-8a5f-48cc-9c2a-651063c3c9c9', NOW())
                  ON CONFLICT DO NOTHING`,
-                [userId]
+                [candidateUserId]
               );
             }
           } catch {}
