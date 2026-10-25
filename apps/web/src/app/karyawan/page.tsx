@@ -69,7 +69,7 @@ const INDO_MONTH_NAMES = [
 function computeRealWeeklySchedule(
   customPreferences?: Record<string, 'WFO' | 'WFH'> | null,
   todayAttendanceType?: 'WFO' | 'WFH' | null
-): { periodStr: string; schedule: WeeklyScheduleDay[]; wfoRatio: number } {
+): { periodStr: string; schedule: WeeklyScheduleDay[]; wfoRatio: number; hasCustomPrefs: boolean } {
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
   const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -80,7 +80,8 @@ function computeRealWeeklySchedule(
   const days: Array<'SENIN' | 'SELASA' | 'RABU' | 'KAMIS' | 'JUMAT'> = [
     'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT'
   ];
-  const defaultTypes: Array<'WFO' | 'WFH'> = ['WFO', 'WFH', 'WFO', 'WFO', 'WFH'];
+
+  const hasCustomPrefs = Boolean(customPreferences && Object.keys(customPreferences).length > 0);
 
   let wfoCount = 0;
   const schedule: WeeklyScheduleDay[] = days.map((dayName, idx) => {
@@ -88,11 +89,18 @@ function computeRealWeeklySchedule(
     d.setDate(monday.getDate() + idx);
     const isoDate = d.toISOString().split('T')[0];
 
-    // Accurate isToday: if weekday (Mon-Fri) exact match, if weekend (Sat/Sun) highlight Friday (day 6) or Monday (day 0)
+    // Accurate isToday: ONLY true if the schedule card date strictly matches actual real-time date
     const isActualToday = d.toDateString() === now.toDateString();
-    const isHighlighted = isActualToday || (dayOfWeek === 6 && idx === 4) || (dayOfWeek === 0 && idx === 0);
 
-    let type: 'WFO' | 'WFH' = customPreferences?.[isoDate] || customPreferences?.[dayName] || defaultTypes[idx];
+    // Default on fresh accounts is 100% WFO (Company Standard HQ SCBD Schedule)
+    let type: 'WFO' | 'WFH' = 'WFO';
+    if (customPreferences) {
+      if (customPreferences[isoDate]) {
+        type = customPreferences[isoDate];
+      } else if (customPreferences[dayName]) {
+        type = customPreferences[dayName];
+      }
+    }
 
     // If today has confirmed clock-in, sync status
     if (isActualToday && todayAttendanceType) {
@@ -108,7 +116,7 @@ function computeRealWeeklySchedule(
       isoDate,
       type,
       location: type === 'WFH' ? 'WFH' : 'WFO (SCBD)',
-      isToday: isHighlighted,
+      isToday: isActualToday,
     };
   });
 
@@ -124,7 +132,7 @@ function computeRealWeeklySchedule(
 
   const wfoRatio = Math.round((wfoCount / 5) * 100);
 
-  return { periodStr, schedule, wfoRatio };
+  return { periodStr, schedule, wfoRatio, hasCustomPrefs };
 }
 
 export default function EmployeeDashboardOverhaulPage() {
@@ -242,6 +250,9 @@ export default function EmployeeDashboardOverhaulPage() {
   });
   const [wfoRatio, setWfoRatio] = useState<number>(() => {
     return computeRealWeeklySchedule().wfoRatio;
+  });
+  const [hasCustomWfoPrefs, setHasCustomWfoPrefs] = useState<boolean>(() => {
+    return computeRealWeeklySchedule().hasCustomPrefs;
   });
 
   // Leave Form State
@@ -425,10 +436,11 @@ export default function EmployeeDashboardOverhaulPage() {
       }
     } catch {}
 
-    const { schedule: realSchedule, periodStr: realPeriodStr, wfoRatio: realWfoRatio } = computeRealWeeklySchedule(storedPrefs);
+    const { schedule: realSchedule, periodStr: realPeriodStr, wfoRatio: realWfoRatio, hasCustomPrefs: realHasCustom } = computeRealWeeklySchedule(storedPrefs);
     setWeeklySchedule(realSchedule);
     setWeeklyPeriodStr(realPeriodStr);
     setWfoRatio(realWfoRatio);
+    setHasCustomWfoPrefs(realHasCustom);
 
     // Initial real-time data load
     fetchRealtimeDashboardData();
@@ -471,11 +483,12 @@ export default function EmployeeDashboardOverhaulPage() {
           fetchRealtimeDashboardData();
         }
 
-        if (type === 'SCHEDULE_PREFERENCE_UPDATED' && event.data?.payload) {
-          const { schedule: syncSched, periodStr: syncPeriod, wfoRatio: syncRatio } = computeRealWeeklySchedule(event.data.payload);
+        if (type === 'SCHEDULE_PREFERENCE_UPDATED') {
+          const { schedule: syncSched, periodStr: syncPeriod, wfoRatio: syncRatio, hasCustomPrefs: syncHasCustom } = computeRealWeeklySchedule(event.data?.payload || null);
           setWeeklySchedule(syncSched);
           setWeeklyPeriodStr(syncPeriod);
           setWfoRatio(syncRatio);
+          setHasCustomWfoPrefs(syncHasCustom);
         }
 
         if (event.data?.type === 'ANNOUNCEMENT_PUBLISHED' && event.data?.payload) {
@@ -832,7 +845,16 @@ export default function EmployeeDashboardOverhaulPage() {
                 <span className="flex items-center gap-1.5 font-medium">
                   <Building2 className="w-3.5 h-3.5 text-blue-600" />
                   <span>
-                    Jadwal: <strong>WFO (HQ SCBD Tower Lt. 7)</strong>
+                    Jadwal:{' '}
+                    <strong>
+                      {(() => {
+                        const now = new Date();
+                        const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+                        if (isWeekend) return 'Libur Akhir Pekan (Weekend)';
+                        const todaySched = weeklySchedule.find((s) => s.isToday);
+                        return todaySched ? todaySched.location : 'WFO (HQ SCBD Tower Lt. 7)';
+                      })()}
+                    </strong>
                   </span>
                 </span>
                 <span className="text-slate-300">•</span>
@@ -1260,7 +1282,7 @@ export default function EmployeeDashboardOverhaulPage() {
                     <span>
                       Rasio kehadiran tim minimum WFO: <strong>60%</strong> per hari kerja{' '}
                       <span className={wfoRatio >= 60 ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-semibold'}>
-                        (Komitmen Anda: {wfoRatio}%)
+                        (Komitmen Anda: {wfoRatio}%{hasCustomWfoPrefs ? '' : ' • Standar Shift Reguler'})
                       </span>
                       .
                     </span>
@@ -1780,6 +1802,29 @@ export default function EmployeeDashboardOverhaulPage() {
             <div className="pt-2 flex items-center justify-end gap-2.5">
               <button
                 type="button"
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('nexora_weekly_wfh_preferences');
+                  } catch {}
+                  const { schedule: resetSched, periodStr: resetPeriod, wfoRatio: resetRatio } = computeRealWeeklySchedule(null);
+                  setWeeklySchedule(resetSched);
+                  setWeeklyPeriodStr(resetPeriod);
+                  setWfoRatio(resetRatio);
+                  setHasCustomWfoPrefs(false);
+                  try {
+                    const bc = new BroadcastChannel('nexora_live_sync');
+                    bc.postMessage({ type: 'SCHEDULE_PREFERENCE_UPDATED', payload: null });
+                    bc.close();
+                  } catch {}
+                  setIsWfhPreferenceModalOpen(false);
+                  showToast('✓ Preferensi WFH berhasil direset ke standar operasional (100% WFO).');
+                }}
+                className="mr-auto px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs active:scale-95 transition-all"
+              >
+                Reset Default WFO
+              </button>
+              <button
+                type="button"
                 onClick={() => setIsWfhPreferenceModalOpen(false)}
                 className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs active:scale-95 transition-all"
               >
@@ -1791,6 +1836,7 @@ export default function EmployeeDashboardOverhaulPage() {
                   const wfoCount = weeklySchedule.filter((i) => i.type === 'WFO').length;
                   const ratio = Math.round((wfoCount / 5) * 100);
                   setWfoRatio(ratio);
+                  setHasCustomWfoPrefs(true);
 
                   // Persist to localStorage
                   const prefMap: Record<string, 'WFO' | 'WFH'> = {};
