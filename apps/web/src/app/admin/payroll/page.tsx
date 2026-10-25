@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import {
@@ -82,7 +82,9 @@ export default function AdminPayrollPage() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isProcessingPayroll, setIsProcessingPayroll] = useState(false);
-  const [processStep, setProcessStep] = useState(1);
+  const [processStep, setProcessStep] = useState(3);
+  const [periodData, setPeriodData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Employee Payroll Records (Rich & Accurate Mock Data)
   const [records, setRecords] = useState<PayrollEmployeeRecord[]>([
@@ -299,25 +301,153 @@ export default function AdminPayrollPage() {
     }, 1200);
   };
 
-  // Handler for Executing Payroll Process Simulation
-  const handleRunPayrollProcess = () => {
+  // Live Fetcher from API & Neon Database
+  const fetchPayrollData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    try {
+      const res = await fetch(`/api/v1/payroll?period=2025-03&t=${Date.now()}`, { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setPeriodData(json.data);
+          if (json.data.records && Array.isArray(json.data.records)) {
+            setRecords(json.data.records);
+          }
+          if (json.data.currentStep) {
+            setProcessStep(json.data.currentStep);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch live payroll:', err);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPayrollData();
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('nexora_live_sync');
+      bc.onmessage = (event) => {
+        if (
+          event.data?.type === 'PAYROLL_DISBURSED' ||
+          event.data?.type === 'PAYROLL_UPDATED' ||
+          event.data?.type === 'ATTENDANCE_SAVED' ||
+          event.data?.type === 'EMPLOYEE_ADDED'
+        ) {
+          fetchPayrollData(true);
+        }
+      };
+    } catch {}
+
+    return () => {
+      try {
+        bc?.close();
+      } catch {}
+    };
+  }, []);
+
+  // Handler for Executing Payroll Process with Real API & PostgreSQL Persistence
+  const handleRunPayrollProcess = async (targetStep = 3) => {
     setIsProcessingPayroll(true);
     setProcessStep(1);
 
-    setTimeout(() => {
-      setProcessStep(2);
-      setTimeout(() => {
-        setProcessStep(3);
-        setTimeout(() => {
-          setIsProcessingPayroll(false);
-          setIsProcessModalOpen(false);
-          setNotification({
-            type: 'success',
-            message: 'Proses Payroll Maret 2025 sukses dikompilasi! 1.248 karyawan telah terverifikasi.',
-          });
-        }, 1000);
-      }, 1000);
-    }, 1000);
+    try {
+      setTimeout(() => setProcessStep(2), 500);
+
+      const res = await fetch('/api/v1/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate',
+          periodKey: '2025-03',
+          step: targetStep,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setPeriodData(json.data);
+          setRecords(json.data.records);
+          setProcessStep(targetStep);
+        }
+
+        try {
+          const bc = new BroadcastChannel('nexora_live_sync');
+          bc.postMessage({ type: 'PAYROLL_UPDATED', periodKey: '2025-03' });
+          bc.close();
+        } catch {}
+
+        setNotification({
+          type: 'success',
+          message: `Proses Payroll Maret 2025 sukses dikompilasi! ${json.data?.totalEmployees || records.length} karyawan telah terverifikasi.`,
+        });
+      } else {
+        setNotification({
+          type: 'error',
+          message: 'Gagal memproses kompilasi payroll di server.',
+        });
+      }
+    } catch {
+      setNotification({
+        type: 'error',
+        message: 'Terjadi kesalahan koneksi saat memproses payroll.',
+      });
+    } finally {
+      setIsProcessingPayroll(false);
+      setIsProcessModalOpen(false);
+    }
+  };
+
+  // Handler for Step 5: Transfer Batch Disbursement to Employee Banks & Release ESS
+  const handleDisbursePayroll = async () => {
+    setIsProcessingPayroll(true);
+    try {
+      const res = await fetch('/api/v1/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'disburse',
+          periodKey: '2025-03',
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setPeriodData(json.data);
+          setRecords(json.data.records);
+          setProcessStep(5);
+        }
+
+        try {
+          const bc = new BroadcastChannel('nexora_live_sync');
+          bc.postMessage({ type: 'PAYROLL_DISBURSED', periodKey: '2025-03' });
+          bc.close();
+        } catch {}
+
+        setNotification({
+          type: 'success',
+          message: `🎉 Batch Transfer Payroll Maret 2025 sukses dicairkan ke bank karyawan & Slip Gaji ESS telah dirilis secara real-time!`,
+        });
+      } else {
+        setNotification({
+          type: 'error',
+          message: 'Gagal mengeksekusi transfer payroll.',
+        });
+      }
+    } catch {
+      setNotification({
+        type: 'error',
+        message: 'Koneksi error saat transfer perbankan.',
+      });
+    } finally {
+      setIsProcessingPayroll(false);
+    }
   };
 
   return (
@@ -423,19 +553,21 @@ export default function AdminPayrollPage() {
                 </div>
               </div>
               <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 mt-2 tracking-tight">
-                Rp 3.842.650.000
+                {periodData ? formatRupiah(periodData.totalNet) : 'Rp 3.842.650.000'}
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <span className="bg-blue-50 text-blue-700 text-[11px] font-bold px-2 py-0.5 rounded-md">
-                  +1.8% vs Februari
+                  Kompilasi Real-Time
                 </span>
                 <span className="text-[11px] text-slate-400 truncate">
-                  Penyesuaian THR...
+                  {periodData?.records?.length || records.length} Karyawan Terdaftar
                 </span>
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 truncate">
-              Pokok: Rp 2.89M • Tunjangan: Rp 580Jt • Lembur: Rp 372.6Jt
+              {periodData
+                ? `Bruto: ${formatRupiah(periodData.totalGross)} • Total Potongan: ${formatRupiah(periodData.totalDeductions)}`
+                : 'Pokok: Rp 2.89M • Tunjangan: Rp 580Jt • Lembur: Rp 372.6Jt'}
             </div>
           </div>
 
@@ -452,7 +584,7 @@ export default function AdminPayrollPage() {
               </div>
               <div className="flex items-baseline gap-2.5 mt-2">
                 <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
-                  25 Maret 2025
+                  {periodData?.cutoffDateStr || '25 Maret 2025'}
                 </div>
                 <span className="bg-sky-50 text-sky-700 text-[11px] font-bold px-2 py-0.5 rounded-md">
                   Tersisa 1 Hari
@@ -460,16 +592,18 @@ export default function AdminPayrollPage() {
               </div>
               <div className="mt-3">
                 <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="text-slate-500">Verifikasi HR</span>
-                  <span className="font-bold text-slate-800">92% Siap</span>
+                  <span className="text-slate-500">Verifikasi Presensi</span>
+                  <span className="font-bold text-slate-800">100% Siap</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style={{ width: '92%' }} />
+                  <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style={{ width: '100%' }} />
                 </div>
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
-              1.236 dari 1.248 data presensi terkunci rapi
+              {periodData
+                ? `${periodData.lockedAttendanceCount} dari ${periodData.totalEmployees} data presensi terkunci rapi`
+                : '1.236 dari 1.248 data presensi terkunci rapi'}
             </div>
           </div>
 
@@ -485,17 +619,19 @@ export default function AdminPayrollPage() {
                 </div>
               </div>
               <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 mt-2 tracking-tight">
-                Rp 418.920.000
+                {periodData ? formatRupiah(periodData.totalPph21 + periodData.totalBpjs) : 'Rp 418.920.000'}
               </div>
               <div className="mt-2">
                 <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200/60 text-blue-700 text-[11px] font-bold px-2 py-0.5 rounded-md">
                   <Check className="w-3.5 h-3.5 text-blue-600 stroke-[3]" />
-                  <span>TERVALIDASI DUKCAPIL & PAJAK</span>
+                  <span>TERVALIDASI DUKCAPIL & PAJAK TER</span>
                 </span>
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 truncate">
-              PPh 21: Rp 268Jt • BPJS TK: Rp 98Jt • BPJS Kes: Rp 52.9Jt
+              {periodData
+                ? `PPh 21: ${formatRupiah(periodData.totalPph21)} • BPJS: ${formatRupiah(periodData.totalBpjs)}`
+                : 'PPh 21: Rp 268Jt • BPJS TK: Rp 98Jt • BPJS Kes: Rp 52.9Jt'}
             </div>
           </div>
 
@@ -504,24 +640,32 @@ export default function AdminPayrollPage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  SLIP GAJI BELUM TERKIRIM
+                  {processStep >= 5 || periodData?.status === 'DISBURSED' ? 'STATUS PENCAIRAN GAJI' : 'SLIP GAJI BELUM TERKIRIM'}
                 </span>
                 <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Mail className="w-4 h-4" />
                 </div>
               </div>
               <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 mt-2 tracking-tight">
-                1.248 Karyawan
+                {processStep >= 5 || periodData?.status === 'DISBURSED'
+                  ? `${periodData?.totalEmployees || records.length} Slip Terdistribusi`
+                  : `${periodData?.totalEmployees || records.length} Karyawan`}
               </div>
               <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                Menunggu Approval Direktur Keuangan & Payroll Release
+                {processStep >= 5 || periodData?.status === 'DISBURSED'
+                  ? 'Gaji telah lunas ditransfer ke rekening bank & slip ESS aktif.'
+                  : 'Menunggu Approval Direktur Keuangan & Payroll Release'}
               </p>
             </div>
 
             <div className="mt-3 bg-blue-50/70 border border-blue-100 rounded-xl p-2.5 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-[11px]">
                 <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>Rilis: 28 Mar, 09:00 WIB</span>
+                <span>
+                  {processStep >= 5 || periodData?.status === 'DISBURSED'
+                    ? 'Lunas: 28 Mar, 08:30 WIB'
+                    : `Rilis: ${periodData?.releaseDateStr || '28 Mar 2025'}, 08:30 WIB`}
+                </span>
               </div>
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
@@ -570,33 +714,109 @@ export default function AdminPayrollPage() {
                 </div>
               </div>
 
-              {/* Step 3 (Active) */}
-              <div className="bg-blue-600 text-white rounded-xl p-2.5 sm:p-3 shadow-md shadow-blue-500/20 border border-blue-500">
-                <span className="text-[10px] font-semibold text-blue-200 block uppercase">Langkah 3</span>
-                <div className="text-xs font-bold text-white truncate mt-0.5">Verifikasi HR Ops</div>
-                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-white">
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Sedang Aktif (92%)</span>
+              {/* Step 3 */}
+              <div
+                className={`rounded-xl p-2.5 sm:p-3 border transition-all ${
+                  processStep === 3
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 border-blue-500'
+                    : processStep > 3
+                    ? 'bg-slate-50/90 border-slate-200/80 text-slate-700'
+                    : 'bg-slate-50/60 border-slate-200/60 opacity-80'
+                }`}
+              >
+                <span className={`text-[10px] font-semibold block uppercase ${processStep === 3 ? 'text-blue-200' : 'text-slate-400'}`}>
+                  Langkah 3
+                </span>
+                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 3 ? 'text-white' : 'text-slate-700'}`}>
+                  Verifikasi HR Ops
+                </div>
+                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold">
+                  {processStep === 3 ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                      <span className="text-white">Terverifikasi (100%)</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="text-blue-600">Selesai</span>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Step 4 */}
-              <div className="bg-slate-50/60 rounded-xl p-2.5 sm:p-3 border border-slate-200/60 opacity-80">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Langkah 4</span>
-                <div className="text-xs font-bold text-slate-600 truncate mt-0.5">Otorisasi Direksi</div>
-                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Menunggu HR</span>
+              <div
+                onClick={() => {
+                  if (processStep < 4) handleRunPayrollProcess(4);
+                }}
+                className={`rounded-xl p-2.5 sm:p-3 border cursor-pointer transition-all ${
+                  processStep === 4
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 border-blue-500'
+                    : processStep > 4
+                    ? 'bg-slate-50/90 border-slate-200/80 text-slate-700'
+                    : 'bg-slate-50/60 border-slate-200/60 hover:bg-slate-100/80'
+                }`}
+                title="Klik untuk setujui Otorisasi Direksi"
+              >
+                <span className={`text-[10px] font-semibold block uppercase ${processStep === 4 ? 'text-blue-200' : 'text-slate-400'}`}>
+                  Langkah 4
+                </span>
+                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 4 ? 'text-white' : 'text-slate-700'}`}>
+                  Otorisasi Direksi
+                </div>
+                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold">
+                  {processStep >= 4 ? (
+                    <span className={processStep === 4 ? 'text-white flex items-center gap-1' : 'text-blue-600 flex items-center gap-1'}>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Disetujui Direksi</span>
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 font-medium flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Klik Setujui</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Step 5 */}
-              <div className="bg-slate-50/60 rounded-xl p-2.5 sm:p-3 border border-slate-200/60 opacity-80 col-span-2 sm:col-span-1">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Langkah 5</span>
-                <div className="text-xs font-bold text-slate-600 truncate mt-0.5">Transfer & Slip ESS</div>
-                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                  <Send className="w-3.5 h-3.5" />
-                  <span>28 Mar 2025</span>
+              <div
+                onClick={() => {
+                  if (processStep >= 4 && processStep < 5) handleDisbursePayroll();
+                }}
+                className={`rounded-xl p-2.5 sm:p-3 border transition-all col-span-2 sm:col-span-1 ${
+                  processStep === 5 || periodData?.status === 'DISBURSED'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20 border-emerald-500'
+                    : processStep === 4
+                    ? 'bg-amber-50 border-amber-300 text-amber-900 cursor-pointer hover:bg-amber-100'
+                    : 'bg-slate-50/60 border-slate-200/60 opacity-80'
+                }`}
+                title={processStep === 4 ? 'Klik untuk eksekusi pencairan gaji ke rekening bank' : undefined}
+              >
+                <span className={`text-[10px] font-semibold block uppercase ${processStep === 5 ? 'text-emerald-200' : 'text-slate-400'}`}>
+                  Langkah 5
+                </span>
+                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 5 ? 'text-white' : 'text-slate-700'}`}>
+                  Transfer & Slip ESS
+                </div>
+                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold">
+                  {processStep === 5 || periodData?.status === 'DISBURSED' ? (
+                    <span className="text-white flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Lunas & Rilis</span>
+                    </span>
+                  ) : processStep === 4 ? (
+                    <span className="text-amber-800 font-bold flex items-center gap-1">
+                      <Send className="w-3.5 h-3.5 animate-pulse" />
+                      <span>Klik Cairkan</span>
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 font-medium flex items-center gap-1">
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Menunggu Step 4</span>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -890,48 +1110,88 @@ export default function AdminPayrollPage() {
 
               {/* Multi-segment Progress Bar */}
               <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-slate-100">
-                <div className="bg-blue-600 h-full" style={{ width: '65%' }} title="BCA 65%" />
-                <div className="bg-sky-500 h-full" style={{ width: '25%' }} title="Mandiri 25%" />
-                <div className="bg-indigo-500 h-full" style={{ width: '10%' }} title="BNI 10%" />
+                {periodData?.bankDistribution?.length ? (
+                  periodData.bankDistribution.map((b: any, idx: number) => {
+                    const colors = ['bg-blue-600', 'bg-sky-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500'];
+                    return (
+                      <div
+                        key={b.bankName}
+                        className={`${colors[idx % colors.length]} h-full transition-all`}
+                        style={{ width: `${b.percentage}%` }}
+                        title={`${b.bankName} ${b.percentage}%`}
+                      />
+                    );
+                  })
+                ) : (
+                  <>
+                    <div className="bg-blue-600 h-full" style={{ width: '65%' }} title="BCA 65%" />
+                    <div className="bg-sky-500 h-full" style={{ width: '25%' }} title="Mandiri 25%" />
+                    <div className="bg-indigo-500 h-full" style={{ width: '10%' }} title="BNI 10%" />
+                  </>
+                )}
               </div>
 
               {/* Bank Breakdown List */}
               <div className="space-y-3 pt-1">
-                {/* BCA */}
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-800">BCA Corporate</div>
-                      <div className="text-[11px] text-slate-400">812 Karyawan (65%)</div>
+                {periodData?.bankDistribution?.length ? (
+                  periodData.bankDistribution.map((b: any, idx: number) => {
+                    const dotColors = ['bg-blue-600', 'bg-sky-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500'];
+                    return (
+                      <div key={b.bankName} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2.5 h-2.5 rounded-full ${dotColors[idx % dotColors.length]} flex-shrink-0`} />
+                          <div>
+                            <div className="font-bold text-slate-800">{b.bankName} Host-to-Host</div>
+                            <div className="text-[11px] text-slate-400">
+                              {b.count} Karyawan ({b.percentage}%)
+                            </div>
+                          </div>
+                        </div>
+                        <div className="font-extrabold text-slate-900 text-sm">
+                          {formatRupiah(b.amount)}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    {/* BCA */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-shrink-0" />
+                        <div>
+                          <div className="font-bold text-slate-800">BCA Corporate</div>
+                          <div className="text-[11px] text-slate-400">812 Karyawan (65%)</div>
+                        </div>
+                      </div>
+                      <div className="font-extrabold text-slate-900 text-sm">Rp 2.49 M</div>
                     </div>
-                  </div>
-                  <div className="font-extrabold text-slate-900 text-sm">Rp 2.49 M</div>
-                </div>
 
-                {/* Mandiri */}
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-sky-500 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-800">Bank Mandiri (MCM)</div>
-                      <div className="text-[11px] text-slate-400">312 Karyawan (25%)</div>
+                    {/* Mandiri */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-sky-500 flex-shrink-0" />
+                        <div>
+                          <div className="font-bold text-slate-800">Bank Mandiri (MCM)</div>
+                          <div className="text-[11px] text-slate-400">312 Karyawan (25%)</div>
+                        </div>
+                      </div>
+                      <div className="font-extrabold text-slate-900 text-sm">Rp 960 Jt</div>
                     </div>
-                  </div>
-                  <div className="font-extrabold text-slate-900 text-sm">Rp 960 Jt</div>
-                </div>
 
-                {/* BNI */}
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 flex-shrink-0" />
-                    <div>
-                      <div className="font-bold text-slate-800">BNI Direct</div>
-                      <div className="text-[11px] text-slate-400">124 Karyawan (10%)</div>
+                    {/* BNI */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 flex-shrink-0" />
+                        <div>
+                          <div className="font-bold text-slate-800">BNI Direct</div>
+                          <div className="text-[11px] text-slate-400">124 Karyawan (10%)</div>
+                        </div>
+                      </div>
+                      <div className="font-extrabold text-slate-900 text-sm">Rp 392.65 Jt</div>
                     </div>
-                  </div>
-                  <div className="font-extrabold text-slate-900 text-sm">Rp 392.65 Jt</div>
-                </div>
+                  </>
+                )}
               </div>
 
               {/* Action Buttons for Host-to-Host */}
@@ -1050,7 +1310,7 @@ export default function AdminPayrollPage() {
                     Batal
                   </button>
                   <button
-                    onClick={handleRunPayrollProcess}
+                    onClick={() => handleRunPayrollProcess(3)}
                     disabled={isProcessingPayroll}
                     className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 shadow-sm"
                   >

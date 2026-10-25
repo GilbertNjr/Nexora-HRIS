@@ -294,8 +294,8 @@ export default function PayrollExecutionPage() {
     }, 600);
   };
 
-  // Final Execution Authorization
-  const handleConfirmExecution = (e: React.FormEvent) => {
+  // Final Execution Authorization with Real API & PostgreSQL Persistence
+  const handleConfirmExecution = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authPin.length < 6) {
       showToast('Masukkan 6 digit Security PIN Otorisasi Direksi/HRD!', 'info');
@@ -303,11 +303,33 @@ export default function PayrollExecutionPage() {
     }
 
     setIsExecuting(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/v1/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'disburse',
+          periodKey: '2025-03',
+        }),
+      });
+
+      if (res.ok) {
+        try {
+          const bc = new BroadcastChannel('nexora_live_sync');
+          bc.postMessage({ type: 'PAYROLL_DISBURSED', periodKey: '2025-03' });
+          bc.close();
+        } catch {}
+
+        setExecutionSuccess(true);
+        showToast('Batch Transfer Payroll Maret 2025 sukses diotorisasi dan dikirim ke Kliring Perbankan!');
+      } else {
+        showToast('Gagal memproses otorisasi perbankan.', 'info');
+      }
+    } catch {
+      showToast('Terjadi kesalahan jaringan.', 'info');
+    } finally {
       setIsExecuting(false);
-      setExecutionSuccess(true);
-      showToast('Batch Transfer Payroll Rp 3.423.730.000 sukses diotorisasi dan dikirim ke Kliring Perbankan!');
-    }, 1500);
+    }
   };
 
   return (

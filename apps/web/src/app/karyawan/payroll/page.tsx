@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -55,6 +55,7 @@ interface PayrollPeriodData {
   transferBank: string;
   accountNumberMasked: string;
   transferDate: string;
+  status?: string;
   earnings: {
     title: string;
     description: string;
@@ -229,8 +230,10 @@ export default function EssPayrollPage() {
     closeMobile,
   } = useSidebarCollapse();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('2025-02');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('2025-03');
   const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
+  const [livePayslip, setLivePayslip] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Modals state
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -243,7 +246,76 @@ export default function EssPayrollPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const currentData = PAYROLL_PERIODS[selectedPeriod] || PAYROLL_PERIODS['2025-02'];
+  const fetchMyPayslip = async (periodKey = selectedPeriod, silent = false) => {
+    if (!currentUser?.employeeNumber) return;
+    if (!silent) setIsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/payroll/my-slip?nik=${encodeURIComponent(currentUser.employeeNumber)}&period=${periodKey}&t=${Date.now()}`,
+        { cache: 'no-store' }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && json.data.record) {
+          setLivePayslip(json.data);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load payslip:', err);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyPayslip(selectedPeriod);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('nexora_live_sync');
+      bc.onmessage = (event) => {
+        if (
+          event.data?.type === 'PAYROLL_DISBURSED' ||
+          event.data?.type === 'PAYROLL_UPDATED' ||
+          event.data?.type === 'ATTENDANCE_SAVED'
+        ) {
+          fetchMyPayslip(selectedPeriod, true);
+          if (event.data?.type === 'PAYROLL_DISBURSED') {
+            showToast('🎉 Gaji periode berjalan telah resmi dicairkan ke rekening bank Anda!');
+          }
+        }
+      };
+    } catch {}
+
+    return () => {
+      try {
+        bc?.close();
+      } catch {}
+    };
+  }, [currentUser?.employeeNumber, selectedPeriod]);
+
+  const currentData: PayrollPeriodData = useMemo(() => {
+    if (livePayslip?.record) {
+      const r = livePayslip.record;
+      const p = livePayslip.period;
+      return {
+        periodKey: p?.periodKey || selectedPeriod,
+        periodLabel: p?.periodLabel ? `${p.periodLabel} (Terbaru)` : 'Maret 2025 (Terbaru)',
+        isLatest: selectedPeriod === '2025-03',
+        takeHomePay: Number(r.takeHomePay) || 0,
+        grossSalary: Number(r.grossSalary) || 0,
+        totalDeductions: Number(r.totalDeductions) || 0,
+        allowancesAndOvertime: (Number(r.allowances) || 0) + (Number(r.overtimePay) || 0),
+        transferBank: r.bankName || 'Bank Central Asia (BCA)',
+        accountNumberMasked: r.bankAccountMasked || '8830****841',
+        transferDate: r.disbursementDate || `${p?.releaseDateStr || '28 Maret 2025'}, 08:30 WIB`,
+        status: r.verificationStatus,
+        earnings: Array.isArray(r.earnings) ? r.earnings : [],
+        deductions: Array.isArray(r.deductions) ? r.deductions : [],
+      };
+    }
+    return PAYROLL_PERIODS[selectedPeriod] || PAYROLL_PERIODS['2025-02'];
+  }, [livePayslip, selectedPeriod]);
 
   const handlePrintSlip = () => {
     if (typeof window !== 'undefined') {
@@ -415,7 +487,11 @@ export default function EssPayrollPage() {
 
                 {isPeriodDropdownOpen && (
                   <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-40 animate-in fade-in zoom-in-95">
-                    {Object.values(PAYROLL_PERIODS).map((item) => (
+                    {[
+                      { periodKey: '2025-03', periodLabel: 'Maret 2025 (Terbaru)' },
+                      { periodKey: '2025-02', periodLabel: 'Februari 2025' },
+                      { periodKey: '2025-01', periodLabel: 'Januari 2025' },
+                    ].map((item) => (
                       <button
                         key={item.periodKey}
                         type="button"
@@ -504,9 +580,23 @@ export default function EssPayrollPage() {
                   <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
                     GAJI BERSIH DITERIMA (TAKE-HOME PAY)
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Lunas &amp; Terverifikasi HR Operations</span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      currentData.status === 'DISBURSED'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        currentData.status === 'DISBURSED' ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'
+                      }`}
+                    />
+                    <span>
+                      {currentData.status === 'DISBURSED'
+                        ? 'Lunas & Terverifikasi HR Operations'
+                        : 'Sedang Diproses HR Operations'}
+                    </span>
                   </span>
                 </div>
 
@@ -516,7 +606,7 @@ export default function EssPayrollPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 font-medium">
-                  / Siklus {currentData.periodKey === '2025-02' ? 'Februari 2025' : 'Januari 2025'}
+                  / Siklus {currentData.periodKey === '2025-03' ? 'Maret 2025' : currentData.periodKey === '2025-02' ? 'Februari 2025' : 'Januari 2025'}
                 </p>
               </div>
 
