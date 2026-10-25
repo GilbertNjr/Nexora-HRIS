@@ -203,24 +203,19 @@ const defaultOneOnOneForRian: OneOnOneSession = {
 };
 
 const defaultPeerReviewForRian: PeerReviewSummary = {
-  rating: 4.9,
-  totalReviews: 4,
+  rating: 0,
+  totalReviews: 0,
   maxReviews: 4,
-  reviewers: [
-    { initials: 'DY', bg: 'bg-blue-600' },
-    { initials: 'BS', bg: 'bg-emerald-600' },
-    { initials: 'KT', bg: 'bg-purple-600' },
-    { initials: '+1', bg: 'bg-slate-900' },
-  ],
+  reviewers: [],
   tags: [
-    '#ArsitekSolutif',
+    '#Integritas',
+    '#Kolaboratif',
     '#HighReliability',
-    '#GreatMentor',
-    '#FastResponse',
+    '#Akuntabel',
     '#CleanCode',
   ],
   quote:
-    'Sangat tanggap saat insiden production dan selalu memberikan penjelasan arsitektural yang jelas untuk tim. Bimbingan tech-talk mikroservis sangat membantu percepatan rilis modul integrasi absensi.',
+    'Pengumpulan ulasan sejawat (360° Peer Review) sedang dibuka oleh tim HR untuk Siklus Q4 2026. Masukan anonim rekan kerja akan tersinkronisasi otomatis.',
 };
 
 const defaultIdpForRian: IdpItem[] = [

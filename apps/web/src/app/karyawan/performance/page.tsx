@@ -82,8 +82,18 @@ export default function EssPerformancePage() {
   });
   const [okrList, setOkrList] = useState<OkrItem[]>([]);
   const [editingOkrId, setEditingOkrId] = useState<string | null>(null);
-  const [tempRating, setTempRating] = useState<string>('4.7');
+  const [tempRating, setTempRating] = useState<string>('5.0');
   const [tempCommentary, setTempCommentary] = useState<string>('');
+
+  // Attendance performance metrics (Real-time from attendance ledger)
+  const [attendanceStats, setAttendanceStats] = useState({
+    presentDays: 0,
+    totalEffectiveHours: 0,
+    totalLateMinutes: 0,
+    onTimeRate: 100,
+    attendanceScore: 100,
+    statusToday: 'Belum Presensi',
+  });
 
   // IDP form state
   const [newIdpTitle, setNewIdpTitle] = useState('');
@@ -108,15 +118,17 @@ export default function EssPerformancePage() {
     } catch {}
   }, []);
 
-  // Fetch current employee review from unified performance API
+  // Fetch current employee review & real-time attendance ledger
   const fetchMyPerformance = useCallback(async () => {
     const nik = currentUser.employeeNumber || 'NX-2021008';
     try {
-      const res = await fetch(`/api/v1/performance?nik=${encodeURIComponent(nik)}`, {
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        const json = await res.json();
+      const [perfRes, attRes] = await Promise.all([
+        fetch(`/api/v1/performance?nik=${encodeURIComponent(nik)}`, { cache: 'no-store' }),
+        fetch('/api/v1/attendance', { cache: 'no-store' }),
+      ]);
+
+      if (perfRes.ok) {
+        const json = await perfRes.json();
         if (json.data) {
           const rec: PerformanceRecord = json.data;
           setPerformanceRecord(rec);
@@ -126,10 +138,29 @@ export default function EssPerformancePage() {
           }
         }
       }
+
+      if (attRes.ok) {
+        const attJson = await attRes.json();
+        const data = attJson.data || {};
+        const present = Number(data.presentDays) || 0;
+        const effectiveHours = Number(data.totalEffectiveHours) || 0;
+        const lateMinutes = Number(data.totalLateMinutes) || 0;
+        const onTime = present > 0 ? Math.max(0, Math.round(((present - (lateMinutes > 0 ? 1 : 0)) / present) * 100)) : 100;
+        const score = present > 0 ? Math.min(100, Math.max(60, 100 - (lateMinutes * 0.5))) : 100;
+
+        setAttendanceStats({
+          presentDays: present,
+          totalEffectiveHours: effectiveHours,
+          totalLateMinutes: lateMinutes,
+          onTimeRate: onTime,
+          attendanceScore: Math.round(score),
+          statusToday: data.today?.status || 'Belum Presensi',
+        });
+      }
     } catch {}
   }, [currentUser.employeeNumber]);
 
-  // Real-time listener for updates across tabs / admin
+  // Real-time listener for updates across tabs / admin / attendance
   useEffect(() => {
     fetchMyPerformance();
     let bc: BroadcastChannel | null = null;
@@ -139,7 +170,9 @@ export default function EssPerformancePage() {
         if (
           event.data?.type === 'PERFORMANCE_UPDATED' ||
           event.data?.type === 'PERFORMANCE_CYCLE_LAUNCHED' ||
-          event.data?.type === 'PROFILE_UPDATED'
+          event.data?.type === 'PROFILE_UPDATED' ||
+          event.data?.type === 'ATTENDANCE_RECORDED' ||
+          event.data?.type === 'ATTENDANCE_RESET'
         ) {
           fetchMyPerformance();
         }
@@ -209,7 +242,7 @@ export default function EssPerformancePage() {
   // Status Evaluasi Diri metrics
   const evaluationStats = useMemo(() => {
     const total = okrList.length || 4;
-    const filledCount = okrList.filter((item) => !item.isDraft).length;
+    const filledCount = okrList.filter((item) => !item.isDraft && Number(item.selfRating) > 0).length;
     const percentage = Math.round((filledCount / total) * 100);
     const draftRemaining = total - filledCount;
     return {
@@ -217,7 +250,7 @@ export default function EssPerformancePage() {
       filledCount,
       percentage,
       draftRemaining,
-      isAllCompleted: draftRemaining === 0,
+      isAllCompleted: draftRemaining === 0 && total > 0,
     };
   }, [okrList]);
 
@@ -234,9 +267,10 @@ export default function EssPerformancePage() {
       .reduce((sum, o) => sum + (o.weight || 0), 0);
 
     return {
-      okrTim: teknikalWeight || 40,
-      operasional: operasionalWeight || 35,
-      budaya: budayaWeight || 15,
+      okrTim: teknikalWeight || 50,
+      presensi: 20,
+      operasional: operasionalWeight || 20,
+      budaya: budayaWeight || 10,
       peer: 10,
     };
   }, [okrList]);
@@ -245,7 +279,7 @@ export default function EssPerformancePage() {
   const oneOnOne: OneOnOneSession = useMemo(() => {
     return (
       performanceRecord?.oneOnOne || {
-        date: '03 April 2025',
+        date: '28 Oktober 2026',
         time: '14:00 - 15:00 WIB',
         managerName: 'Arya Wibowo, M.Sc',
         managerTitle: 'VP of Engineering',
@@ -253,15 +287,15 @@ export default function EssPerformancePage() {
         platform: 'Google Meet',
         meetLink: 'https://meet.google.com/nex-perf-rian',
         agenda: [
-          '1. Kalibrasi self-appraisal arsitektur microservices core.',
-          '2. Roadmap sertifikasi GCP Cloud Architect Q2 2025.',
+          '1. Kalibrasi self-appraisal sasaran arsitektur microservices core Q4 2026.',
+          '2. Roadmap sertifikasi GCP Cloud Architect Q4 2026.',
           '3. Rencana suksesi mentoring engineering squad backend.',
         ],
-        risalahDate: '14 Maret 2025',
+        risalahDate: '24 Oktober 2026',
         risalahAgreedPoints: [
-          'Arsitektur cloud Kubernetes GKE dinilai sangat sukses menjaga SLA 99.99%.',
+          'Arsitektur cloud Kubernetes GKE dinilai sangat sukses menjaga SLA 99.99% di Q4.',
           'Penyelesaian modul enkripsi data karyawan diapresiasi penuh oleh HR & Legal.',
-          'Fokus kuartal berikutnya dialokasikan 20% untuk mentoring squad junior.',
+          'Fokus kuartal dialokasikan 20% untuk mentoring squad junior.',
         ],
       }
     );
@@ -271,18 +305,13 @@ export default function EssPerformancePage() {
   const peerReview: PeerReviewSummary = useMemo(() => {
     return (
       performanceRecord?.peerReview || {
-        rating: 4.9,
-        totalReviews: 4,
+        rating: 0,
+        totalReviews: 0,
         maxReviews: 4,
-        reviewers: [
-          { initials: 'DY', bg: 'bg-blue-600' },
-          { initials: 'BS', bg: 'bg-emerald-600' },
-          { initials: 'KT', bg: 'bg-purple-600' },
-          { initials: '+1', bg: 'bg-slate-900' },
-        ],
-        tags: ['#ArsitekSolutif', '#HighReliability', '#GreatMentor', '#FastResponse', '#CleanCode'],
+        reviewers: [],
+        tags: ['#Integritas', '#Kolaboratif', '#Akuntabel', '#Profesional'],
         quote:
-          'Sangat tanggap saat insiden production dan selalu memberikan penjelasan arsitektural yang jelas untuk tim. Bimbingan tech-talk mikroservis sangat membantu percepatan rilis modul integrasi absensi.',
+          'Pengumpulan ulasan sejawat (360° Peer Review) sedang dibuka oleh tim HR untuk Siklus Q4 2026. Masukan anonim rekan kerja akan tersinkronisasi otomatis.',
       }
     );
   }, [performanceRecord]);
@@ -294,13 +323,13 @@ export default function EssPerformancePage() {
         {
           id: 'idp-1',
           title: 'Google Cloud Professional Cloud Architect',
-          target: 'Target Sertifikasi: Mei 2025 • Biaya ditanggung PT Nexora',
+          target: 'Target Sertifikasi: Semester 2 2026 • Biaya ditanggung PT Nexora',
           status: 'Disetujui VP',
         },
         {
           id: 'idp-2',
           title: 'Executive Engineering Leadership Workshop',
-          target: 'Target Modul: Juni 2025 • Persiapan Principal Band',
+          target: 'Target Modul: Akhir Tahun 2026 • Persiapan Principal Band',
           status: 'Disetujui VP',
         },
       ]
@@ -729,7 +758,7 @@ export default function EssPerformancePage() {
               <div className="flex items-center justify-between text-[11px] font-semibold text-rose-600 pt-0.5">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3 text-rose-500" />
-                  <span>Tenggat: 31 Maret 2025</span>
+                  <span>Tenggat: 31 Desember 2026</span>
                 </span>
                 <span
                   className={`font-bold ${
@@ -761,9 +790,9 @@ export default function EssPerformancePage() {
 
               <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-slate-600 font-medium">
                 <span className="truncate">● OKR Tim: {weightBreakdown.okrTim}%</span>
+                <span className="truncate">● Presensi: {weightBreakdown.presensi}%</span>
                 <span className="truncate">● Operasional: {weightBreakdown.operasional}%</span>
                 <span className="truncate">● Budaya: {weightBreakdown.budaya}%</span>
-                <span className="truncate">● Peer: {weightBreakdown.peer}%</span>
               </div>
 
               {/* Segmented color bar */}
@@ -843,7 +872,7 @@ export default function EssPerformancePage() {
                       </div>
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 flex items-center gap-0.5">
                         <Clock className="w-2.5 h-2.5" />
-                        <span>Batas: 31 Mar</span>
+                        <span>Batas: 15 Des 2026</span>
                       </span>
                     </div>
                     <p className="text-xs font-extrabold text-slate-900">Self-Appraisal</p>
@@ -857,7 +886,7 @@ export default function EssPerformancePage() {
                     </div>
                     <p className="text-xs font-bold text-slate-900">Review Atasan</p>
                     <p className="text-[11px] text-slate-500">1-on-1 dgn {oneOnOne.managerName.split(',')[0]}</p>
-                    <p className="text-[10px] text-slate-400">03 - 07 Apr 2025</p>
+                    <p className="text-[10px] text-slate-400">16 - 22 Des 2026</p>
                   </div>
 
                   {/* Step 3: Kalibrasi HR */}
@@ -867,7 +896,7 @@ export default function EssPerformancePage() {
                     </div>
                     <p className="text-xs font-bold text-slate-900">Kalibrasi HR</p>
                     <p className="text-[11px] text-slate-500">Komite &amp; C-Level</p>
-                    <p className="text-[10px] text-slate-400">10 - 18 Apr 2025</p>
+                    <p className="text-[10px] text-slate-400">23 - 28 Des 2026</p>
                   </div>
 
                   {/* Step 4: Pengesahan */}
@@ -877,7 +906,75 @@ export default function EssPerformancePage() {
                     </div>
                     <p className="text-xs font-bold text-slate-900">Pengesahan</p>
                     <p className="text-[11px] text-slate-500">Hasil &amp; Kompensasi</p>
-                    <p className="text-[10px] text-slate-400">25 Apr 2025</p>
+                    <p className="text-[10px] text-slate-400">31 Des 2026</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION A2: Integritas Kehadiran & Jam Kerja Efektif (Real-Time Attendance Ledger) */}
+              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900">
+                        Integritas Kehadiran &amp; Kedisiplinan Kerja ({activeCycle})
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Sinkronisasi otomatis real-time dari presensi biometrik &amp; ledger absensi Neon PostgreSQL.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 self-start sm:self-auto">
+                    ● Terhubung Database Presensi
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                      TOTAL KEHADIRAN
+                    </p>
+                    <p className="text-2xl font-black text-slate-900 mt-1">
+                      {attendanceStats.presentDays} <span className="text-xs font-bold text-slate-500">Hari</span>
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Siklus {activeCycle}</p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                      JAM KERJA EFEKTIF
+                    </p>
+                    <p className="text-2xl font-black text-slate-900 mt-1">
+                      {attendanceStats.totalEffectiveHours.toFixed(1)} <span className="text-xs font-bold text-slate-500">Jam</span>
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Akumulasi Terverifikasi</p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                      TINGKAT KETEPATAN
+                    </p>
+                    <p className="text-2xl font-black text-slate-900 mt-1">
+                      {attendanceStats.onTimeRate}%
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Telat: {attendanceStats.totalLateMinutes} Menit
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                      SKOR KEDISIPLINAN
+                    </p>
+                    <p className="text-2xl font-black text-emerald-600 mt-1">
+                      {attendanceStats.attendanceScore}%
+                    </p>
+                    <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                      {attendanceStats.presentDays === 0 ? 'Akun Awal Bersih' : 'Sangat Disiplin'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -949,14 +1046,15 @@ export default function EssPerformancePage() {
                 {/* DYNAMIC OKR CARDS - EDITABLE, LIVE, NOT STATIC DUMMY! */}
                 <div className="space-y-4 pt-1">
                   {filteredOkrs.map((okr) => {
-                    const isCurrentlyEditing = editingOkrId === okr.id || (okr.isDraft && editingOkrId === null && okr.id === 'okr-4');
+                    const isCurrentlyEditing = editingOkrId === okr.id;
+                    const isRated = !okr.isDraft && Number(okr.selfRating) > 0;
 
                     return (
                       <div
                         key={okr.id}
                         className="p-5 rounded-2xl border border-slate-200/90 bg-slate-50/50 space-y-3 transition-all hover:bg-white hover:shadow-xs"
                       >
-                        {/* Badges Row matching screenshot */}
+                        {/* Badges Row */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800">
@@ -964,12 +1062,12 @@ export default function EssPerformancePage() {
                             </span>
                             <span
                               className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${
-                                okr.progressPercent >= 90
+                                isRated
                                   ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-amber-100 text-amber-800'
+                                  : 'bg-slate-200 text-slate-700'
                               }`}
                             >
-                              ✓ {okr.progressPercent}% Tercapai
+                              {isRated ? `✓ ${okr.progressPercent || 100}% Tercapai` : 'Target Kuartal Q4 2026'}
                             </span>
                             <span className="px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-slate-200/80 text-slate-700">
                               {okr.tag}
@@ -977,8 +1075,10 @@ export default function EssPerformancePage() {
                           </div>
 
                           <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
-                            <Star className="w-3.5 h-3.5 fill-blue-600 text-blue-600" />
-                            <span>Self-Rating: {Number(okr.selfRating).toFixed(1)} / 5.0</span>
+                            <Star className={`w-3.5 h-3.5 ${isRated ? 'fill-blue-600 text-blue-600' : 'text-slate-400'}`} />
+                            <span className={isRated ? 'text-blue-700' : 'text-slate-500'}>
+                              {isRated ? `Self-Rating: ${Number(okr.selfRating).toFixed(1)} / 5.0` : 'Belum Dinilai'}
+                            </span>
                             {!isCurrentlyEditing && (
                               <button
                                 type="button"
@@ -1006,13 +1106,9 @@ export default function EssPerformancePage() {
                         <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              okr.progressPercent >= 95
-                                ? 'bg-blue-600'
-                                : okr.progressPercent >= 85
-                                ? 'bg-emerald-600'
-                                : 'bg-amber-500'
+                              isRated ? 'bg-blue-600' : 'bg-slate-300'
                             }`}
-                            style={{ width: `${okr.progressPercent}%` }}
+                            style={{ width: `${isRated ? (okr.progressPercent || 100) : 0}%` }}
                           />
                         </div>
 
@@ -1029,9 +1125,9 @@ export default function EssPerformancePage() {
                             </div>
                             <textarea
                               rows={2}
-                              value={tempCommentary || okr.commentary}
+                              value={tempCommentary}
                               onChange={(e) => setTempCommentary(e.target.value)}
-                              placeholder="Tuliskan pencapaian konkrit, tantangan teknis, dan bukti kontribusi..."
+                              placeholder="Tuliskan pencapaian konkrit, tantangan teknis, dan bukti kontribusi Anda..."
                               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                             />
                             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1072,7 +1168,7 @@ export default function EssPerformancePage() {
                               </div>
                             </div>
                           </div>
-                        ) : (
+                        ) : isRated ? (
                           <div className="p-3 rounded-xl bg-white border border-slate-200/90 text-xs text-slate-600 space-y-1">
                             <div className="flex items-center justify-between">
                               <span className="font-bold text-slate-800 text-[11px]">
@@ -1087,13 +1183,24 @@ export default function EssPerformancePage() {
                                   onClick={() => handleStartEditOkr(okr)}
                                   className="text-[10px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
                                 >
-                                  Ubah
+                                  Ubah Nilai
                                 </button>
                               </div>
                             </div>
                             <p className="text-[11px] leading-relaxed italic">
-                              &ldquo;{okr.commentary}&rdquo;
+                              &ldquo;{okr.commentary || 'Sasaran telah diselesaikan sesuai target metrik.'}&rdquo;
                             </p>
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-white border border-dashed border-slate-300 text-xs text-slate-500 flex items-center justify-between gap-2">
+                            <span>Belum ada penilaian mandiri untuk sasaran ini.</span>
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditOkr(okr)}
+                              className="px-3 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs hover:bg-blue-100 transition-colors cursor-pointer"
+                            >
+                              + Beri Nilai Mandiri
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1149,7 +1256,7 @@ export default function EssPerformancePage() {
                 <div className="flex items-center justify-between text-xs pt-1">
                   <span className="text-slate-400 text-[11px] flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>{oneOnOne.risalahDate || '14 Maret 2025'}</span>
+                    <span>{oneOnOne.risalahDate || '24 Oktober 2026'}</span>
                   </span>
                   <button
                     type="button"
@@ -1171,7 +1278,7 @@ export default function EssPerformancePage() {
                     </h3>
                   </div>
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    Lengkap ({peerReview.totalReviews}/{peerReview.maxReviews})
+                    {peerReview.totalReviews > 0 ? `Lengkap (${peerReview.totalReviews}/${peerReview.maxReviews})` : 'Tahap Pengumpulan (0/4)'}
                   </span>
                 </div>
 
@@ -1182,7 +1289,7 @@ export default function EssPerformancePage() {
                     </span>
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-black text-slate-900 tracking-tight font-mono">
-                        {peerReview.rating.toFixed(2)}
+                        {peerReview.totalReviews > 0 ? peerReview.rating.toFixed(2) : '—'}
                       </span>
                       <span className="text-slate-400 font-bold text-xs">/ 5.0</span>
                     </div>
@@ -1190,14 +1297,20 @@ export default function EssPerformancePage() {
 
                   {/* Reviewers Avatar Stack */}
                   <div className="flex items-center -space-x-2">
-                    {peerReview.reviewers.map((rev, idx) => (
-                      <div
-                        key={idx}
-                        className={`w-7 h-7 rounded-full ${rev.bg} text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-2xs`}
-                      >
-                        {rev.initials}
-                      </div>
-                    ))}
+                    {peerReview.reviewers && peerReview.reviewers.length > 0 ? (
+                      peerReview.reviewers.map((rev, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-7 h-7 rounded-full ${rev.bg} text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-2xs`}
+                        >
+                          {rev.initials}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                        Anonim (0 Rekan)
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1240,7 +1353,7 @@ export default function EssPerformancePage() {
                   <div className="flex items-center gap-2">
                     <Target className="w-4 h-4 text-blue-600" />
                     <h3 className="text-sm font-extrabold text-slate-900">
-                      Rencana Pengembangan (IDP Q2)
+                      Rencana Pengembangan (IDP {activeCycle})
                     </h3>
                   </div>
                   <button
@@ -1595,7 +1708,7 @@ export default function EssPerformancePage() {
                   type="text"
                   value={newIdpTarget}
                   onChange={(e) => setNewIdpTarget(e.target.value)}
-                  placeholder="Target Sertifikasi: Juli 2025 • Biaya ditanggung PT Nexora"
+                  placeholder="Target Sertifikasi: Q1 2027 • Biaya ditanggung PT Nexora"
                   className="w-full p-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
