@@ -1366,14 +1366,18 @@ export default function EmployeeProfilePage() {
                   setPwdError('Konfirmasi kata sandi baru tidak cocok.');
                   return;
                 }
+                const userIdentifier = currentUser?.email || currentUser?.employeeNumber;
+                if (!userIdentifier) {
+                  setPwdError('Sesi pengguna tidak valid. Silakan muat ulang halaman.');
+                  return;
+                }
                 setIsChangingPwd(true);
                 try {
                   const res = await fetch('/api/v1/auth/change-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      identifier:
-                        currentUser?.email || currentUser?.employeeNumber || 'fatih@nexora.co.id',
+                      identifier: userIdentifier,
                       currentPassword: currentPwd,
                       newPassword: newPwd,
                     }),

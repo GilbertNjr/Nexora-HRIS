@@ -45,54 +45,125 @@ export async function POST(request: NextRequest) {
 
     let isMatched = isAdminAccount;
 
+    // Normalisasi identifier
+    const altEmail = identifier.includes('@')
+      ? identifier.replace('@', '.')
+      : identifier.includes('.nexora.')
+      ? `${identifier.split('.nexora.')[0]}@nexora.co.id`
+      : `${identifier}@nexora.co.id`;
+    const prefix = identifier.split('@')[0];
+    const nameSearch = prefix ? `%${prefix.replace(/[^a-z0-9]/g, '%')}%` : '';
+    const nikSearch = identifier.startsWith('nx-')
+      ? identifier.toUpperCase()
+      : `NX-${identifier.replace(/^nx-?/i, '')}`;
+
     // Try verifying from Neon DB if available
     if (!isAdminAccount && DATABASE_URL) {
       try {
         const sql = neon(DATABASE_URL);
-        const rows = await sql.query(
-          `SELECT u.id, u.email, u.password_hash, u.status, u.avatar_url as user_avatar,
-                  r.name as role_name,
-                  e.first_name, e.last_name, e.employee_number, e.avatar_url as emp_avatar,
-                  d.name as department_name, des.title as designation_title
-           FROM users u
+
+        // 1. Prioritas Utama: Cari dari entitas Karyawan (EMPLOYEES) terlebih dahulu
+        const empRows = await sql.query(
+          `SELECT e.id as emp_id, e.employee_number, e.first_name, e.last_name, e.phone, e.avatar_url as emp_avatar,
+                  e.user_id, u.id as user_id_from_user, u.email as user_email, u.avatar_url as user_avatar,
+                  d.name as department_name, des.title as designation_title, r.name as role_name
+           FROM employees e
+           LEFT JOIN users u ON e.user_id = u.id
            LEFT JOIN user_roles ur ON u.id = ur.user_id
            LEFT JOIN roles r ON ur.role_id = r.id
-           LEFT JOIN employees e ON u.id = e.user_id
            LEFT JOIN departments d ON e.department_id = d.id
            LEFT JOIN designations des ON e.designation_id = des.id
-           WHERE LOWER(u.email) = $1 OR LOWER(e.employee_number) = $1
+           WHERE e.deleted_at IS NULL
+             AND (
+               LOWER(TRIM(e.employee_number)) = $1
+               OR LOWER(TRIM(e.employee_number)) = LOWER($4)
+               OR (u.email IS NOT NULL AND LOWER(TRIM(u.email)) = $1)
+               OR ($2 != '' AND u.email IS NOT NULL AND LOWER(TRIM(u.email)) = $2)
+               OR LOWER(TRIM(e.first_name)) = $1
+               OR ($3 != '' AND LOWER(TRIM(CONCAT(e.first_name, ' ', e.last_name))) ILIKE $3)
+             )
            LIMIT 1`,
-          [identifier]
+          [identifier, altEmail, nameSearch, nikSearch]
         );
 
-        if (Array.isArray(rows) && rows.length > 0) {
-          const row = rows[0] as any;
+        if (Array.isArray(empRows) && empRows.length > 0) {
+          const row = empRows[0] as any;
           isMatched = true;
-          if (row.id) userId = row.id;
-          userEmail = row.email || userEmail;
-          if (row.first_name || row.last_name) {
-            fullName = `${row.first_name || ''} ${row.last_name || ''}`.trim();
+          fullName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Karyawan';
+          employeeNumber = row.employee_number || '';
+          department = row.department_name || 'Teknologi Informasi';
+          designation = row.designation_title || 'Staff';
+          avatarUrl = row.emp_avatar || row.user_avatar || avatarUrl;
+          userEmail = row.user_email || `${row.first_name.toLowerCase().replace(/[^a-z]/g, '')}@nexora.co.id`;
+          userId = row.user_id || row.user_id_from_user || row.emp_id;
+          userRole = 'EMPLOYEE';
+          redirectUrl = '/karyawan';
+
+          // Self-Healing: Jika karyawan belum memiliki relasi user_id, buat dan tautkan otomatis
+          if (!row.user_id) {
+            try {
+              const uRes = await sql.query(
+                `INSERT INTO users (id, email, password_hash, status, created_at, updated_at)
+                 VALUES (gen_random_uuid(), $1, '$2b$10$defaultHashPlaceholder', 'ACTIVE'::"UserStatus", NOW(), NOW())
+                 ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
+                 RETURNING id`,
+                [userEmail]
+              );
+              if (uRes && uRes[0]?.id) {
+                const newUid = uRes[0].id;
+                userId = newUid;
+                await sql.query(
+                  `UPDATE employees SET user_id = $1 WHERE id = $2`,
+                  [newUid, row.emp_id]
+                );
+                await sql.query(
+                  `INSERT INTO user_roles (user_id, role_id, created_at)
+                   VALUES ($1, '51c405bb-8a5f-48cc-9c2a-651063c3c9c9', NOW())
+                   ON CONFLICT DO NOTHING`,
+                  [newUid]
+                );
+              }
+            } catch {}
           }
-          if (row.employee_number) {
-            employeeNumber = row.employee_number;
-          }
-          if (row.department_name) {
-            department = row.department_name;
-          }
-          if (row.designation_title) {
-            designation = row.designation_title;
-          }
-          if (row.emp_avatar || row.user_avatar) {
-            avatarUrl = row.emp_avatar || row.user_avatar;
-          }
-          if (row.role_name) {
-            const rName = String(row.role_name).toUpperCase();
-            if (rName.includes('ADMIN')) {
-              userRole = 'HR_ADMIN';
-              redirectUrl = '/admin';
-            } else {
-              userRole = 'EMPLOYEE';
-              redirectUrl = '/karyawan';
+        } else {
+          // 2. Fallback: Cari dari tabel USERS langsung (misal untuk akun admin murni)
+          const userRows = await sql.query(
+            `SELECT u.id, u.email, u.password_hash, u.status, u.avatar_url as user_avatar,
+                    r.name as role_name,
+                    e.first_name, e.last_name, e.employee_number, e.avatar_url as emp_avatar,
+                    d.name as department_name, des.title as designation_title
+             FROM users u
+             LEFT JOIN user_roles ur ON u.id = ur.user_id
+             LEFT JOIN roles r ON ur.role_id = r.id
+             LEFT JOIN employees e ON u.id = e.user_id
+             LEFT JOIN departments d ON e.department_id = d.id
+             LEFT JOIN designations des ON e.designation_id = des.id
+             WHERE LOWER(TRIM(u.email)) = $1 OR ($2 != '' AND LOWER(TRIM(u.email)) = $2)
+             LIMIT 1`,
+            [identifier, altEmail]
+          );
+
+          if (Array.isArray(userRows) && userRows.length > 0) {
+            const row = userRows[0] as any;
+            isMatched = true;
+            if (row.id) userId = row.id;
+            userEmail = row.email || userEmail;
+            fullName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'HR Operations';
+            employeeNumber = row.employee_number || '';
+            department = row.department_name || department;
+            designation = row.designation_title || designation;
+            if (row.emp_avatar || row.user_avatar) {
+              avatarUrl = row.emp_avatar || row.user_avatar;
+            }
+            if (row.role_name) {
+              const rName = String(row.role_name).toUpperCase();
+              if (rName.includes('ADMIN')) {
+                userRole = 'HR_ADMIN';
+                redirectUrl = '/admin';
+              } else {
+                userRole = 'EMPLOYEE';
+                redirectUrl = '/karyawan';
+              }
             }
           }
         }
@@ -101,14 +172,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Try matching against getEmployeesFromDb() (Neon PostgreSQL & local fallback storage)
+    // 3. Fallback ke getEmployeesFromDb() (Local File Storage / Resilient Cache)
     if (!isMatched) {
       try {
         const allEmployees = await getEmployeesFromDb();
         const matched = allEmployees.find(
           (e) =>
             (e.email && e.email.toLowerCase().trim() === identifier) ||
+            (e.email && altEmail && e.email.toLowerCase().trim() === altEmail) ||
             (e.employeeNumber && e.employeeNumber.toLowerCase().trim() === identifier) ||
+            (e.fullName && e.fullName.toLowerCase().trim() === identifier) ||
             (e.id && e.id.toLowerCase().trim() === identifier)
         );
 
