@@ -38,7 +38,7 @@ interface ApprovalRequest {
   id: string;
   name: string;
   role: string;
-  type: 'cuti' | 'lembur';
+  type: 'cuti' | 'lembur' | 'dokumen';
   title: string;
   highlightType: string;
   detail: string;
@@ -51,6 +51,12 @@ interface ApprovalRequest {
   avatarColor: string;
   initials: string;
   verifiedBadge: 'check' | 'alert' | 'bolt';
+  ticketNo?: string;
+  currentStep?: number;
+  totalSteps?: number;
+  targetOrg?: string;
+  targetPurpose?: string;
+  urgency?: string;
 }
 
 export default function AdminDashboardPage() {
@@ -75,7 +81,7 @@ export default function AdminDashboardPage() {
   });
 
   // State for interactive features
-  const [activeFilter, setActiveFilter] = useState<'all' | 'cuti' | 'lembur'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'cuti' | 'lembur' | 'dokumen'>('all');
   const [selectedMonth, setSelectedMonth] = useState(currentMonthYear);
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -417,15 +423,18 @@ export default function AdminDashboardPage() {
           );
         }
 
-        // When employee submits leave or attendance is recorded/reset
+        // When employee submits leave or attendance is recorded/reset or document requested
         if (
           msg.type === 'NEW_APPROVAL_REQUEST' ||
           msg.type === 'APPROVAL_SUBMITTED' ||
-          msg.type === 'LEAVE_SUBMITTED'
+          msg.type === 'LEAVE_SUBMITTED' ||
+          msg.type === 'DOCUMENT_REQUEST_CREATED'
         ) {
           fetchLiveMetrics();
           showToast(
-            `🔔 Pengajuan Real-Time Baru: ${msg.request?.name || msg.item?.name || 'Karyawan'} baru saja mengajukan permohonan!`
+            `🔔 Pengajuan Real-Time Baru: ${msg.request?.name || msg.item?.name || msg.name || 'Karyawan'} baru saja mengajukan ${
+              msg.title || 'permohonan'
+            }!`
           );
         }
 
@@ -434,7 +443,9 @@ export default function AdminDashboardPage() {
           msg.type === 'LEAVE_ACTIONED' ||
           msg.type === 'ATTENDANCE_RECORDED' ||
           msg.type === 'ATTENDANCE_LOGGED' ||
-          msg.type === 'ATTENDANCE_RESET'
+          msg.type === 'ATTENDANCE_RESET' ||
+          msg.type === 'DOCUMENT_REQUEST_UPDATED' ||
+          msg.type === 'DOCUMENTS_UPDATED'
         ) {
           fetchLiveMetrics();
         }
@@ -469,6 +480,7 @@ export default function AdminDashboardPage() {
     try {
       const bc = new BroadcastChannel('nexora_live_sync');
       bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'APPROVED' });
+      bc.postMessage({ type: 'DOCUMENT_REQUEST_UPDATED', id, status: 'APPROVED' });
       bc.close();
     } catch {
       // ignore
@@ -500,6 +512,7 @@ export default function AdminDashboardPage() {
     try {
       const bc = new BroadcastChannel('nexora_live_sync');
       bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'REJECTED' });
+      bc.postMessage({ type: 'DOCUMENT_REQUEST_UPDATED', id, status: 'REJECTED' });
       bc.close();
     } catch {
       // ignore
@@ -523,6 +536,7 @@ export default function AdminDashboardPage() {
   const filteredRequests = requests.filter((r) => {
     if (activeFilter === 'cuti') return r.type === 'cuti';
     if (activeFilter === 'lembur') return r.type === 'lembur';
+    if (activeFilter === 'dokumen') return r.type === 'dokumen';
     return true;
   });
 
@@ -847,7 +861,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* Filter Pills */}
-                <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+                <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl flex-wrap">
                   <button
                     type="button"
                     onClick={() => setActiveFilter('all')}
@@ -881,6 +895,18 @@ export default function AdminDashboardPage() {
                   >
                     Klaim Lembur ({requests.filter((r) => r.type === 'lembur').length})
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilter('dokumen')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${
+                      activeFilter === 'dokumen'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span>Dokumen &amp; Surat ({requests.filter((r) => r.type === 'dokumen').length})</span>
+                  </button>
                 </div>
               </div>
 
@@ -907,7 +933,11 @@ export default function AdminDashboardPage() {
                           <div
                             className={`w-11 h-11 rounded-2xl bg-gradient-to-tr ${req.avatarColor} text-white flex items-center justify-center font-bold text-sm shadow-sm`}
                           >
-                            {req.initials}
+                            {req.type === 'dokumen' ? (
+                              <FileText className="w-5 h-5 text-white" />
+                            ) : (
+                              req.initials
+                            )}
                           </div>
                           {req.verifiedBadge === 'check' && (
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] border-2 border-white">
@@ -932,6 +962,11 @@ export default function AdminDashboardPage() {
                             <h3 className="text-sm font-bold text-[#0F172A] truncate">
                               {req.name}
                             </h3>
+                            {req.type === 'dokumen' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                Permohonan Surat
+                              </span>
+                            )}
                           </div>
                           <p className="text-[11px] text-slate-400 font-medium truncate">
                             {req.role}
@@ -947,7 +982,17 @@ export default function AdminDashboardPage() {
                           </p>
 
                           {/* Contextual Badges */}
-                          <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px] text-slate-500">
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11px] text-slate-500">
+                            {req.ticketNo && (
+                              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                #{req.ticketNo}
+                              </span>
+                            )}
+                            {req.currentStep && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Tahap {req.currentStep}/{req.totalSteps || 3}
+                              </span>
+                            )}
                             {req.quotaMeta && (
                               <span className="flex items-center gap-1 font-medium text-slate-600">
                                 <Calendar className="w-3 h-3 text-slate-400" />
@@ -984,13 +1029,21 @@ export default function AdminDashboardPage() {
                         <button
                           type="button"
                           onClick={() => handleApprove(req.id, req.name)}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all transform active:scale-95 flex items-center gap-1"
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all transform active:scale-95 flex items-center gap-1 cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
-                          <span>Setujui</span>
+                          <span>{req.type === 'dokumen' ? '✓ Otorisasi Berkas' : 'Setujui'}</span>
                         </button>
 
-                        {req.hasAttachment ? (
+                        {req.type === 'dokumen' ? (
+                          <Link
+                            href="/admin/documents"
+                            className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Detail</span>
+                          </Link>
+                        ) : req.hasAttachment ? (
                           <button
                             type="button"
                             onClick={() => setPreviewAttachment(req.attachmentName || 'Surat_Dokter_Klinik.pdf')}
@@ -1003,7 +1056,7 @@ export default function AdminDashboardPage() {
                           <button
                             type="button"
                             onClick={() => handleReject(req.id, req.name)}
-                            className="px-3 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold transition-colors flex items-center gap-1"
+                            className="px-3 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <X className="w-3.5 h-3.5 text-rose-500" />
                             <span>Tolak</span>
@@ -1016,15 +1069,25 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Bottom Link to Full Leave Approval Page */}
+            {/* Bottom Link to Full Leave / Document Approval Page */}
             <div className="pt-4 border-t border-slate-100 text-center">
-              <Link
-                href="/admin/leave"
-                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                <span>Lihat Semua {requests.length} Permohonan Menunggu</span>
-                <span className="text-sm">→</span>
-              </Link>
+              {activeFilter === 'dokumen' ? (
+                <Link
+                  href="/admin/documents"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  <span>Buka Modul Manajemen Dokumen &amp; Surat Lengkap</span>
+                  <span className="text-sm">→</span>
+                </Link>
+              ) : (
+                <Link
+                  href="/admin/leave"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  <span>Lihat Semua {requests.length} Permohonan Menunggu</span>
+                  <span className="text-sm">→</span>
+                </Link>
+              )}
             </div>
           </div>
 

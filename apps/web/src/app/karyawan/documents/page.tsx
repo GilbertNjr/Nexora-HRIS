@@ -133,12 +133,26 @@ export default function EssDocumentsPage() {
     try {
       bc = new BroadcastChannel('nexora_live_sync');
       bc.onmessage = (event) => {
+        const msg = event.data;
+        if (!msg || !msg.type) return;
+
         if (
-          event.data?.type === 'DOCUMENTS_UPDATED' ||
-          event.data?.type === 'DOCUMENT_REQUEST_CREATED' ||
-          event.data?.type === 'PROFILE_UPDATED'
+          msg.type === 'DOCUMENTS_UPDATED' ||
+          msg.type === 'DOCUMENT_REQUEST_CREATED' ||
+          msg.type === 'DOCUMENT_REQUEST_UPDATED' ||
+          msg.type === 'APPROVAL_UPDATED' ||
+          msg.type === 'PROFILE_UPDATED'
         ) {
           fetchLiveDocuments();
+          if (msg.type === 'DOCUMENT_REQUEST_UPDATED') {
+            if (msg.status === 'APPROVED') {
+              showToast('✓ Permohonan surat Anda telah disahkan & dokumen resmi telah diterbitkan!');
+            } else if (msg.status === 'REJECTED') {
+              showToast('✕ Permohonan surat Anda ditolak oleh HR Operations.');
+            } else {
+              showToast('⚡ Status tahapan verifikasi dokumen Anda telah diperbarui.');
+            }
+          }
         }
       };
     } catch {}
@@ -238,6 +252,9 @@ export default function EssDocumentsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nik,
+          employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
+          employeeRole: currentUser.designation || 'Lead Backend Architect',
+          department: currentUser.department || 'Teknologi Informasi',
           title: requestDocType,
           targetPurpose: requestPurpose,
           targetOrg: requestTargetOrg,
@@ -254,13 +271,19 @@ export default function EssDocumentsPage() {
 
         try {
           const bc = new BroadcastChannel('nexora_live_sync');
-          bc.postMessage({ type: 'DOCUMENT_REQUEST_CREATED', nik });
+          bc.postMessage({
+            type: 'DOCUMENT_REQUEST_CREATED',
+            nik,
+            name: currentUser.fullName || 'Rian Pratama, S.Kom',
+            title: requestDocType,
+            ticketNo: json.data?.ticketNo,
+          });
           bc.close();
         } catch {}
 
         showToast(
           `✓ Permohonan "${requestDocType}" berhasil diajukan dengan nomor tiket ${
-            json.data?.ticketNo || '#REQ-DOC-2025'
+            json.data?.ticketNo || '#REQ-DOC-2026-083'
           }.`
         );
       }

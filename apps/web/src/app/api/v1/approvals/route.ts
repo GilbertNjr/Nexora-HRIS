@@ -10,6 +10,10 @@ import {
   saveLeaveRequestToDb,
   updateLeaveRequestStatusInDb,
 } from '@/lib/leaveDb';
+import {
+  getDocumentRequestsFromDb,
+  updateDocumentRequestStepInDb,
+} from '@/lib/documentDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,7 +28,7 @@ export interface ApprovalItem {
   role: string;
   department?: string;
   avatarUrl?: string;
-  type: 'cuti' | 'lembur';
+  type: 'cuti' | 'lembur' | 'dokumen';
   leaveType?: string;
   typeCategory?: 'tahunan' | 'sakit' | 'khusus';
   title: string;
@@ -49,6 +53,12 @@ export interface ApprovalItem {
   verifiedBadge: 'check' | 'alert' | 'bolt';
   status: 'PENDING' | 'PENDING_SPV' | 'PENDING_HRD' | 'APPROVED' | 'REJECTED';
   submittedDate?: string;
+  ticketNo?: string;
+  currentStep?: number;
+  totalSteps?: number;
+  targetOrg?: string;
+  targetPurpose?: string;
+  urgency?: string;
 }
 
 const defaultApprovals: ApprovalItem[] = [];
@@ -90,12 +100,60 @@ export async function GET(request: NextRequest) {
   const includeAll = searchParams.get('all') === 'true';
   const approvals = getStoredApprovals();
 
-  // Load real persistent leave requests from Neon PostgreSQL
+  // 1. Load real persistent leave requests from Neon PostgreSQL
   let dbLeaves: ApprovalItem[] = [];
   try {
     dbLeaves = await getLeaveRequestsFromDb();
   } catch (err) {
-    console.warn('[approvals/GET] Could not load from DB:', err);
+    console.warn('[approvals/GET] Could not load leaves from DB:', err);
+  }
+
+  // 2. Load real persistent document requests from Neon PostgreSQL / documentDb
+  let dbDocs: ApprovalItem[] = [];
+  try {
+    const docReqs = await getDocumentRequestsFromDb();
+    dbDocs = docReqs.map((d) => {
+      const name = d.employeeName || 'Rian Pratama, S.Kom';
+      const initials = name
+        .replace(/[^a-zA-Z\s]/g, '')
+        .split(' ')
+        .filter(Boolean)
+        .map((w: string) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'RP';
+
+      const isCompleted = d.currentStep >= d.totalSteps && d.status === 'APPROVED';
+      const isRejected = d.status === 'REJECTED';
+
+      return {
+        id: d.id,
+        name,
+        nik: d.nik,
+        role: d.employeeRole || 'Lead Backend Architect',
+        department: d.department || 'Teknologi Informasi',
+        avatarUrl: d.avatarUrl,
+        type: 'dokumen' as const,
+        title: d.title,
+        highlightType: d.urgency?.includes('Penting') ? 'Sangat Penting' : 'Dokumen Resmi',
+        detail: `Keperluan: ${d.targetPurpose} • Tiket: ${d.ticketNo} (${d.statusLabel} - Tahap ${d.currentStep}/${d.totalSteps})`,
+        timestamp: d.submittedAt,
+        avatarColor: 'from-blue-600 to-indigo-600',
+        initials,
+        verifiedBadge: 'check' as const,
+        status: isCompleted ? 'APPROVED' : isRejected ? 'REJECTED' : 'PENDING',
+        submittedDate: d.submittedAt,
+        ticketNo: d.ticketNo,
+        currentStep: d.currentStep,
+        totalSteps: d.totalSteps,
+        targetOrg: d.targetOrg,
+        targetPurpose: d.targetPurpose,
+        urgency: d.urgency,
+        documentName: d.title,
+      };
+    });
+  } catch (err) {
+    console.warn('[approvals/GET] Could not load document requests:', err);
   }
 
   let merged = approvals;
@@ -103,6 +161,13 @@ export async function GET(request: NextRequest) {
     const dbIds = new Set(dbLeaves.map((d) => d.id));
     const remaining = approvals.filter((a) => !dbIds.has(a.id));
     merged = [...dbLeaves, ...remaining];
+  }
+
+  // Merge document requests
+  if (Array.isArray(dbDocs) && dbDocs.length > 0) {
+    const existingIds = new Set(merged.map((m) => m.id));
+    const remainingDocs = dbDocs.filter((d) => !existingIds.has(d.id));
+    merged = [...remainingDocs, ...merged];
   }
 
   if (includeAll) {
@@ -127,7 +192,7 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .map((n: string) => n[0])
       .join('')
-      .slice(0, 2)
+      .slice(0, 2);
     const generatedId =
       body.id && body.id.includes('-') && body.id.length === 36
         ? body.id
@@ -149,102 +214,53 @@ export async function POST(request: NextRequest) {
       startDate: body.startDate || new Date().toISOString().slice(0, 10),
       endDate: body.endDate || new Date().toISOString().slice(0, 10),
       durationDays: body.durationDays || 1,
-      remainingQuota: typeof body.remainingQuota === 'number' ? body.remainingQuota : 8,
-      totalQuota: body.totalQuota || 12,
-      reason: body.reason || 'Keperluan Pribadi & Urusan Keluarga',
-      quotaMeta: body.quotaMeta || `Sisa Kuota: ${body.remainingQuota ?? 8} Hari`,
-      hasAttachment: Boolean(body.hasAttachment || body.documentName),
-      attachmentName: body.attachmentName || body.documentName,
-      documentName: body.documentName || body.attachmentName,
-      documentUrl: body.documentUrl || '#',
-      estimatedCost: body.estimatedCost,
+      remainingQuota: body.remainingQuota ?? 12,
+      totalQuota: body.totalQuota ?? 12,
+      reason: body.reason || body.detail || 'Keperluan Pribadi',
+      quotaMeta: body.quotaMeta || 'Sisa Kuota: 12 Hari',
+      timestamp:
+        body.timestamp ||
+        'Hari ini • ' +
+          new Intl.DateTimeFormat('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }).format(new Date()) +
+          ' WIB',
+      hasAttachment: !!body.hasAttachment,
+      attachmentName: body.attachmentName,
+      documentName: body.documentName,
+      documentUrl: body.documentUrl,
       verifiedBy: body.verifiedBy,
-      timestamp: 'Baru saja',
-      avatarColor: body.type === 'lembur' ? 'from-emerald-500 to-teal-700' : 'from-blue-600 to-indigo-600',
-      initials,
-      verifiedBadge: body.type === 'lembur' ? 'bolt' : body.hasAttachment ? 'alert' : 'check',
+      estimatedCost: body.estimatedCost,
+      avatarColor: body.avatarColor || 'from-blue-600 to-indigo-600',
+      initials: initials || 'RP',
+      verifiedBadge: body.verifiedBadge || 'check',
       status: 'PENDING',
-      submittedDate: 'Hari ini, Baru saja',
+      submittedDate: body.submittedDate || new Date().toISOString(),
     };
 
-    const updated = [newItem, ...approvals];
-    saveStoredApprovals(updated);
+    approvals.unshift(newItem);
+    saveStoredApprovals(approvals);
 
-    // Persist permanently to Neon PostgreSQL
-    try {
-      await saveLeaveRequestToDb(newItem);
-    } catch (dbErr) {
-      console.error('[approvals/POST] Error persisting to Neon DB:', dbErr);
+    // Save leave request to Neon PostgreSQL
+    if (newItem.type === 'cuti') {
+      try {
+        await saveLeaveRequestToDb(newItem);
+      } catch (dbErr) {
+        console.error('[approvals/POST] Error saving leave to Neon DB:', dbErr);
+      }
     }
 
-    // 1. Broadcast real-time SSE event to all connected devices / browsers
-    broadcastApprovalEvent('LEAVE_SUBMITTED', newItem);
+    // Broadcast SSE to all connected clients
+    broadcastApprovalEvent('APPROVAL_SUBMITTED', {
+      id: newItem.id,
+      request: newItem,
+    });
 
-    // 2. Automatically generate real-time notification for Admin
-    try {
-      const NOTIFICATIONS_FILE = path.join(STORAGE_DIR, 'nexora_notifications.json');
-      let notifs: any[] = [];
-      if (fs.existsSync(NOTIFICATIONS_FILE)) {
-        try {
-          notifs = JSON.parse(fs.readFileSync(NOTIFICATIONS_FILE, 'utf-8'));
-        } catch {}
-      }
-      const newNotif = {
-        id: `notif-${Date.now()}`,
-        title: `Pengajuan ${newItem.highlightType} Baru`,
-        message: `${newItem.name} (${newItem.role.split('•')[0]?.trim() || 'Karyawan'}) mengajukan ${newItem.title}.`,
-        category: 'leave',
-        type: 'warning',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        actionUrl: '/admin/leave',
-        actionLabel: 'Tinjau Pengajuan',
-        actor: {
-          name: newItem.name,
-          initials: newItem.initials,
-          avatarColor: newItem.avatarColor,
-        },
-        metadata: {
-          requestId: newItem.id,
-          type: newItem.type,
-        },
-      };
-      fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify([newNotif, ...notifs].slice(0, 50), null, 2), 'utf-8');
-    } catch {}
-
-    // 3. Dispatch real-time audit log to Neon PostgreSQL database & broadcast
-    try {
-      await recordAuditLog({
-        module: 'LEAVE',
-        action: 'LEAVE_REQUESTED',
-        recordId: newItem.id,
-        userName: newItem.name,
-        userEmail: `${newItem.nik || 'user'}@nexora.co.id`,
-        userNik: newItem.nik,
-        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
-        userAgent: request.headers.get('user-agent') || 'Portal Karyawan (Web)',
-        oldData: null,
-        newData: {
-          leaveType: newItem.leaveType,
-          durationDays: newItem.durationDays,
-          startDate: newItem.startDate,
-          endDate: newItem.endDate,
-          reason: newItem.reason,
-        },
-      });
-    } catch {}
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: newItem,
-        message: 'Pengajuan berhasil dikirimkan dan menunggu persetujuan HR Admin secara real-time.',
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: newItem }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, error: { code: 'SUBMIT_ERROR', message: err.message } },
+      { success: false, error: { code: 'POST_ERROR', message: err.message } },
       { status: 500 }
     );
   }
@@ -254,14 +270,63 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, status } = body;
+
     if (!id || !status) {
       return NextResponse.json(
-        { success: false, error: { message: 'ID dan status dibutuhkan' } },
+        { success: false, error: { message: 'ID dan status wajib disertakan' } },
         { status: 400 }
       );
     }
 
-    // Update in Neon PostgreSQL
+    // 1. If it's a document request (id starts with 'req-')
+    if (id.startsWith('req-')) {
+      const action = status === 'APPROVED' ? 'APPROVE_STEP' : 'REJECT';
+      const result = await updateDocumentRequestStepInDb(id, action, 'Dewi Lestari, S.Psi (HR Admin)');
+      if (!result.success || !result.item) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Data pengajuan dokumen tidak ditemukan' } },
+          { status: 404 }
+        );
+      }
+
+      broadcastApprovalEvent('DOCUMENT_REQUEST_UPDATED', {
+        id,
+        status: result.item.status,
+        item: result.item,
+      });
+
+      try {
+        await recordAuditLog({
+          module: 'LEAVE',
+          action: status === 'APPROVED' ? 'DOCUMENT_APPROVAL_DECIDED' : 'DOCUMENT_REJECTED',
+          recordId: id,
+          userName: 'HR Administrator',
+          userEmail: 'admin@nexora.local',
+          ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+          userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+          oldData: { status: 'PENDING' },
+          newData: {
+            status: result.item.status,
+            title: result.item.title,
+            ticketNo: result.item.ticketNo,
+            currentStep: result.item.currentStep,
+          },
+        });
+      } catch {}
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.item,
+          message: `Permohonan dokumen ${result.item.title} berhasil ${
+            status === 'APPROVED' ? 'disetujui' : 'ditolak'
+          } dan disinkronkan ke karyawan.`,
+        },
+        { status: 200 }
+      );
+    }
+
+    // 2. Regular Leave / Overtime request update in Neon PostgreSQL
     let dbUpdated = false;
     try {
       dbUpdated = await updateLeaveRequestStatusInDb(
@@ -317,9 +382,9 @@ export async function PATCH(request: NextRequest) {
         oldData: { status: 'PENDING' },
         newData: {
           status,
-          employee: approvals[index].name,
-          leaveType: approvals[index].leaveType,
-          durationDays: approvals[index].durationDays,
+          employee: targetItem?.name || 'Karyawan',
+          leaveType: targetItem?.leaveType || 'Cuti',
+          durationDays: targetItem?.durationDays || 1,
         },
       });
     } catch {}
@@ -327,7 +392,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        data: approvals[index],
+        data: targetItem,
         message: `Pengajuan berhasil ${status === 'APPROVED' ? 'disetujui' : 'ditolak'} dan disinkronkan ke karyawan.`,
       },
       { status: 200 }
@@ -351,6 +416,16 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // If document request
+    if (id.startsWith('req-')) {
+      const result = await updateDocumentRequestStepInDb(id, 'REJECT', 'HR Administrator', 'Dibatalkan oleh admin');
+      return NextResponse.json({
+        success: true,
+        message: 'Permohonan dokumen berhasil dibatalkan.',
+        data: result.item,
+      });
+    }
+
     const approvals = getStoredApprovals();
     const index = approvals.findIndex((a) => a.id === id);
     if (index === -1) {
@@ -363,28 +438,11 @@ export async function DELETE(request: NextRequest) {
     const [deletedItem] = approvals.splice(index, 1);
     saveStoredApprovals(approvals);
 
-    // Broadcast SSE update event to all connected devices
     broadcastApprovalEvent('LEAVE_ACTIONED', {
       id,
       status: 'CANCELLED',
       item: deletedItem,
     });
-
-    // Record audit log for cancellation to database
-    try {
-      await recordAuditLog({
-        module: 'LEAVE',
-        action: 'LEAVE_CANCELLED',
-        recordId: id,
-        userName: deletedItem.name,
-        userEmail: `${deletedItem.nik || 'user'}@nexora.co.id`,
-        userNik: deletedItem.nik,
-        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
-        userAgent: request.headers.get('user-agent') || 'Portal Karyawan ESS (Web)',
-        oldData: { status: deletedItem.status, type: deletedItem.leaveType },
-        newData: { status: 'CANCELLED' },
-      });
-    } catch {}
 
     return NextResponse.json(
       {

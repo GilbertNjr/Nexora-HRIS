@@ -28,6 +28,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   User,
+  FileText,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -217,6 +218,12 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
           href: '/admin/performance',
           icon: TrendingUp,
           active: pathname.startsWith('/admin/performance'),
+        },
+        {
+          name: 'Pusat Dokumen & Surat',
+          href: '/admin/documents',
+          icon: FileText,
+          active: pathname.startsWith('/admin/documents'),
         },
       ],
     },
