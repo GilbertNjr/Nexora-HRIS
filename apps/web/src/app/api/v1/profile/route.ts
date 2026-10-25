@@ -109,16 +109,29 @@ export async function GET(request: NextRequest) {
     );
 
     if (matched) {
-      const merged: UserProfile = {
+      const merged: UserProfile & Record<string, any> = {
         fullName: matched.fullName || 'Karyawan',
         employeeNumber: matched.employeeNumber,
         email: matched.email || (emailParam || `${matched.employeeNumber.toLowerCase()}@nexora.co.id`),
         phone: matched.phone || '+62 812-8899-7766',
         department: matched.department || 'Technology & Core Engineering',
         designation: matched.designation || 'Specialist',
+        division: matched.division || 'Divisi Rekayasa & Arsitektur Cloud',
+        grade: matched.grade || 'Grade: P3 - Specialist',
         manager: matched.managerName || 'HR Operations Lead',
         location: matched.office || 'HQ Pacific Tower SCBD',
+        employmentType: matched.employmentType === 'CONTRACT_PKWT' ? 'Kontrak (PKWT)' : 'Karyawan Tetap (PKWTT)',
         joinDate: matched.joinDate || '2026-10-24',
+        tenure: matched.tenure || 'Baru Bergabung',
+        nik: matched.nik || '3174092408960003',
+        npwp: matched.npwp || '82.491.332.8-014.000',
+        bpjsTk: matched.bpjsTk || '21094481029',
+        bpjsKes: matched.bpjsKes || '0002881920194',
+        birthPlaceDate: matched.birthPlaceDate || 'Jakarta, 14 Agustus 1996',
+        genderReligion: matched.genderBlood ? `${matched.genderBlood} • ${matched.religion || 'Islam'}` : 'Laki-laki • Islam',
+        bankName: matched.bankName || 'BCA',
+        bankAccountNumber: matched.accountNumber || '',
+        bankAccountHolder: matched.accountHolder || matched.fullName || '',
         avatarUrl: matched.avatarUrl || '',
         updatedAt: matched.updatedAt || new Date().toISOString(),
         role: 'EMPLOYEE',
@@ -127,6 +140,26 @@ export async function GET(request: NextRequest) {
     }
   } catch (err) {
     console.error('[Profile API GET error]:', err);
+  }
+
+  // Fallback: if employee identifier was provided, return clean dynamic profile instead of stale Rian
+  if (empNoParam || emailParam) {
+    const fallbackId = empNoParam || 'NX-2025089';
+    const fallbackName = emailParam ? emailParam.split('@')[0] : 'Karyawan';
+    const dynamicProfile: UserProfile = {
+      fullName: fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1),
+      employeeNumber: fallbackId,
+      email: emailParam || `${fallbackId.toLowerCase()}@nexora.co.id`,
+      phone: '+62 812-8899-7766',
+      department: 'Human Resource Department',
+      designation: 'Specialist',
+      manager: 'HR Operations Lead',
+      location: 'HQ Pacific Tower SCBD Lt. 7',
+      joinDate: new Date().toISOString().split('T')[0],
+      avatarUrl: '',
+      role: 'EMPLOYEE',
+    };
+    return NextResponse.json({ success: true, data: dynamicProfile, hasData: true }, { status: 200 });
   }
 
   // Fallback to local stored employee profile
@@ -234,7 +267,7 @@ export async function PUT(request: NextRequest) {
     // C. Sync to PostgreSQL Neon if configured
     if (DATABASE_URL) {
       try {
-        const sql = neon(DATABASE_URL);
+        const sql = neon(DATABASE_URL, { fetchOptions: { cache: 'no-store' } });
         const av = updatedEmployee.avatarUrl || null;
         const ph = updatedEmployee.phone || null;
         const empNum = updatedEmployee.employeeNumber;
@@ -245,6 +278,12 @@ export async function PUT(request: NextRequest) {
                       avatar_url = ${av}, 
                       updated_at = NOW() 
                   WHERE employee_number = ${empNum}`;
+        if (updatedEmployee.email) {
+          await sql`UPDATE users
+                    SET avatar_url = ${av},
+                        updated_at = NOW()
+                    WHERE LOWER(email) = LOWER(${updatedEmployee.email})`;
+        }
       } catch (err: any) {
         console.warn('[Profile PUT] Neon update error:', err?.message);
       }

@@ -90,34 +90,34 @@ export default function EmployeeProfilePage() {
     setTimeout(() => setToastMessage(null), 4500);
   };
 
-  // Profile data states (Initialized matching user's official master identity)
+  // Profile data states (Initialized matching user's official master identity dynamically)
   const [profileData, setProfileData] = useState({
     // Personal Identity
-    fullName: 'fajar, S.Kom',
-    preferredName: 'Fajar',
-    employeeNumber: 'NX-2021008',
+    fullName: currentUser.fullName || '',
+    preferredName: currentUser.firstName || currentUser.fullName?.split(' ')[0] || '',
+    employeeNumber: currentUser.employeeNumber || '',
     nik: '3174092408960003',
-    birthPlaceDate: 'Jakarta, 24 Agustus 1996',
+    birthPlaceDate: 'Jakarta, 14 Agustus 1996',
     age: '28 Tahun',
     genderReligion: 'Laki-laki • Islam',
     maritalPtkp: 'Kawin',
     ptkpBadge: 'K/1 (1 Tanggungan)',
-    emailCompany: 'rian.pratama@nexora.co.id',
-    emailPersonal: 'rian.pratama.dev@gmail.com',
-    phone: '+62 812-9845-1120',
+    emailCompany: currentUser.email || '',
+    emailPersonal: currentUser.email || '',
+    phone: currentUser.phone || '+62 812-8899-7766',
     addressKtp: 'SCBD Suites Tower 2 Lt. 18, Jl. Jend. Sudirman Kav. 52, Jakarta Selatan',
-    avatarUrl: '',
+    avatarUrl: currentUser.avatarUrl || '',
 
     // Employment
-    department: 'Technology & Core Engineering',
-    division: 'Core Engineering & Platform Architecture',
-    designation: 'Lead Backend Architect',
-    level: 'Senior Principal Engineer (Band P5)',
+    department: currentUser.department || 'Human Resource Department',
+    division: 'Divisi Rekayasa & Arsitektur Cloud',
+    designation: currentUser.designation || 'Specialist',
+    level: 'Senior Specialist (Band P4)',
     employmentType: 'Karyawan Tetap (PKWTT)',
-    joinDate: '12 Januari 2021',
-    tenure: '4 Thn 2 Bln',
-    workLocation: 'HQ Pacific Tower SCBD Lt. 7',
-    manager: 'Arya Wibowo, M.Sc (VP Eng.)',
+    joinDate: '24 Oktober 2026',
+    tenure: 'Baru Bergabung',
+    workLocation: 'Head Office Jakarta',
+    manager: 'HR Operations Lead',
     workModel: 'Hybrid Flexible (3 Hari WFO / 2 Hari WFH)',
     schedule: 'Senin - Jumat (09:00 - 18:00 WIB)',
 
@@ -125,26 +125,46 @@ export default function EmployeeProfilePage() {
     npwp: '72.819.291.0-012.000',
     bankName: 'Bank Central Asia (BCA)',
     bankAccountNumber: '8092-1829-10',
-    bankAccountHolder: 'Fajar',
+    bankAccountHolder: currentUser.fullName || '',
     bpjsTkNumber: '21908291829',
     bpjsKesNumber: '000192839182',
 
     // Security
     twoFactorActive: true,
-    lastPasswordChange: '14 hari lalu (Kedaluwarsa dlm 76 hari)',
+    lastPasswordChange: 'Baru saja diperbarui',
     biometricRegistered: true,
   });
 
-  // Load from local storage and API on mount
+  // Load from local storage, SSE real-time stream, and API on mount or user change
   useEffect(() => {
-    // 1. Load from employee-specific cache if matching current user
+    // 0. Synchronize immediately from currentUser if available
+    if (currentUser.employeeNumber || currentUser.fullName) {
+      setProfileData((prev) => {
+        const isDiffUser =
+          prev.employeeNumber &&
+          currentUser.employeeNumber &&
+          prev.employeeNumber.toLowerCase() !== currentUser.employeeNumber.toLowerCase();
+        return {
+          ...prev,
+          fullName: isDiffUser ? currentUser.fullName : (prev.fullName || currentUser.fullName),
+          preferredName: currentUser.firstName || currentUser.fullName?.split(' ')[0] || prev.preferredName,
+          employeeNumber: currentUser.employeeNumber || prev.employeeNumber,
+          emailCompany: currentUser.email || prev.emailCompany,
+          department: currentUser.department || prev.department,
+          designation: currentUser.designation || prev.designation,
+          avatarUrl: currentUser.avatarUrl !== undefined ? currentUser.avatarUrl : prev.avatarUrl,
+        };
+      });
+    }
+
+    // 1. Load from employee-specific cache ONLY if matching current active user
     try {
       const cached = localStorage.getItem('nexora_employee_profile');
       if (cached) {
         const parsed = JSON.parse(cached);
         const isMatch =
-          !currentUser.employeeNumber ||
-          !parsed.employeeNumber ||
+          currentUser.employeeNumber &&
+          parsed.employeeNumber &&
           parsed.employeeNumber.toLowerCase().trim() === currentUser.employeeNumber.toLowerCase().trim();
         if (isMatch) {
           setProfileData((prev) => ({
@@ -153,8 +173,11 @@ export default function EmployeeProfilePage() {
             fullName: parsed.fullName || prev.fullName,
             preferredName: parsed.preferredName || parsed.fullName?.split(' ')[0] || prev.preferredName,
             phone: parsed.phone || prev.phone,
-            avatarUrl: parsed.avatarUrl || prev.avatarUrl,
+            avatarUrl: parsed.avatarUrl !== undefined ? parsed.avatarUrl : prev.avatarUrl,
           }));
+        } else if (parsed.employeeNumber && currentUser.employeeNumber && parsed.employeeNumber !== currentUser.employeeNumber) {
+          // Different user's stale cache: purge it immediately!
+          localStorage.removeItem('nexora_employee_profile');
         }
       }
     } catch {}
@@ -180,9 +203,9 @@ export default function EmployeeProfilePage() {
                 ...prev,
                 ...json.data,
                 fullName: cleanName,
-                preferredName: cleanName.split(' ')[0] || prev.preferredName,
+                preferredName: json.data.preferredName || cleanName.split(' ')[0] || prev.preferredName,
                 phone: json.data.phone || prev.phone,
-                avatarUrl: json.data.avatarUrl || prev.avatarUrl,
+                avatarUrl: json.data.avatarUrl !== undefined ? json.data.avatarUrl : prev.avatarUrl,
               };
               try {
                 localStorage.setItem('nexora_employee_profile', JSON.stringify(merged));
@@ -196,22 +219,81 @@ export default function EmployeeProfilePage() {
 
     fetchLiveProfile();
 
-    // Listen to real-time broadcast channel for employee profile updates
+    // 3. Listen to SSE employee stream for instant real-time sync from Admin HR updates!
+    let sse: EventSource | null = null;
+    try {
+      sse = new EventSource('/api/v1/employees/stream');
+      sse.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (
+            (payload.type === 'EMPLOYEE_UPDATED' || payload.type === 'EMPLOYEE_CREATED') &&
+            payload.data
+          ) {
+            const updatedEmp = payload.data;
+            const currentEmpNum = currentUser.employeeNumber?.toLowerCase().trim();
+            const currentMail = currentUser.email?.toLowerCase().trim();
+            const isTarget =
+              (currentEmpNum && updatedEmp.employeeNumber?.toLowerCase().trim() === currentEmpNum) ||
+              (currentMail && updatedEmp.email?.toLowerCase().trim() === currentMail);
+
+            if (isTarget) {
+              setProfileData((prev) => {
+                const cleanName = updatedEmp.fullName || prev.fullName;
+                const nextMerged = {
+                  ...prev,
+                  fullName: cleanName,
+                  preferredName: cleanName.split(' ')[0],
+                  employeeNumber: updatedEmp.employeeNumber || prev.employeeNumber,
+                  department: updatedEmp.department || prev.department,
+                  designation: updatedEmp.designation || prev.designation,
+                  phone: updatedEmp.phone || prev.phone,
+                  avatarUrl: updatedEmp.avatarUrl !== undefined ? updatedEmp.avatarUrl : prev.avatarUrl,
+                  tenure: updatedEmp.tenure || prev.tenure,
+                  joinDate: updatedEmp.joinDate || prev.joinDate,
+                };
+                try {
+                  localStorage.setItem('nexora_employee_profile', JSON.stringify(nextMerged));
+                } catch {}
+                return nextMerged;
+              });
+              if (updatedEmp.avatarUrl !== undefined) {
+                updateLocalUser({ avatarUrl: updatedEmp.avatarUrl, fullName: updatedEmp.fullName });
+              }
+            }
+          }
+        } catch {}
+      };
+    } catch {}
+
+    // 4. Listen to real-time broadcast channel for employee profile updates across browser tabs
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('nexora_live_sync');
       channel.onmessage = (event) => {
         const msg = event.data;
-        if (msg?.type === 'PROFILE_UPDATED' && msg.profile && (msg.role === 'EMPLOYEE' || !msg.role)) {
-          setProfileData((prev) => ({ ...prev, ...msg.profile }));
+        if (
+          (msg?.type === 'PROFILE_UPDATED' || msg?.type === 'EMPLOYEE_UPDATED') &&
+          (msg.profile || msg.employee || msg.data)
+        ) {
+          const profileUpdate = msg.profile || msg.employee || msg.data;
+          const currentEmpNum = currentUser.employeeNumber?.toLowerCase().trim();
+          if (
+            !profileUpdate.employeeNumber ||
+            !currentEmpNum ||
+            profileUpdate.employeeNumber.toLowerCase().trim() === currentEmpNum
+          ) {
+            setProfileData((prev) => ({ ...prev, ...profileUpdate }));
+          }
         }
       };
     } catch {}
 
     return () => {
       if (channel) channel.close();
+      if (sse) sse.close();
     };
-  }, []);
+  }, [currentUser.employeeNumber, currentUser.email, currentUser.fullName]);
 
   // Compression helper for uploaded image
   const compressImageToJpg = (file: File): Promise<string> => {
@@ -526,7 +608,7 @@ export default function EmployeeProfilePage() {
               <div className="px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-medium text-slate-600 flex items-center gap-2">
                 <span className="flex items-center gap-1 text-slate-700 font-bold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Sesi Aktif: {profileData.employeeNumber}
+                  Sesi Aktif: {profileData.employeeNumber || currentUser.employeeNumber || '-'}
                 </span>
                 <span className="text-slate-300">|</span>
                 <span className="text-blue-700 font-semibold">Terverifikasi Dukcapil &amp; HR Ops</span>
@@ -549,20 +631,20 @@ export default function EmployeeProfilePage() {
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
                 {/* Avatar with Online Dot & Upload Camera Overlay */}
                 <div className="relative group flex-shrink-0">
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-blue-900 border-2 border-white/40 shadow-lg">
-                    {profileData.avatarUrl || currentUser.avatarUrl ? (
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-blue-900 border-2 border-white/40 shadow-lg relative flex items-center justify-center">
+                    {(profileData.avatarUrl || currentUser.avatarUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={profileData.avatarUrl || currentUser.avatarUrl}
-                        alt={profileData.fullName}
+                        alt={profileData.fullName || currentUser.fullName || 'Foto Profil'}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.currentTarget as HTMLElement).style.display = 'none';
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-800 text-white font-extrabold text-2xl sm:text-3xl">
-                        {profileData.fullName ? profileData.fullName.slice(0, 2).toUpperCase() : 'RP'}
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 text-white font-extrabold text-2xl sm:text-3xl shadow-inner">
+                        {currentUser.initials || (profileData.fullName || currentUser.fullName || 'FT').slice(0, 2).toUpperCase()}
                       </div>
                     )}
                   </div>
@@ -598,40 +680,40 @@ export default function EmployeeProfilePage() {
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                     <input
                       type="text"
-                      value={profileData.fullName}
+                      value={profileData.fullName || currentUser.fullName || ''}
                       onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
                       className="text-xl sm:text-2xl font-black tracking-tight text-white bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none transition-colors"
                       title="Klik untuk mengubah nama tampilan Anda"
                     />
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold flex items-center gap-1 shadow-2xs">
                       <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
-                      {profileData.employmentType}
+                      {profileData.employmentType || 'Karyawan Tetap (PKWTT)'}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-center sm:justify-start">
                     <span className="px-2 py-0.5 rounded-md bg-blue-900/60 border border-blue-400/30 text-[11px] font-bold text-blue-200">
-                      NIP: {profileData.employeeNumber}
+                      NIP: {profileData.employeeNumber || currentUser.employeeNumber || '-'}
                     </span>
                   </div>
 
                   <p className="text-sm font-medium text-blue-100">
-                    {profileData.designation} / {profileData.division}
+                    {profileData.designation || currentUser.designation || 'Specialist'} / {profileData.division || (currentUser as any).division || 'Human Resource Department'}
                   </p>
 
                   {/* Meta Pills Line */}
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-1 text-xs text-blue-200/90 font-medium">
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-blue-300" />
-                      Masa Kerja: <strong className="text-white font-bold">{profileData.tenure}</strong>
+                      Masa Kerja: <strong className="text-white font-bold">{profileData.tenure || 'Baru Bergabung'}</strong>
                     </span>
                     <span className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-blue-300" />
-                      {profileData.workLocation}
+                      {profileData.workLocation || 'Head Office Jakarta'}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-blue-300" />
-                      Atasan: <strong className="text-white font-bold">{profileData.manager}</strong>
+                      Atasan: <strong className="text-white font-bold">{profileData.manager || 'HR Operations Lead'}</strong>
                     </span>
                   </div>
                 </div>

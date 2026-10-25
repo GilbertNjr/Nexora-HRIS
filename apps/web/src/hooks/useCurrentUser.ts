@@ -19,18 +19,18 @@ export interface CurrentUser {
 }
 
 const DEFAULT_USER: CurrentUser = {
-  id: 'usr-emp-default',
-  fullName: 'Rian Pratama, S.Kom',
-  firstName: 'Rian',
-  lastName: 'Pratama',
-  employeeNumber: 'NX-2021008',
-  email: 'rian.pratama@nexora.co.id',
+  id: '',
+  fullName: '',
+  firstName: '',
+  lastName: '',
+  employeeNumber: '',
+  email: '',
   roles: ['EMPLOYEE'],
   primaryRole: 'EMPLOYEE',
-  department: 'Technology & Engineering',
-  designation: 'Lead Backend Architect',
+  department: '',
+  designation: '',
   avatarUrl: '',
-  initials: 'RP',
+  initials: 'NX',
 };
 
 function getInitials(name: string): string {
@@ -78,14 +78,23 @@ function parseStoredUser(): CurrentUser {
     const base = parsedUser || validEmp;
     if (!base) return DEFAULT_USER;
 
+    const userEmail =
+      (parsedUser && (parsedUser.email || parsedUser.emailCompany)) ||
+      (validEmp && validEmp.email) ||
+      base.email ||
+      '';
+
+    const fallbackName = userEmail ? userEmail.split('@')[0] : 'Karyawan';
+
     const rawFullName =
       (parsedUser && parsedUser.fullName) ||
       (parsedUser && parsedUser.name) ||
       (validEmp && validEmp.fullName) ||
       (validEmp && validEmp.name) ||
-      DEFAULT_USER.fullName;
+      base.fullName ||
+      fallbackName;
 
-    const cleanRaw = rawFullName.trim();
+    const cleanRaw = (rawFullName || '').trim();
     const fullName = cleanRaw
       ? cleanRaw
           .split(/\s+/)
@@ -104,20 +113,18 @@ function parseStoredUser(): CurrentUser {
     const employeeNumber =
       (parsedUser && (parsedUser.employeeNumber || parsedUser.nik || parsedUser.employee_number)) ||
       (validEmp && (validEmp.employeeNumber || validEmp.nik)) ||
-      DEFAULT_USER.employeeNumber;
+      base.employeeNumber ||
+      '';
 
-    const email =
-      (parsedUser && (parsedUser.email || parsedUser.emailCompany)) ||
-      (validEmp && validEmp.email) ||
-      DEFAULT_USER.email;
+    const email = userEmail || '';
 
     const roles = Array.isArray(base.roles)
       ? base.roles
       : [base.primaryRole || 'EMPLOYEE'];
 
     const primaryRole = base.primaryRole || roles[0] || 'EMPLOYEE';
-    const department = base.department || (validEmp && validEmp.department) || DEFAULT_USER.department;
-    const designation = base.designation || base.role || (validEmp && validEmp.designation) || DEFAULT_USER.designation;
+    const department = base.department || (validEmp && validEmp.department) || 'Human Resource Department';
+    const designation = base.designation || base.role || (validEmp && validEmp.designation) || 'Specialist';
 
     let avatarUrl =
       typeof (validEmp?.avatarUrl || base.avatarUrl) === 'string'
@@ -132,7 +139,7 @@ function parseStoredUser(): CurrentUser {
     const initials = getInitials(fullName);
 
     return {
-      id: base.id || DEFAULT_USER.id,
+      id: base.id || '',
       fullName,
       firstName,
       lastName,
@@ -144,7 +151,7 @@ function parseStoredUser(): CurrentUser {
       designation,
       avatarUrl,
       initials,
-      phone: validEmp?.phone || parsedUser?.phone,
+      phone: validEmp?.phone || parsedUser?.phone || '+62 812-8899-7766',
     };
   } catch {
     return DEFAULT_USER;
@@ -186,7 +193,9 @@ export function useCurrentUser() {
               if (
                 json.data.employeeNumber &&
                 prev.employeeNumber &&
-                json.data.employeeNumber.toLowerCase() !== prev.employeeNumber.toLowerCase()
+                prev.id &&
+                json.data.employeeNumber.toLowerCase() !== prev.employeeNumber.toLowerCase() &&
+                json.data.email?.toLowerCase() !== prev.email?.toLowerCase()
               ) {
                 return prev;
               }

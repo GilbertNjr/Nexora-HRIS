@@ -199,7 +199,7 @@ export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
   // 1. Primary: Neon Serverless PostgreSQL
   if (DATABASE_URL) {
     try {
-      const sql = neon(DATABASE_URL);
+      const sql = neon(DATABASE_URL, { fetchOptions: { cache: 'no-store' } });
       const rows = await sql.query(
         `SELECT e.id, e.employee_number, e.first_name, e.last_name, e.phone, e.avatar_url, 
                 e.employment_type, e.employment_status, e.join_date, e.created_at,
@@ -276,7 +276,7 @@ export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
         return DEFAULT_EMPLOYEES;
       }
     } catch (err: any) {
-      console.warn('[DB] Neon getEmployees error, falling back to local storage:', err?.message);
+      console.warn('[DB] Neon getEmployees error, falling back to local storage:', err?.message, err);
     }
   }
 
@@ -364,7 +364,7 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
   // 1. Save to Neon PostgreSQL
   if (DATABASE_URL) {
     try {
-      const sql = neon(DATABASE_URL);
+      const sql = neon(DATABASE_URL, { fetchOptions: { cache: 'no-store' } });
 
       // Check matching department or fallback
       let deptRes = await sql.query('SELECT id, company_id FROM departments WHERE name ILIKE $1 LIMIT 1', [
@@ -399,6 +399,13 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
             );
             if (userRes && userRes[0]?.id) {
               userId = userRes[0].id;
+              // Ensure role EMPLOYEE is assigned so user can log in seamlessly
+              await sql.query(
+                `INSERT INTO user_roles (user_id, role_id, created_at)
+                 VALUES ($1, '51c405bb-8a5f-48cc-9c2a-651063c3c9c9', NOW())
+                 ON CONFLICT DO NOTHING`,
+                [userId]
+              );
             }
           } catch {}
         }
@@ -504,7 +511,7 @@ export async function updateEmployeeInDb(
   // Update in Neon PostgreSQL
   if (DATABASE_URL) {
     try {
-      const sql = neon(DATABASE_URL);
+      const sql = neon(DATABASE_URL, { fetchOptions: { cache: 'no-store' } });
       const empNum = existing[index].employeeNumber;
       const fn = updatedRecord.firstName;
       const ln = updatedRecord.lastName;
@@ -542,7 +549,7 @@ export async function deleteEmployeeFromDb(idOrNik: string, hardDelete = false):
 
   if (DATABASE_URL) {
     try {
-      const sql = neon(DATABASE_URL);
+      const sql = neon(DATABASE_URL, { fetchOptions: { cache: 'no-store' } });
       if (hardDelete) {
         await sql.query('DELETE FROM employees WHERE id::text = $1 OR employee_number = $1', [idOrNik]);
       } else {
