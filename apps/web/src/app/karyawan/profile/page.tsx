@@ -733,59 +733,80 @@ export default function EmployeeProfilePage() {
             </div>
           </div>
 
-          {/* 4. Tab Bar (With Horizontal Scrollbar & No Clipping) */}
-          <div className="bg-white border-b border-slate-200/90 rounded-2xl px-2 shadow-2xs overflow-x-auto scrollbar-none flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('biodata')}
-              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                activeTab === 'biodata'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <IdCard className="w-4 h-4" />
-              <span>Biodata &amp; Informasi Personal</span>
-            </button>
+          {/* 4. Tab Bar (With Top Save Button Placed Beside Tabs) */}
+          <div className="bg-white border-b border-slate-200/90 rounded-2xl px-3 sm:px-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Tabs List */}
+            <div className="overflow-x-auto scrollbar-none flex items-center gap-2 flex-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('biodata')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'biodata'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <IdCard className="w-4 h-4" />
+                <span>Biodata &amp; Informasi Personal</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('kepegawaian')}
-              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                activeTab === 'kepegawaian'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Briefcase className="w-4 h-4" />
-              <span>Kepegawaian &amp; Jenjang Karir</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('kepegawaian')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'kepegawaian'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Briefcase className="w-4 h-4" />
+                <span>Kepegawaian &amp; Jenjang Karir</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('pajak_bank')}
-              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                activeTab === 'pajak_bank'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <CreditCard className="w-4 h-4" />
-              <span>Data Pajak, Bank &amp; BPJS</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('pajak_bank')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'pajak_bank'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Data Pajak, Bank &amp; BPJS</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('keamanan')}
-              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                activeTab === 'keamanan'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Keamanan Akun &amp; Sesi</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('keamanan')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'keamanan'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Keamanan Akun &amp; Sesi</span>
+              </button>
+            </div>
+
+            {/* Simpan Perubahan Button - Placed at Top Beside Tabs */}
+            <div className="flex-shrink-0 py-2 sm:py-0 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={handleMasterSave}
+                disabled={isSaving}
+                className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+                title="Simpan seluruh perubahan profil dan biodata ke database"
+              >
+                {isSaving ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                ) : (
+                  <Save className="w-4 h-4 text-white" />
+                )}
+                <span className="whitespace-nowrap">{isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+              </button>
+            </div>
           </div>
 
           {/* 5. TAB 1 CONTENT: BIODATA & INFORMASI PERSONAL */}
@@ -1252,36 +1273,6 @@ export default function EmployeeProfilePage() {
             </div>
           )}
 
-          {/* 6. SATU-SATUNYA TOMBOL SIMPAN DI BAGIAN BAWAH UNTUK MENGATUR SEMUA LOGIC (Sesuai Permintaan User) */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-                <Save className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-900">
-                  Simpan Seluruh Perubahan Form &amp; Profil
-                </h4>
-                <p className="text-[11px] text-slate-500">
-                  Cukup satu tombol ini untuk menyimpan foto, biodata, dan kontak ke database cloud secara otomatis.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleMasterSave}
-              disabled={isSaving}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
-            >
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-              ) : (
-                <Save className="w-4 h-4 text-white" />
-              )}
-              <span>{isSaving ? 'Menyimpan ke Database...' : 'Simpan Perubahan'}</span>
-            </button>
-          </div>
         </main>
       </div>
 
