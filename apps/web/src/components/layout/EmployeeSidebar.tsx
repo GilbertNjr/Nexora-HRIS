@@ -20,6 +20,7 @@ import {
   Megaphone,
 } from 'lucide-react';
 import { EmployeeAnnouncementBroadcastListener } from '@/components/notifications/EmployeeAnnouncementBroadcastListener';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export type EmployeeActiveMenu =
   | 'dashboard'
@@ -52,6 +53,7 @@ export function EmployeeSidebar({
   onShowToast,
   subtitle,
 }: EmployeeSidebarProps) {
+  const { user: currentUser } = useCurrentUser();
   const [companyLogo, setCompanyLogo] = useState<string>('/company-logo-saved.jpg');
   const [companyName, setCompanyName] = useState<string>('Nexora Group & HR Solutions');
 
@@ -253,7 +255,7 @@ export function EmployeeSidebar({
         {isCollapsed && (
           <div
             className="hidden md:flex w-10 h-8 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 items-center justify-center mx-auto"
-            title="Sesi Aktif: NX-2021008 (Karyawan Terverifikasi)"
+            title={`Sesi Aktif: ${currentUser.employeeNumber || 'Karyawan'} (${currentUser.fullName || 'Terverifikasi'})`}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
           </div>
@@ -262,7 +264,7 @@ export function EmployeeSidebar({
           isCollapsed ? 'flex md:hidden' : 'flex'
         }`}>
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
-          <span className="truncate">Sesi Aktif: NX-2021008</span>
+          <span className="truncate">Sesi Aktif: {currentUser.employeeNumber || 'Karyawan'}</span>
         </div>
 
         {/* Quick Access: Pengumuman HRD Live */}

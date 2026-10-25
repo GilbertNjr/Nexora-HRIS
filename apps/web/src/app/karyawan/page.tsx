@@ -348,53 +348,56 @@ export default function EmployeeDashboardOverhaulPage() {
   const fetchRealtimeDashboardData = React.useCallback(async () => {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
-    const userEmpNum = currentUser.employeeNumber || 'NX-2021008';
+    const userEmpNum = currentUser.employeeNumber || '';
+    const userFullName = (currentUser.fullName || '').toLowerCase().trim();
 
     // 1. Fetch real-time attendance
     try {
-      const attRes = await fetch(`/api/v1/attendance?employeeId=${encodeURIComponent(userEmpNum)}`);
-      if (attRes.ok) {
-        const attJson = await attRes.json();
-        const records = attJson.data?.records || [];
-        const todayRec = records.find(
-          (r: any) =>
-            r.date === todayStr &&
-            ((r.employeeId && r.employeeId.toLowerCase() === userEmpNum.toLowerCase()) ||
-              (r.employeeName && r.employeeName.toLowerCase().includes('rian')))
-        );
-
-        if (todayRec) {
-          const isWfh = todayRec.status === 'WFH';
-          setTodayAttendance({
-            hasClockedIn: true,
-            checkInTime: todayRec.checkInTime || todayRec.time || '08:00 WIB',
-            checkOutTime: todayRec.checkOutTime || '—',
-            status: todayRec.status || 'TEPAT_WAKTU',
-            location: todayRec.location || (isWfh ? 'Rumah / Remote Workspace' : 'SCBD Treasury Tower Lt. 32 (HQ Jakarta)'),
-            device: todayRec.device || '((•)) Biometrik Liveness Selfie',
-          });
-
-          // Dynamically sync today's card in weeklySchedule
-          setWeeklySchedule((prev) =>
-            prev.map((item) =>
-              item.isToday
-                ? {
-                    ...item,
-                    type: isWfh ? 'WFH' : 'WFO',
-                    location: isWfh ? 'WFH (Tervalidasi)' : 'WFO (SCBD)',
-                  }
-                : item
-            )
+      if (userEmpNum) {
+        const attRes = await fetch(`/api/v1/attendance?employeeId=${encodeURIComponent(userEmpNum)}`);
+        if (attRes.ok) {
+          const attJson = await attRes.json();
+          const records = attJson.data?.records || [];
+          const todayRec = records.find(
+            (r: any) =>
+              r.date === todayStr &&
+              ((r.employeeId && r.employeeId.toLowerCase() === userEmpNum.toLowerCase()) ||
+                (userFullName && r.employeeName && r.employeeName.toLowerCase().includes(userFullName)))
           );
-        } else {
-          setTodayAttendance({
-            hasClockedIn: false,
-            checkInTime: '—',
-            checkOutTime: '—',
-            status: 'BELUM_PRESENSI',
-            location: 'Kantor SCBD Lt. 7',
-            device: '((•)) Liveness Selfie Camera',
-          });
+
+          if (todayRec) {
+            const isWfh = todayRec.status === 'WFH';
+            setTodayAttendance({
+              hasClockedIn: true,
+              checkInTime: todayRec.checkInTime || todayRec.time || '08:00 WIB',
+              checkOutTime: todayRec.checkOutTime || '—',
+              status: todayRec.status || 'TEPAT_WAKTU',
+              location: todayRec.location || (isWfh ? 'Rumah / Remote Workspace' : 'SCBD Treasury Tower Lt. 32 (HQ Jakarta)'),
+              device: todayRec.device || '((•)) Biometrik Liveness Selfie',
+            });
+
+            // Dynamically sync today's card in weeklySchedule
+            setWeeklySchedule((prev) =>
+              prev.map((item) =>
+                item.isToday
+                  ? {
+                      ...item,
+                      type: isWfh ? 'WFH' : 'WFO',
+                      location: isWfh ? 'WFH (Tervalidasi)' : 'WFO (SCBD)',
+                    }
+                  : item
+              )
+            );
+          } else {
+            setTodayAttendance({
+              hasClockedIn: false,
+              checkInTime: '—',
+              checkOutTime: '—',
+              status: 'BELUM_PRESENSI',
+              location: 'Kantor SCBD Lt. 7',
+              device: '((•)) Liveness Selfie Camera',
+            });
+          }
         }
       }
     } catch {}
@@ -408,8 +411,8 @@ export default function EmployeeDashboardOverhaulPage() {
         const myApproved = approvals.filter(
           (a: any) =>
             a.status === 'APPROVED' &&
-            ((a.nik && a.nik.toLowerCase() === userEmpNum.toLowerCase()) ||
-              (a.name && a.name.toLowerCase().includes('rian')))
+            ((userEmpNum && a.nik && a.nik.toLowerCase() === userEmpNum.toLowerCase()) ||
+              (userFullName && a.name && a.name.toLowerCase().includes(userFullName)))
         );
         const used = myApproved.reduce(
           (sum: number, item: any) => sum + (Number(item.durationDays) || 1),
@@ -428,27 +431,29 @@ export default function EmployeeDashboardOverhaulPage() {
 
     // 3. Fetch real-time performance KPI from database
     try {
-      const perfRes = await fetch(`/api/v1/performance?nik=${encodeURIComponent(userEmpNum)}`);
-      if (perfRes.ok) {
-        const perfJson = await perfRes.json();
-        const quarter = Math.floor(now.getMonth() / 3) + 1;
-        if (perfJson.success && perfJson.data) {
-          const p = perfJson.data;
-          const scoreNum = Number(p.score) || 0;
-          const isEvaluated = scoreNum > 0 && p.status !== 'MENUNGGU SUBMISI';
-          setPerformanceKpi({
-            cycleCode: p.cycle || `Q${quarter} ${now.getFullYear()}`,
-            quarterName: `Q${quarter}`,
-            score: isEvaluated ? scoreNum.toFixed(2) : '—',
-            grade: isEvaluated ? (p.grade || 'Grade B (Meets)') : 'Belum Dinilai',
-            yoyChange: isEvaluated ? '+0.15 YoY' : '—',
-            okrAchievement: isEvaluated ? (p.okrAchievement || '100%') : '0%',
-            status: p.status || 'MENUNGGU SUBMISI',
-          });
+      if (userEmpNum) {
+        const perfRes = await fetch(`/api/v1/performance?nik=${encodeURIComponent(userEmpNum)}`);
+        if (perfRes.ok) {
+          const perfJson = await perfRes.json();
+          const quarter = Math.floor(now.getMonth() / 3) + 1;
+          if (perfJson.success && perfJson.data) {
+            const p = perfJson.data;
+            const scoreNum = Number(p.score) || 0;
+            const isEvaluated = scoreNum > 0 && p.status !== 'MENUNGGU SUBMISI';
+            setPerformanceKpi({
+              cycleCode: p.cycle || `Q${quarter} ${now.getFullYear()}`,
+              quarterName: `Q${quarter}`,
+              score: isEvaluated ? scoreNum.toFixed(2) : '—',
+              grade: isEvaluated ? (p.grade || 'Grade B (Meets)') : 'Belum Dinilai',
+              yoyChange: isEvaluated ? '+0.15 YoY' : '—',
+              okrAchievement: isEvaluated ? (p.okrAchievement || '100%') : '0%',
+              status: p.status || 'MENUNGGU SUBMISI',
+            });
+          }
         }
       }
     } catch {}
-  }, [currentUser.employeeNumber]);
+  }, [currentUser.employeeNumber, currentUser.fullName]);
 
   useEffect(() => {
     const now = new Date();
@@ -903,7 +908,11 @@ export default function EmployeeDashboardOverhaulPage() {
 
               {/* Title with Emoji */}
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                {liveGreeting}, {currentUser.firstName || currentUser.fullName.split(' ')[0]}! 👋
+                {liveGreeting},{' '}
+                {(() => {
+                  const raw = (currentUser.firstName || currentUser.fullName?.split(' ')[0] || 'Karyawan').trim();
+                  return raw.charAt(0).toUpperCase() + raw.slice(1);
+                })()}! 👋
               </h1>
 
               {/* Subtitle details matching screenshot */}

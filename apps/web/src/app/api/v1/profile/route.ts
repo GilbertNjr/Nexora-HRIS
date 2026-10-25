@@ -98,33 +98,36 @@ export async function GET(request: NextRequest) {
 
   // Employee Profile: check master employee database first for 100% data consistency!
   try {
-    const targetIdOrNik = empNoParam || 'NX-2021008';
+    const targetIdOrNik = (empNoParam || '').trim();
     const allEmps = await getEmployeesFromDb();
     const matched = allEmps.find(
       (e) =>
-        e.employeeNumber?.toLowerCase() === targetIdOrNik.toLowerCase() ||
-        (emailParam && e.email?.toLowerCase() === emailParam.toLowerCase())
+        (targetIdOrNik && e.employeeNumber && e.employeeNumber.toLowerCase().trim() === targetIdOrNik.toLowerCase()) ||
+        (targetIdOrNik && e.id && e.id.toLowerCase().trim() === targetIdOrNik.toLowerCase()) ||
+        (emailParam && e.email && e.email.toLowerCase().trim() === emailParam.toLowerCase()) ||
+        (emailParam && e.fullName && e.fullName.toLowerCase().trim() === emailParam.toLowerCase())
     );
 
-    const empData = getStoredProfile(EMPLOYEE_PROFILE_FILE, defaultEmployeeProfile);
     if (matched) {
       const merged: UserProfile = {
-        fullName: matched.fullName || defaultEmployeeProfile.fullName,
-        employeeNumber: matched.employeeNumber || defaultEmployeeProfile.employeeNumber,
-        email: matched.email || defaultEmployeeProfile.email,
-        phone: matched.phone || defaultEmployeeProfile.phone,
-        department: matched.department || defaultEmployeeProfile.department,
-        designation: matched.designation || defaultEmployeeProfile.designation,
-        manager: matched.managerName || defaultEmployeeProfile.manager,
-        location: matched.office || defaultEmployeeProfile.location,
-        joinDate: matched.joinDate || defaultEmployeeProfile.joinDate,
-        avatarUrl: matched.avatarUrl || empData.avatarUrl || '',
+        fullName: matched.fullName || 'Karyawan',
+        employeeNumber: matched.employeeNumber,
+        email: matched.email || (emailParam || `${matched.employeeNumber.toLowerCase()}@nexora.co.id`),
+        phone: matched.phone || '+62 812-8899-7766',
+        department: matched.department || 'Technology & Core Engineering',
+        designation: matched.designation || 'Specialist',
+        manager: matched.managerName || 'HR Operations Lead',
+        location: matched.office || 'HQ Pacific Tower SCBD',
+        joinDate: matched.joinDate || '2026-10-24',
+        avatarUrl: matched.avatarUrl || '',
         updatedAt: matched.updatedAt || new Date().toISOString(),
         role: 'EMPLOYEE',
       };
       return NextResponse.json({ success: true, data: merged, hasData: true }, { status: 200 });
     }
-  } catch {}
+  } catch (err) {
+    console.error('[Profile API GET error]:', err);
+  }
 
   // Fallback to local stored employee profile
   const empData = getStoredProfile(EMPLOYEE_PROFILE_FILE, defaultEmployeeProfile);

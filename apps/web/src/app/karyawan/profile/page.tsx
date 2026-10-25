@@ -137,33 +137,50 @@ export default function EmployeeProfilePage() {
 
   // Load from local storage and API on mount
   useEffect(() => {
-    // 1. Load from employee-specific cache
+    // 1. Load from employee-specific cache if matching current user
     try {
       const cached = localStorage.getItem('nexora_employee_profile');
       if (cached) {
         const parsed = JSON.parse(cached);
-        setProfileData((prev) => ({
-          ...prev,
-          ...parsed,
-          fullName: parsed.fullName || prev.fullName,
-          phone: parsed.phone || prev.phone,
-          avatarUrl: parsed.avatarUrl || prev.avatarUrl,
-        }));
+        const isMatch =
+          !currentUser.employeeNumber ||
+          !parsed.employeeNumber ||
+          parsed.employeeNumber.toLowerCase().trim() === currentUser.employeeNumber.toLowerCase().trim();
+        if (isMatch) {
+          setProfileData((prev) => ({
+            ...prev,
+            ...parsed,
+            fullName: parsed.fullName || prev.fullName,
+            preferredName: parsed.preferredName || parsed.fullName?.split(' ')[0] || prev.preferredName,
+            phone: parsed.phone || prev.phone,
+            avatarUrl: parsed.avatarUrl || prev.avatarUrl,
+          }));
+        }
       }
     } catch {}
 
-    // 2. Fetch live from backend API with role=employee
+    // 2. Fetch live from backend API dynamically for the active employee
     const fetchLiveProfile = async () => {
       try {
-        const res = await fetch('/api/v1/profile?role=employee&employeeNumber=NX-2021008');
+        const userEmpNum = currentUser.employeeNumber || '';
+        const userEmail = currentUser.email || '';
+        if (!userEmpNum && !userEmail) return;
+
+        const query = userEmpNum
+          ? `employeeNumber=${encodeURIComponent(userEmpNum)}`
+          : `email=${encodeURIComponent(userEmail)}`;
+
+        const res = await fetch(`/api/v1/profile?role=employee&${query}`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
             setProfileData((prev) => {
+              const cleanName = json.data.fullName || prev.fullName;
               const merged = {
                 ...prev,
                 ...json.data,
-                fullName: json.data.fullName || prev.fullName,
+                fullName: cleanName,
+                preferredName: cleanName.split(' ')[0] || prev.preferredName,
                 phone: json.data.phone || prev.phone,
                 avatarUrl: json.data.avatarUrl || prev.avatarUrl,
               };

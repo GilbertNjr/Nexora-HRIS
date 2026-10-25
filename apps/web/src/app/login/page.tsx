@@ -103,6 +103,11 @@ export default function UnifiedLoginPage() {
           }
 
           localStorage.setItem('nexora_user', JSON.stringify(safeUser));
+          localStorage.setItem('nexora_employee_profile', JSON.stringify(safeUser));
+
+          try {
+            localStorage.removeItem('nexora_latest_selfie_attendance');
+          } catch {}
 
           if (user.roles?.includes('EMPLOYEE')) {
             localStorage.setItem('nexora_active_portal', 'karyawan');

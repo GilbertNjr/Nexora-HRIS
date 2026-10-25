@@ -51,29 +51,77 @@ function parseStoredUser(): CurrentUser {
     const parsedUser = rawUser ? JSON.parse(rawUser) : null;
     const parsedEmp = rawEmp ? JSON.parse(rawEmp) : null;
 
-    // Merge employee profile updates over default user
-    const merged = {
-      ...DEFAULT_USER,
-      ...(parsedUser || {}),
-      ...(parsedEmp || {}),
-    };
+    // Check if parsedEmp belongs to the same user as parsedUser
+    let validEmp: any = null;
+    if (parsedEmp && parsedUser) {
+      const sameNik =
+        parsedEmp.employeeNumber &&
+        parsedUser.employeeNumber &&
+        parsedEmp.employeeNumber.toLowerCase().trim() === parsedUser.employeeNumber.toLowerCase().trim();
+      const sameEmail =
+        parsedEmp.email &&
+        parsedUser.email &&
+        parsedEmp.email.toLowerCase().trim() === parsedUser.email.toLowerCase().trim();
+      if (sameNik || sameEmail) {
+        validEmp = parsedEmp;
+      } else {
+        // Discard stale employee profile cached from a previous session/account
+        try {
+          localStorage.removeItem('nexora_employee_profile');
+        } catch {}
+      }
+    } else if (parsedEmp && !parsedUser) {
+      validEmp = parsedEmp;
+    }
 
-    const fullName = merged.fullName || merged.name || DEFAULT_USER.fullName;
-    const nameParts = fullName.split(' ');
-    const firstName = merged.firstName || nameParts[0] || 'Karyawan';
-    const lastName = merged.lastName || nameParts.slice(1).join(' ') || '';
+    // Determine the active user base
+    const base = parsedUser || validEmp;
+    if (!base) return DEFAULT_USER;
+
+    const rawFullName =
+      (parsedUser && parsedUser.fullName) ||
+      (parsedUser && parsedUser.name) ||
+      (validEmp && validEmp.fullName) ||
+      (validEmp && validEmp.name) ||
+      DEFAULT_USER.fullName;
+
+    const cleanRaw = rawFullName.trim();
+    const fullName = cleanRaw
+      ? cleanRaw
+          .split(/\s+/)
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+      : 'Karyawan';
+
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
+    const firstName =
+      (parsedUser && parsedUser.firstName && (parsedUser.firstName.charAt(0).toUpperCase() + parsedUser.firstName.slice(1))) ||
+      (nameParts.length > 0 ? nameParts[0] : 'Karyawan');
+    const lastName =
+      (parsedUser && parsedUser.lastName) ||
+      (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
+
     const employeeNumber =
-      merged.employeeNumber || merged.nik || merged.employee_number || DEFAULT_USER.employeeNumber;
-    const email = merged.email || merged.emailCompany || DEFAULT_USER.email;
-    const roles = Array.isArray(merged.roles) ? merged.roles : [merged.primaryRole || 'EMPLOYEE'];
-    const primaryRole = merged.primaryRole || roles[0] || 'EMPLOYEE';
-    const department = merged.department || DEFAULT_USER.department;
-    const designation = merged.designation || merged.role || DEFAULT_USER.designation;
+      (parsedUser && (parsedUser.employeeNumber || parsedUser.nik || parsedUser.employee_number)) ||
+      (validEmp && (validEmp.employeeNumber || validEmp.nik)) ||
+      DEFAULT_USER.employeeNumber;
+
+    const email =
+      (parsedUser && (parsedUser.email || parsedUser.emailCompany)) ||
+      (validEmp && validEmp.email) ||
+      DEFAULT_USER.email;
+
+    const roles = Array.isArray(base.roles)
+      ? base.roles
+      : [base.primaryRole || 'EMPLOYEE'];
+
+    const primaryRole = base.primaryRole || roles[0] || 'EMPLOYEE';
+    const department = base.department || (validEmp && validEmp.department) || DEFAULT_USER.department;
+    const designation = base.designation || base.role || (validEmp && validEmp.designation) || DEFAULT_USER.designation;
+
     let avatarUrl =
-      typeof merged.avatarUrl === 'string'
-        ? merged.avatarUrl
-        : typeof merged.avatar_url === 'string'
-        ? merged.avatar_url
+      typeof (validEmp?.avatarUrl || base.avatarUrl) === 'string'
+        ? (validEmp?.avatarUrl || base.avatarUrl)
         : '';
 
     // Ignore corrupted test strings
@@ -84,7 +132,7 @@ function parseStoredUser(): CurrentUser {
     const initials = getInitials(fullName);
 
     return {
-      id: merged.id || DEFAULT_USER.id,
+      id: base.id || DEFAULT_USER.id,
       fullName,
       firstName,
       lastName,
@@ -96,6 +144,7 @@ function parseStoredUser(): CurrentUser {
       designation,
       avatarUrl,
       initials,
+      phone: validEmp?.phone || parsedUser?.phone,
     };
   } catch {
     return DEFAULT_USER;
@@ -115,15 +164,33 @@ export function useCurrentUser() {
   useEffect(() => {
     refreshUser();
 
-    // 1. Fetch live profile from database on mount to guarantee persistence across deploys / devices
+    // 1. Fetch live profile from database on mount for the CURRENT logged-in employee
     let isMounted = true;
     const fetchLiveUser = async () => {
       try {
-        const res = await fetch('/api/v1/profile?role=employee&employeeNumber=NX-2021008');
+        const currentStored = parseStoredUser();
+        const empNum = currentStored.employeeNumber || '';
+        const empEmail = currentStored.email || '';
+        if (!empNum && !empEmail) return;
+
+        const query = empNum
+          ? `employeeNumber=${encodeURIComponent(empNum)}`
+          : `email=${encodeURIComponent(empEmail)}`;
+
+        const res = await fetch(`/api/v1/profile?role=employee&${query}`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data && isMounted) {
             setUser((prev) => {
+              // Ensure we only update if the returned profile belongs to the currently active user
+              if (
+                json.data.employeeNumber &&
+                prev.employeeNumber &&
+                json.data.employeeNumber.toLowerCase() !== prev.employeeNumber.toLowerCase()
+              ) {
+                return prev;
+              }
+
               const liveAvatar = json.data.avatarUrl;
               const hasValidLiveAvatar =
                 typeof liveAvatar === 'string' &&
@@ -132,17 +199,38 @@ export function useCurrentUser() {
 
               const nextAvatar = hasValidLiveAvatar ? liveAvatar : prev.avatarUrl;
 
+              const rawLive = (json.data.fullName || prev.fullName || '').trim();
+              const cleanName = rawLive
+                ? rawLive
+                    .split(/\s+/)
+                    .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(' ')
+                : prev.fullName;
+              const nameParts = cleanName.split(/\s+/).filter(Boolean);
+              const nextFirstName =
+                json.data.firstName
+                  ? json.data.firstName.charAt(0).toUpperCase() + json.data.firstName.slice(1)
+                  : nameParts.length > 0
+                  ? nameParts[0]
+                  : prev.firstName;
+              const nextLastName =
+                json.data.lastName ||
+                (nameParts.length > 1 ? nameParts.slice(1).join(' ') : prev.lastName);
+
               const updated: CurrentUser = {
                 ...prev,
-                fullName: json.data.fullName || prev.fullName,
+                fullName: cleanName || prev.fullName,
+                firstName: nextFirstName,
+                lastName: nextLastName,
+                employeeNumber: json.data.employeeNumber || prev.employeeNumber,
                 department: json.data.department || prev.department,
                 designation: json.data.designation || prev.designation,
                 email: json.data.email || prev.email,
                 phone: json.data.phone || (prev as any).phone,
                 avatarUrl: nextAvatar,
               };
-              if (json.data.fullName) {
-                updated.initials = getInitials(json.data.fullName);
+              if (cleanName) {
+                updated.initials = getInitials(cleanName);
               }
               try {
                 localStorage.setItem('nexora_user', JSON.stringify(updated));
