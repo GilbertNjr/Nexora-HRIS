@@ -86,177 +86,8 @@ export default function AdminPayrollPage() {
   const [periodData, setPeriodData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Employee Payroll Records (Rich & Accurate Mock Data)
-  const [records, setRecords] = useState<PayrollEmployeeRecord[]>([
-    {
-      id: 'rec-1',
-      initials: 'RP',
-      avatarBg: 'bg-blue-100 text-blue-700',
-      employeeNumber: 'NX-2021008',
-      employeeName: 'Rian Pratama, S.Kom',
-      department: 'Technology & Engineering',
-      designation: 'Lead Backend Architect',
-      bankName: 'BCA',
-      bankAccountNumber: '8820491823',
-      baseSalary: 28500000,
-      allowanceTitle: 'Tunjangan Posisi & Komunikasi',
-      allowances: 4250000,
-      overtimeHours: 0,
-      overtimePay: 0,
-      unpaidLeaveDays: 0,
-      unpaidLeaveDeduction: 0,
-      grossSalary: 32750000,
-      ptkpCategory: 'TER_A',
-      pph21Rate: '12.00%',
-      pph21Amount: 1950000,
-      bpjsTkEmp: 855000,
-      bpjsKesEmp: 315000,
-      otherDeductions: 0,
-      totalDeductions: 3120000,
-      takeHomePay: 29630000,
-      verificationStatus: 'VERIFIED',
-    },
-    {
-      id: 'rec-2',
-      initials: 'DL',
-      avatarBg: 'bg-purple-100 text-purple-700',
-      employeeNumber: 'NX-2020012',
-      employeeName: 'Dewi Lestari, S.Psi',
-      department: 'Human Resources',
-      designation: 'HR Operations Manager',
-      bankName: 'Bank Mandiri',
-      bankAccountNumber: '12200984128',
-      baseSalary: 24000000,
-      allowanceTitle: 'Tunjangan Operasional & Kinerja',
-      allowances: 3500000,
-      overtimeHours: 0,
-      overtimePay: 0,
-      unpaidLeaveDays: 0,
-      unpaidLeaveDeduction: 0,
-      grossSalary: 27500000,
-      ptkpCategory: 'TER_B',
-      pph21Rate: '9.50%',
-      pph21Amount: 1520000,
-      bpjsTkEmp: 720000,
-      bpjsKesEmp: 240000,
-      otherDeductions: 0,
-      totalDeductions: 2480000,
-      takeHomePay: 25020000,
-      verificationStatus: 'VERIFIED',
-    },
-    {
-      id: 'rec-3',
-      initials: 'BS',
-      avatarBg: 'bg-emerald-100 text-emerald-700',
-      employeeNumber: 'NX-2019045',
-      employeeName: 'Bambang Sutedjo',
-      department: 'Logistics & Supply Chain',
-      designation: 'Warehouse Logistics Lead',
-      bankName: 'BCA',
-      bankAccountNumber: '7310029411',
-      baseSalary: 8500000,
-      allowanceTitle: 'Lembur 14 Jam (+Rp 1.15M)',
-      allowances: 700000,
-      overtimeHours: 14,
-      overtimePay: 1150000,
-      unpaidLeaveDays: 0,
-      unpaidLeaveDeduction: 0,
-      grossSalary: 10350000,
-      ptkpCategory: 'TER_A',
-      pph21Rate: '2.50%',
-      pph21Amount: 175000,
-      bpjsTkEmp: 295000,
-      bpjsKesEmp: 115000,
-      otherDeductions: 0,
-      totalDeductions: 585000,
-      takeHomePay: 9765000,
-      verificationStatus: 'REVIEW_LEMBUR',
-    },
-    {
-      id: 'rec-4',
-      initials: 'SR',
-      avatarBg: 'bg-amber-100 text-amber-700',
-      employeeNumber: 'NX-2022019',
-      employeeName: 'Siti Rahmawati, S.E.',
-      department: 'Finance & Accounting',
-      designation: 'Senior Financial Analyst',
-      bankName: 'BCA',
-      bankAccountNumber: '6041189201',
-      baseSalary: 15000000,
-      allowanceTitle: 'Tunjangan Transport & Makan',
-      allowances: 2000000,
-      overtimeHours: 0,
-      overtimePay: 0,
-      unpaidLeaveDays: 0,
-      unpaidLeaveDeduction: 0,
-      grossSalary: 17000000,
-      ptkpCategory: 'TER_A',
-      pph21Rate: '7.00%',
-      pph21Amount: 820000,
-      bpjsTkEmp: 450000,
-      bpjsKesEmp: 150000,
-      otherDeductions: 0,
-      totalDeductions: 1420000,
-      takeHomePay: 15580000,
-      verificationStatus: 'VERIFIED',
-    },
-    {
-      id: 'rec-5',
-      initials: 'FA',
-      avatarBg: 'bg-sky-100 text-sky-700',
-      employeeNumber: 'NX-2023004',
-      employeeName: 'Farhan Al-Ghifari',
-      department: 'Technology & Engineering',
-      designation: 'DevOps & Cloud Engineer',
-      bankName: 'Bank Mandiri',
-      bankAccountNumber: '13700192841',
-      baseSalary: 19500000,
-      allowanceTitle: 'On-Call Standby & Sertifikasi',
-      allowances: 2500000,
-      overtimeHours: 0,
-      overtimePay: 0,
-      unpaidLeaveDays: 0,
-      unpaidLeaveDeduction: 0,
-      grossSalary: 22000000,
-      ptkpCategory: 'TER_A',
-      pph21Rate: '9.00%',
-      pph21Amount: 1200000,
-      bpjsTkEmp: 585000,
-      bpjsKesEmp: 195000,
-      otherDeductions: 0,
-      totalDeductions: 1980000,
-      takeHomePay: 20020000,
-      verificationStatus: 'VERIFIED',
-    },
-    {
-      id: 'rec-6',
-      initials: 'AN',
-      avatarBg: 'bg-rose-100 text-rose-700',
-      employeeNumber: 'NX-2023078',
-      employeeName: 'Annisa Nurul Aini',
-      department: 'Product & Design',
-      designation: 'UI/UX Product Designer',
-      bankName: 'BNI',
-      bankAccountNumber: '0892147820',
-      baseSalary: 12000000,
-      allowanceTitle: 'Tunjangan Work-From-Anywhere',
-      allowances: 1200000,
-      overtimeHours: 0,
-      overtimePay: 0,
-      unpaidLeaveDays: 2,
-      unpaidLeaveDeduction: 450000,
-      grossSalary: 13200000,
-      ptkpCategory: 'TER_A',
-      pph21Rate: '4.50%',
-      pph21Amount: 540000,
-      bpjsTkEmp: 360000,
-      bpjsKesEmp: 120000,
-      otherDeductions: 330000,
-      totalDeductions: 1350000,
-      takeHomePay: 11850000,
-      verificationStatus: 'UNPAID_LEAVE',
-    },
-  ]);
+  // Employee Payroll Records (Fetched live from database)
+  const [records, setRecords] = useState<PayrollEmployeeRecord[]>([]);
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -603,7 +434,7 @@ export default function AdminPayrollPage() {
             <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
               {periodData
                 ? `${periodData.lockedAttendanceCount} dari ${periodData.totalEmployees} data presensi terkunci rapi`
-                : '1.236 dari 1.248 data presensi terkunci rapi'}
+                : `${records.length} data presensi terkunci rapi`}
             </div>
           </div>
 
@@ -894,7 +725,7 @@ export default function AdminPayrollPage() {
                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                Semua Karyawan (1.248)
+                Semua Karyawan ({periodData?.totalEmployees ?? records.length})
               </button>
 
               <button
@@ -1061,7 +892,7 @@ export default function AdminPayrollPage() {
               <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
                 <span>
                   Menampilkan <strong className="text-slate-800">{filteredRecords.length}</strong> dari{' '}
-                  <strong className="text-slate-800">1.248</strong> karyawan
+                  <strong className="text-slate-800">{periodData?.totalEmployees ?? records.length}</strong> karyawan
                 </span>
                 <div className="flex items-center gap-1">
                   <button className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50">
@@ -1265,7 +1096,7 @@ export default function AdminPayrollPage() {
 
               <div className="p-6 space-y-5">
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Sistem akan mengompilasi data absensi, jam lembur, potongan unpaid leave, formula PPh 21 TER PP 58/2023, serta iuran BPJS untuk seluruh <strong>1.248 karyawan</strong>.
+                  Sistem akan mengompilasi data absensi, jam lembur, potongan unpaid leave, formula PPh 21 TER PP 58/2023, serta iuran BPJS untuk seluruh <strong>{periodData?.totalEmployees ?? records.length} karyawan</strong>.
                 </p>
 
                 {isProcessingPayroll ? (
@@ -1288,11 +1119,11 @@ export default function AdminPayrollPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Target Distribusi</span>
-                      <span className="font-bold text-slate-900">1.248 Karyawan Aktif</span>
+                      <span className="font-bold text-slate-900">{periodData?.totalEmployees ?? records.length} Karyawan Aktif</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Estimasi Total Bruto</span>
-                      <span className="font-bold text-blue-600">Rp 3.842.650.000</span>
+                      <span className="font-bold text-blue-600">{formatRupiah(periodData?.totalGross || 0)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Kepatuhan Pajak</span>
