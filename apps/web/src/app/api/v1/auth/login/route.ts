@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry, recordAuditLog } from '@/lib/auditDb';
 import { neon } from '@neondatabase/serverless';
+import { getEmployeesFromDb } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -31,19 +32,20 @@ export async function POST(request: NextRequest) {
       identifier.startsWith('admin') ||
       identifier === 'nx-admin-001';
 
-    let userRole: 'SUPER_ADMIN' | 'HR_ADMIN' | 'EMPLOYEE' = isAdminAccount ? 'SUPER_ADMIN' : 'EMPLOYEE';
+    let userRole: 'SUPER_ADMIN' | 'HR_ADMIN' | 'EMPLOYEE' = isAdminAccount ? 'HR_ADMIN' : 'EMPLOYEE';
     let redirectUrl = isAdminAccount ? '/admin' : '/karyawan';
-    let fullName = isAdminAccount ? 'HR Administrator (Dewi Lestari)' : 'Rian Pratama, S.Kom';
-    let employeeNumber = isAdminAccount ? 'NX-ADMIN-001' : 'NX-2021008';
+    let fullName = isAdminAccount ? 'HR Administrator (Dewi Lestari)' : '';
+    let employeeNumber = isAdminAccount ? 'NX-ADMIN-001' : '';
     let userEmail = identifier.includes('@') ? identifier : `${identifier}@nexora.co.id`;
-
-    let userId = isAdminAccount ? 'usr-admin-unified' : 'usr-emp-unified';
-    let department = isAdminAccount ? 'Human Capital & People Operations' : 'Technology & Engineering';
-    let designation = isAdminAccount ? 'HR Administrator' : 'Lead Backend Architect';
+    let userId = isAdminAccount ? 'usr-admin-unified' : '';
+    let department = isAdminAccount ? 'Human Resource Operations' : '';
+    let designation = isAdminAccount ? 'HR Operations Lead' : '';
     let avatarUrl = isAdminAccount ? '' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
 
+    let isMatched = isAdminAccount;
+
     // Try verifying from Neon DB if available
-    if (DATABASE_URL) {
+    if (!isAdminAccount && DATABASE_URL) {
       try {
         const sql = neon(DATABASE_URL);
         const rows = await sql.query(
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
 
         if (Array.isArray(rows) && rows.length > 0) {
           const row = rows[0] as any;
+          isMatched = true;
           if (row.id) userId = row.id;
           userEmail = row.email || userEmail;
           if (row.first_name || row.last_name) {
@@ -95,6 +98,50 @@ export async function POST(request: NextRequest) {
       } catch (dbErr) {
         console.warn('[Auth] Database check skipped, using fallback validation:', dbErr);
       }
+    }
+
+    // Try matching against getEmployeesFromDb() (Neon PostgreSQL & local fallback storage)
+    if (!isMatched) {
+      try {
+        const allEmployees = await getEmployeesFromDb();
+        const matched = allEmployees.find(
+          (e) =>
+            (e.email && e.email.toLowerCase().trim() === identifier) ||
+            (e.employeeNumber && e.employeeNumber.toLowerCase().trim() === identifier) ||
+            (e.id && e.id.toLowerCase().trim() === identifier)
+        );
+
+        if (matched) {
+          isMatched = true;
+          userId = matched.id;
+          userEmail = matched.email || `${matched.employeeNumber.toLowerCase()}@nexora.co.id`;
+          fullName = matched.fullName;
+          employeeNumber = matched.employeeNumber;
+          department = matched.department;
+          designation = matched.designation;
+          avatarUrl =
+            matched.avatarUrl ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
+          userRole = 'EMPLOYEE';
+          redirectUrl = '/karyawan';
+        }
+      } catch (empErr) {
+        console.warn('[Auth] getEmployeesFromDb error:', empErr);
+      }
+    }
+
+    // If identifier is not found in database or admin whitelist
+    if (!isMatched) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'ACCOUNT_NOT_FOUND',
+            message: `Akun '${identifier}' belum terdaftar. Pastikan Email Perusahaan atau ID Karyawan (NIP) Anda telah didaftarkan resmi oleh HR Operations.`,
+          },
+        },
+        { status: 401 }
+      );
     }
 
     const userData = {

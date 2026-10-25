@@ -157,7 +157,8 @@ export default function EmployeesPage() {
         if (
           msg.type === 'PROFILE_UPDATED' ||
           msg.type === 'EMPLOYEE_UPDATED' ||
-          msg.type === 'EMPLOYEES_UPDATED'
+          msg.type === 'EMPLOYEES_UPDATED' ||
+          msg.type === 'EMPLOYEE_CREATED'
         ) {
           const empData = msg.employee || msg.profile || msg.data;
           if (empData && empData.employeeNumber) {

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import { PartnerBankSelect } from '@/components/common/PartnerBankSelect';
 import {
@@ -118,13 +119,91 @@ export default function AdminQuickEntryPage() {
     }
   };
 
-  // Handle Final Submit
-  const handleKirimDanAktifkan = (e: React.FormEvent) => {
+  // Router for navigation
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Handle Final Submit to Real Backend API
+  const handleKirimDanAktifkan = async (e: React.FormEvent) => {
     e.preventDefault();
-    showToast(
-      `Akun ${formData.fullName} (${formData.employeeId}) berhasil didaftarkan dan diaktifkan di portal!`,
-      'success'
-    );
+    if (!formData.fullName || !formData.emailCorporate) {
+      showToast('Nama Lengkap dan Email Korporat wajib diisi.', 'info');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const nameParts = formData.fullName.trim().split(' ');
+      const firstName = nameParts[0] || 'Karyawan';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const payload = {
+        firstName,
+        lastName,
+        fullName: formData.fullName.trim(),
+        email: formData.emailCorporate.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        department: formData.department,
+        designation: formData.role,
+        division: formData.directorate || 'Divisi Rekayasa & Arsitektur Cloud',
+        employmentType: formData.contractType === 'PKWTT' ? 'PERMANENT' : 'CONTRACT_PKWT',
+        employeeNumber: formData.employeeId.trim(),
+        joinDate: formData.startDate || new Date().toISOString().split('T')[0],
+        nik: formData.nik.trim(),
+        npwp: formData.npwp.trim(),
+        birthPlaceDate: `${formData.birthPlace}, ${formData.birthDate}`,
+        genderBlood: `${formData.gender} / O (+)`,
+        taxStatus: formData.ptkp,
+        bankName: formData.bankName,
+        accountNumber: formData.bankAccount,
+        accountHolder: formData.fullName.trim(),
+        basicSalary: Number(formData.baseSalary) || 20000000,
+        transportAllowance: Number(formData.allowance) || 3000000,
+        mealAllowance: 1500000,
+        bpjsTk: formData.bpjsTk,
+        bpjsKes: formData.bpjsKes,
+        avatarUrl: photoPreview || formData.avatarUrl,
+        office: formData.workLocation,
+      };
+
+      const res = await fetch('/api/v1/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json();
+
+      if (!res.ok || !resData.success) {
+        throw new Error(resData?.error?.message || 'Gagal menyimpan data karyawan baru.');
+      }
+
+      // Broadcast on BroadcastChannel so Kelola Data Karyawan (Gambar 2) and other tabs refresh immediately
+      try {
+        const ch = new BroadcastChannel('nexora_live_sync');
+        ch.postMessage({
+          type: 'EMPLOYEE_CREATED',
+          employee: resData.data,
+          time: Date.now(),
+        });
+        ch.close();
+      } catch {}
+
+      showToast(
+        `✓ Akun ${formData.fullName} (${formData.employeeId}) berhasil didaftarkan ke Database & Aktif di Portal! Mengalihkan ke direktori...`,
+        'success'
+      );
+
+      // Smooth redirect to Kelola Data Karyawan (Gambar 2) so user can see it in the master table
+      setTimeout(() => {
+        router.push('/admin/employees');
+      }, 1500);
+    } catch (err: any) {
+      showToast(err.message || 'Terjadi kesalahan saat mendaftarkan karyawan.', 'info');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Handle Save Draft
@@ -201,11 +280,21 @@ export default function AdminQuickEntryPage() {
             {/* Kirim & Aktifkan Akun */}
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleKirimDanAktifkan}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95"
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95 disabled:opacity-70 cursor-pointer"
             >
-              <UserCheck className="w-4 h-4 text-white" />
-              <span>Kirim &amp; Aktifkan Akun</span>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-white animate-spin" />
+                  <span>Mendaftarkan ke Database...</span>
+                </>
+              ) : (
+                <>
+                  <UserCheck className="w-4 h-4 text-white" />
+                  <span>Kirim &amp; Aktifkan Akun</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -997,11 +1086,21 @@ export default function AdminQuickEntryPage() {
 
                   <button
                     type="button"
+                    disabled={isSubmitting}
                     onClick={handleKirimDanAktifkan}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold shadow-xs"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-semibold shadow-xs disabled:opacity-70 cursor-pointer"
                   >
-                    <UserCheck className="w-4 h-4" />
-                    <span>Simpan &amp; Aktifkan Akun Sekarang</span>
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Mendaftarkan ke Database...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="w-4 h-4" />
+                        <span>Simpan &amp; Aktifkan Akun Sekarang</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

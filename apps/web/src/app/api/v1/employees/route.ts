@@ -147,6 +147,8 @@ export async function POST(request: NextRequest) {
     }
 
     const saved = await saveEmployeeToDb({
+      employeeNumber: body.employeeNumber?.trim() || undefined,
+      avatarUrl: body.avatarUrl || null,
       firstName: body.firstName.trim(),
       lastName: (body.lastName || '').trim(),
       fullName: `${body.firstName.trim()} ${(body.lastName || '').trim()}`.trim(),
