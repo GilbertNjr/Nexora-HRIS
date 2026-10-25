@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     const isAdminAccount =
       identifier === 'admin@nexora.local' ||
       identifier === 'admin@nexora.co.id' ||
+      identifier === 'dewi.lestari@nexora.co.id' ||
       identifier.startsWith('admin') ||
       identifier === 'nx-admin-001';
 
@@ -144,6 +145,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Ensure avatarUrl never exceeds browser localStorage quota limits
+    let safeAvatar = avatarUrl;
+    if (safeAvatar && (safeAvatar.startsWith('data:') || safeAvatar.length > 25000)) {
+      safeAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
+    }
+
     const userData = {
       id: userId,
       email: userEmail,
@@ -151,7 +158,7 @@ export async function POST(request: NextRequest) {
       employeeNumber,
       department,
       designation,
-      avatarUrl,
+      avatarUrl: safeAvatar,
       roles: [userRole],
       primaryRole: userRole,
     };

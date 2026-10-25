@@ -30,6 +30,8 @@ import {
   RefreshCw,
   Loader2,
   Download,
+  Sparkles,
+  Copy,
 } from 'lucide-react';
 
 export interface EmployeeItem {
@@ -564,9 +566,23 @@ export default function EmployeesPage() {
                       key={emp.id}
                       className="hover:bg-slate-50/80 transition-colors group"
                     >
-                      {/* NIK */}
-                      <td className="py-4 px-6 font-mono text-slate-600 font-medium">
-                        {emp.employeeNumber}
+                      {/* NIK Otomatis */}
+                      <td className="py-4 px-6 font-mono">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/90 border border-slate-200 text-slate-800 text-xs font-bold shadow-2xs">
+                          <span>{emp.employeeNumber}</span>
+                          <button
+                            type="button"
+                            title="Salin NIK Karyawan"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(emp.employeeNumber);
+                              showToast(`✓ NIK ${emp.employeeNumber} disalin ke clipboard`);
+                            }}
+                            className="text-slate-400 hover:text-blue-600 transition-colors p-0.5 cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
                       </td>
 
                       {/* Nama Karyawan dengan Foto Profil Real-Time */}
@@ -1004,6 +1020,21 @@ export default function EmployeesPage() {
             </div>
 
             <form onSubmit={handleAddEmployee} className="space-y-4 text-xs">
+              {/* NIK Otomatis Preview */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/70 border border-blue-200/80 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
+                    ID / NIK Karyawan (Otomatis Dihasilkan)
+                  </span>
+                  <p className="text-sm font-extrabold font-mono text-slate-900 mt-0.5">
+                    {`NX-${new Date().getFullYear()}-${String(employees.length + 1).padStart(4, '0')}`}
+                  </p>
+                </div>
+                <span className="text-[11px] font-semibold text-blue-700 bg-white border border-blue-200 px-2.5 py-1 rounded-xl shadow-2xs flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  Auto-Generated Sistem
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Nama Depan *</label>

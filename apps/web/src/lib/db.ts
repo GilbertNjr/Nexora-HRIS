@@ -347,7 +347,10 @@ export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<E
     religion: data.religion || 'Islam',
     taxStatus: data.taxStatus || 'Lajang (TK/0)',
     taxDependents: data.taxDependents || 'Tidak Ada',
-    avatarUrl: data.avatarUrl || null,
+    avatarUrl:
+      data.avatarUrl && (data.avatarUrl.startsWith('data:') && data.avatarUrl.length > 25000)
+        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
+        : data.avatarUrl || null,
     bankName: data.bankName || 'BCA',
     accountNumber: data.accountNumber || '',
     accountHolder: data.accountHolder || `${data.firstName || ''} ${data.lastName || ''}`.trim(),

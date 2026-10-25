@@ -76,6 +76,13 @@ export default function EmployeeProfilePage() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isTestingNotification, setIsTestingNotification] = useState(false);
 
+  // Change Password Form State
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [isChangingPwd, setIsChangingPwd] = useState(false);
+  const [pwdError, setPwdError] = useState<string | null>(null);
+
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => {
@@ -1220,52 +1227,144 @@ export default function EmployeeProfilePage() {
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900">Perbarui Kata Sandi Akun ESS</h3>
-              <button
-                type="button"
-                onClick={() => setIsPasswordModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Kata Sandi Saat Ini</label>
-                <input
-                  type="password"
-                  placeholder="••••••••••••"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Perbarui Kata Sandi Akun ESS</h3>
+                  <p className="text-[11px] text-slate-400">Atur sandi baru untuk akun mandiri Anda</p>
+                </div>
               </div>
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Kata Sandi Baru</label>
-                <input
-                  type="password"
-                  placeholder="Minimal 8 karakter (huruf, angka, simbol)"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-            </div>
-            <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsPasswordModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs cursor-pointer"
-              >
-                Batal
-              </button>
               <button
                 type="button"
                 onClick={() => {
                   setIsPasswordModalOpen(false);
-                  showToast('✓ Kata sandi berhasil diperbarui!');
+                  setPwdError(null);
                 }}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-md cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
-                Simpan Kata Sandi
+                ✕
               </button>
             </div>
+
+            {pwdError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{pwdError}</span>
+              </div>
+            )}
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setPwdError(null);
+                if (!newPwd || newPwd.length < 8) {
+                  setPwdError('Kata sandi baru minimal 8 karakter.');
+                  return;
+                }
+                if (newPwd !== confirmPwd) {
+                  setPwdError('Konfirmasi kata sandi baru tidak cocok.');
+                  return;
+                }
+                setIsChangingPwd(true);
+                try {
+                  const res = await fetch('/api/v1/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      identifier:
+                        currentUser?.email || currentUser?.employeeNumber || 'fatih@nexora.co.id',
+                      currentPassword: currentPwd,
+                      newPassword: newPwd,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.success) {
+                    throw new Error(data?.error?.message || 'Gagal mengubah kata sandi');
+                  }
+                  setIsPasswordModalOpen(false);
+                  setCurrentPwd('');
+                  setNewPwd('');
+                  setConfirmPwd('');
+                  showToast('✓ Kata sandi berhasil diperbarui dan tersinkronisasi ke database!');
+                } catch (err: any) {
+                  setPwdError(err.message || 'Terjadi kesalahan saat menyimpan kata sandi.');
+                } finally {
+                  setIsChangingPwd(false);
+                }
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Kata Sandi Saat Ini</label>
+                <input
+                  type="password"
+                  required
+                  value={currentPwd}
+                  onChange={(e) => setCurrentPwd(e.target.value)}
+                  placeholder="Karyawan@Nexora2026! (atau sandi lama)"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Kata Sandi Baru</label>
+                <input
+                  type="password"
+                  required
+                  value={newPwd}
+                  onChange={(e) => setNewPwd(e.target.value)}
+                  placeholder="Minimal 8 karakter (huruf, angka, simbol)"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Konfirmasi Kata Sandi Baru</label>
+                <input
+                  type="password"
+                  required
+                  value={confirmPwd}
+                  onChange={(e) => setConfirmPwd(e.target.value)}
+                  placeholder="Ketik ulang kata sandi baru"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 space-y-1">
+                <span className="font-bold text-slate-700 block">Kebijakan Kata Sandi Nexora:</span>
+                <p>• Minimal 8 karakter kombinasi huruf besar, kecil, angka &amp; simbol.</p>
+                <p>• Setelah berhasil disimpan, gunakan kata sandi baru untuk login portal mandiri.</p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPasswordModalOpen(false);
+                    setPwdError(null);
+                  }}
+                  className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isChangingPwd}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md cursor-pointer flex items-center gap-2 disabled:opacity-60"
+                >
+                  {isChangingPwd ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <span>Simpan Kata Sandi</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
