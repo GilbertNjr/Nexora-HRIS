@@ -223,3 +223,18 @@ export async function deleteAttendanceFromDb(
     return false;
   }
 }
+
+export async function clearAllAttendancesFromDb(): Promise<boolean> {
+  try {
+    const sql = getDb();
+    await sql`TRUNCATE TABLE attendances CASCADE`;
+    try {
+      await sql`TRUNCATE TABLE attendance_corrections CASCADE`;
+    } catch {}
+    return true;
+  } catch (err) {
+    console.error('[attendanceDb] Error clearing all attendances from Neon DB:', err);
+    return false;
+  }
+}
+

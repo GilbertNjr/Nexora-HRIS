@@ -9,6 +9,7 @@ import {
   getAttendancesFromDb,
   saveAttendanceToDb,
   deleteAttendanceFromDb,
+  clearAllAttendancesFromDb,
 } from '@/lib/attendanceDb';
 
 export const dynamic = 'force-dynamic';
@@ -759,6 +760,68 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const isClearAll = searchParams.get('all') === 'true' || searchParams.get('clearAll') === 'true';
+
+    if (isClearAll) {
+      await clearAllAttendancesFromDb();
+      const data = getStoredAttendance();
+      data.records = [];
+      data.presentCount = 0;
+      data.onTimeCount = 0;
+      data.lateCount = 0;
+      data.leaveCount = 0;
+      saveStoredAttendance(data);
+
+      try {
+        const corrFile = path.join(STORAGE_DIR, 'nexora_attendance_corrections.json');
+        if (fs.existsSync(corrFile)) {
+          fs.writeFileSync(corrFile, '[]', 'utf-8');
+        }
+      } catch {}
+
+      try {
+        await recordAuditLog({
+          module: 'ATTENDANCE',
+          action: 'LOGS_CLEARED_PRE_LAUNCH',
+          recordId: 'attendance-all',
+          userName: 'HR Administrator',
+          userEmail: 'admin@nexora.co.id',
+          userNik: 'NX-ADMIN-001',
+          ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+          userAgent: request.headers.get('user-agent') || 'Admin Console',
+          timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+          oldData: { note: 'Purged test attendances for clean system launch' },
+          newData: { totalRecords: 0, status: 'CLEAN' },
+        });
+
+        broadcastEmployeeEvent('ATTENDANCE_CLEARED', {
+          records: [],
+          summary: {
+            totalEmployees: data.totalEmployees,
+            presentCount: 0,
+            onTimeCount: 0,
+            lateCount: 0,
+            leaveCount: 0,
+            absentCount: data.totalEmployees,
+            attendanceRate: 0,
+          },
+        });
+      } catch {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'Seluruh log presensi berhasil dibersihkan (0 baris). Sistem siap untuk peluncuran resmi.',
+        data: {
+          records: [],
+          totalEmployees: data.totalEmployees,
+          presentCount: 0,
+          onTimeCount: 0,
+          lateCount: 0,
+          leaveCount: 0,
+        },
+      });
+    }
+
     const employeeId = searchParams.get('employeeId') || searchParams.get('nik') || 'NX-2021008';
     const employeeName = searchParams.get('employeeName') || searchParams.get('name') || 'Rian Pratama';
     const todayStr = getTodayDateStr();

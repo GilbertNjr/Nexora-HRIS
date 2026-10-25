@@ -36,6 +36,7 @@ import {
   ShieldCheck,
   Camera,
   Edit3,
+  Trash2,
 } from 'lucide-react';
 
 interface AttendanceRecord {
@@ -583,6 +584,38 @@ export default function AdminAttendancePage() {
       ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'REJECTED' });
       ch.close();
     } catch {}
+  };
+
+  const handleClearAllAttendanceLogs = async () => {
+    if (
+      !window.confirm(
+        'Bersihkan seluruh log presensi agar kosong sebelum sistem diluncurkan ke seluruh karyawan?'
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/v1/attendance?all=true', { method: 'DELETE' });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setRecords([]);
+        setSelectedIds([]);
+        setKpiSummary((prev) => ({
+          ...prev,
+          presentCount: 0,
+          onTimeCount: 0,
+          lateCount: 0,
+          leaveCount: 0,
+          absentCount: prev.totalEmployees,
+          attendanceRate: 0,
+        }));
+        showToast('✓ Seluruh log presensi berhasil dibersihkan (0 baris). Sistem siap diluncurkan!');
+      } else {
+        showToast('Gagal membersihkan log presensi.');
+      }
+    } catch {
+      showToast('Terjadi kesalahan saat membersihkan log presensi.');
+    }
   };
 
   const handleApproveCorrection = async (item: AttendanceCorrectionItem) => {
@@ -1156,6 +1189,16 @@ export default function AdminAttendancePage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-slate-400">
+                  {records.length > 0 && (
+                    <button
+                      onClick={handleClearAllAttendanceLogs}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all cursor-pointer mr-1"
+                      title="Bersihkan Semua Log Presensi Sebelum Peluncuran Resmi"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Bersihkan Log</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => showToast('Mengatur konfigurasi kolom tampilan')}
                     className="p-1.5 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
@@ -1201,10 +1244,12 @@ export default function AdminAttendancePage() {
                     {filteredRecords.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-16 text-center">
-                          <Clock className="w-10 h-10 text-slate-300 mx-auto mb-2.5 opacity-80" />
-                          <p className="text-xs font-bold text-slate-700">Belum Ada Presensi Masuk Hari Ini</p>
-                          <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
-                            Log presensi harian akan terisi secara otomatis & real-time saat karyawan melakukan Clock-In mandiri via portal ESS.
+                          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 border border-slate-200">
+                            <Clock className="w-6 h-6 opacity-80" />
+                          </div>
+                          <p className="text-xs font-bold text-slate-800">Log Presensi Bersih &amp; Kosong (0 Baris)</p>
+                          <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
+                            Sistem dalam kondisi siap luncur (Clean State). Log kehadiran harian akan terisi secara otomatis saat karyawan melakukan Clock-In resmi.
                           </p>
                         </td>
                       </tr>
