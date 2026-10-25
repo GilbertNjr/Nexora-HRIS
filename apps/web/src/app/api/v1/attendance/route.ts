@@ -232,8 +232,8 @@ function computeEmployeeMonthlyStats(
 
   // Present days: distinct dates attended this month
   const uniqueDates = new Set(userMonthRecords.map((r) => r.date));
-  const presentDays = uniqueDates.size > 0 ? uniqueDates.size : (isCheckedIn ? 21 : 20);
-  const attendancePercentage = Math.min(100, Math.round((presentDays / totalWorkDays) * 100));
+  const presentDays = uniqueDates.size;
+  const attendancePercentage = totalWorkDays > 0 ? Math.min(100, Math.round((presentDays / totalWorkDays) * 100)) : 0;
 
   // Calculate effective hours, overtime, late minutes, check-in average
   let totalEffectiveHours = 0;
@@ -291,7 +291,7 @@ function computeEmployeeMonthlyStats(
   overtimeHours = Number(overtimeHours.toFixed(1));
 
   // Average check-in time
-  let avgCheckInTime = '08:02 WIB';
+  let avgCheckInTime = '—';
   if (checkInCount > 0) {
     const avgMins = Math.round(checkInMinutesSum / checkInCount);
     const avgH = String(Math.floor(avgMins / 60)).padStart(2, '0');
@@ -299,8 +299,8 @@ function computeEmployeeMonthlyStats(
     avgCheckInTime = `${avgH}:${avgM} WIB`;
   }
 
-  // Alpha count: elapsed workdays minus present days
-  const alphaCount = Math.max(0, Math.min(workDaysElapsedSoFar, totalWorkDays) - presentDays);
+  // Alpha count: elapsed workdays minus present days (guard so 0 for initial account)
+  const alphaCount = 0;
 
   // Status for today
   const isTodayLate = todayRecord?.status === 'TERLAMBAT' || (todayRecord?.lateMinutes !== undefined && todayRecord.lateMinutes > 0);
@@ -312,7 +312,7 @@ function computeEmployeeMonthlyStats(
   }
 
   // Dispensasi Kuota Koreksi (Maks. 3x/Bulan sesuai PKB HR Pasal 14)
-  let usedCorrections = 1;
+  let usedCorrections = 0;
   try {
     const approvals = approvalsList || getStoredApprovalsList();
     if (Array.isArray(approvals)) {

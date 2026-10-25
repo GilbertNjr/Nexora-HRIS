@@ -19,87 +19,8 @@ function formatWibTime(dateInput: Date | string | null | undefined): string {
 }
 
 export async function ensureMonthlyAttendanceDbRecords(targetNik = 'NX-2021008'): Promise<void> {
-  try {
-    const sql = getDb();
-    const emps = await sql`
-      SELECT id, employee_number, first_name, last_name 
-      FROM employees 
-      WHERE employee_number = ${targetNik} OR id::text = ${targetNik}
-      LIMIT 1
-    `;
-    if (emps.length === 0) return;
-    const employeeId = emps[0].id;
-
-    const countRes = await sql`
-      SELECT COUNT(*)::int as cnt 
-      FROM attendances 
-      WHERE employee_id = ${employeeId}
-    `;
-    if (countRes.length > 0 && Number(countRes[0].cnt) >= 15) {
-      return; // Already populated
-    }
-
-    const pastDays = [
-      { date: '2026-10-01', in: '07:50', out: '17:05', overtime: 0, wfh: false },
-      { date: '2026-10-02', in: '07:55', out: '17:10', overtime: 0, wfh: false },
-      { date: '2026-10-05', in: '07:48', out: '17:00', overtime: 0, wfh: true },
-      { date: '2026-10-06', in: '07:52', out: '17:15', overtime: 0, wfh: false },
-      { date: '2026-10-07', in: '08:01', out: '17:30', overtime: 0.5, wfh: false },
-      { date: '2026-10-08', in: '07:58', out: '17:00', overtime: 0, wfh: false },
-      { date: '2026-10-09', in: '07:54', out: '18:00', overtime: 1.0, wfh: false },
-      { date: '2026-10-10', in: '08:05', out: '17:00', overtime: 0, wfh: true },
-      { date: '2026-10-12', in: '07:51', out: '17:08', overtime: 0, wfh: false },
-      { date: '2026-10-13', in: '07:59', out: '17:25', overtime: 0.5, wfh: false },
-      { date: '2026-10-14', in: '07:49', out: '17:00', overtime: 0, wfh: true },
-      { date: '2026-10-15', in: '07:55', out: '18:30', overtime: 1.5, wfh: false },
-      { date: '2026-10-16', in: '08:02', out: '17:10', overtime: 0, wfh: false },
-      { date: '2026-10-17', in: '08:10', out: '17:00', overtime: 0, wfh: true },
-      { date: '2026-10-18', in: '08:12', out: '17:00', overtime: 0, wfh: true },
-      { date: '2026-10-19', in: '07:53', out: '17:05', overtime: 0, wfh: false },
-      { date: '2026-10-20', in: '07:56', out: '17:45', overtime: 0.5, wfh: false },
-      { date: '2026-10-21', in: '07:47', out: '17:00', overtime: 0, wfh: true },
-      { date: '2026-10-22', in: '08:00', out: '18:30', overtime: 1.5, wfh: false },
-      { date: '2026-10-23', in: '07:51', out: '18:00', overtime: 1.0, wfh: false },
-    ];
-
-    for (const item of pastDays) {
-      const clockInIso = `${item.date}T${item.in}:00+07:00`;
-      const clockOutIso = `${item.date}T${item.out}:00+07:00`;
-      const existing = await sql`
-        SELECT id FROM attendances 
-        WHERE employee_id = ${employeeId} AND date = ${item.date}::date
-        LIMIT 1
-      `;
-      if (existing.length === 0) {
-        await sql`
-          INSERT INTO attendances (
-            id, employee_id, date, clock_in_time, clock_out_time, 
-            status, late_minutes, early_minutes, 
-            clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng,
-            notes, created_at, updated_at
-          ) VALUES (
-            ${crypto.randomUUID()},
-            ${employeeId},
-            ${item.date}::date,
-            ${clockInIso}::timestamptz,
-            ${clockOutIso}::timestamptz,
-            'PRESENT'::"AttendanceStatus",
-            0,
-            0,
-            -6.2255,
-            106.8089,
-            -6.2255,
-            106.8089,
-            ${item.wfh ? 'Presensi Remote WFH Tervalidasi' : (item.overtime > 0 ? `Presensi WFO HQ SCBD Lt. 7 (Lembur SPL ${item.overtime} Jam)` : 'Presensi WFO HQ SCBD Lt. 7')},
-            ${clockInIso}::timestamptz,
-            ${clockOutIso}::timestamptz
-          )
-        `;
-      }
-    }
-  } catch (err) {
-    console.warn('[attendanceDb] Error during ensureMonthlyAttendanceDbRecords:', err);
-  }
+  // Pure real-time mode: Initial accounts start empty (0 records) until actual attendance is logged
+  return;
 }
 
 export async function getAttendancesFromDb(): Promise<AttendanceItem[]> {
@@ -132,32 +53,7 @@ export async function getAttendancesFromDb(): Promise<AttendanceItem[]> {
     `;
 
     if (rows.length === 0) {
-      await ensureMonthlyAttendanceDbRecords();
-      rows = await sql`
-        SELECT 
-          a.id,
-          a.employee_id,
-          a.shift_id,
-          TO_CHAR(a.date, 'YYYY-MM-DD') as date_str,
-          a.clock_in_time,
-          a.clock_out_time,
-          a.clock_in_lat,
-          a.clock_in_lng,
-          a.clock_in_photo,
-          a.clock_out_photo,
-          a.status,
-          a.late_minutes,
-          a.notes,
-          e.employee_number,
-          e.first_name,
-          e.last_name,
-          d.name as department_name,
-          e.avatar_url
-        FROM attendances a
-        JOIN employees e ON a.employee_id = e.id
-        LEFT JOIN departments d ON e.department_id = d.id
-        ORDER BY a.date DESC, a.clock_in_time DESC NULLS LAST, a.created_at DESC
-      `;
+      return [];
     }
 
     return rows.map((r: any) => {

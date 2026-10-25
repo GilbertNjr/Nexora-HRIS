@@ -133,18 +133,18 @@ export default function EmployeeAttendancePage() {
   const [hasClockedOut, setHasClockedOut] = useState(false);
   const [clockOutTimeStr, setClockOutTimeStr] = useState('-- : -- : -- WIB');
 
-  // Real-Time Monthly KPI Stats
+  // Real-Time Monthly KPI Stats (Clean initial state for fresh/new accounts)
   const [attendanceStats, setAttendanceStats] = useState<MonthlyAttendanceStats>({
-    presentDays: 20,
+    presentDays: 0,
     totalWorkDays: 21,
-    attendancePercentage: 95,
-    totalEffectiveHours: 161.0,
-    overtimeHours: 8.5,
+    attendancePercentage: 0,
+    totalEffectiveHours: 0.0,
+    overtimeHours: 0.0,
     totalLateMinutes: 0,
     lateCount: 0,
     alphaCount: 0,
-    avgCheckInTime: '08:02 WIB',
-    remainingCorrectionQuota: 2,
+    avgCheckInTime: '—',
+    remainingCorrectionQuota: 3,
     maxCorrectionQuota: 3,
     isCheckedIn: false,
     checkInTimeStr: '-- : -- WIB',
@@ -159,8 +159,8 @@ export default function EmployeeAttendancePage() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState('ALL');
   const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-  // Quota and Corrections
-  const [remainingCorrectionQuota, setRemainingCorrectionQuota] = useState(2);
+  // Quota and Corrections (Default max 3x per month available)
+  const [remainingCorrectionQuota, setRemainingCorrectionQuota] = useState(3);
   const [correctionDate, setCorrectionDate] = useState(new Date().toISOString().split('T')[0]);
   const [correctionType, setCorrectionType] = useState('Lupa Tap-Out');
   const [correctionTargetTime, setCorrectionTargetTime] = useState('16:30');
@@ -228,10 +228,13 @@ export default function EmployeeAttendancePage() {
       const saved = localStorage.getItem('nexora_latest_selfie_attendance');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.photoUrl) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (parsed.date === todayStr && parsed.photoUrl) {
           setTodaySelfiePhoto(parsed.photoUrl);
           if (parsed.time) setCheckInTimeStr(parsed.time);
           if (parsed.isLate !== undefined) setIsTodayLate(parsed.isLate);
+        } else if (parsed.date !== todayStr) {
+          localStorage.removeItem('nexora_latest_selfie_attendance');
         }
       }
     } catch {}
@@ -969,15 +972,20 @@ export default function EmployeeAttendancePage() {
                 </div>
                 <span
                   className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${
-                    attendanceStats.attendancePercentage === 100
+                    attendanceStats.presentDays === 0
+                      ? 'bg-slate-50 text-slate-600 border-slate-200'
+                      : attendanceStats.attendancePercentage === 100
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : attendanceStats.attendancePercentage >= 90
                       ? 'bg-blue-50 text-blue-700 border-blue-200'
                       : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
                 >
-                  {attendanceStats.attendancePercentage}%{' '}
-                  {attendanceStats.attendancePercentage === 100 ? 'Sempurna' : 'Disiplin'}
+                  {attendanceStats.presentDays === 0
+                    ? '0% Tercatat'
+                    : `${attendanceStats.attendancePercentage}% ${
+                        attendanceStats.attendancePercentage === 100 ? 'Sempurna' : 'Disiplin'
+                      }`}
                 </span>
               </div>
 
@@ -998,7 +1006,11 @@ export default function EmployeeAttendancePage() {
               <div className="pt-0.5">
                 <div
                   className={`w-28 h-1 rounded-full ${
-                    attendanceStats.attendancePercentage >= 90 ? 'bg-emerald-500' : 'bg-amber-500'
+                    attendanceStats.presentDays === 0
+                      ? 'bg-slate-200'
+                      : attendanceStats.attendancePercentage >= 90
+                      ? 'bg-emerald-500'
+                      : 'bg-amber-500'
                   }`}
                 />
               </div>
@@ -1712,8 +1724,16 @@ export default function EmployeeAttendancePage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
-                        Tidak ada catatan presensi yang sesuai dengan filter pencarian.
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-1">
+                            <Calendar className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <p className="font-semibold text-slate-700 text-xs">Belum Ada Catatan Presensi Bulan Ini</p>
+                          <p className="text-[11px] text-slate-400 max-w-sm">
+                            Lakukan Presensi Masuk (Selfie Biometrik) di atas untuk mulai mencatat kehadiran dan kalkulasi jam kerja secara real-time.
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   )}
