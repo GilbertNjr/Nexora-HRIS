@@ -40,8 +40,8 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [companyLogo, setCompanyLogo] = useState<string>('');
-  const [companyName, setCompanyName] = useState<string>('Nexora HRIS');
+  const [companyLogo, setCompanyLogo] = useState<string>('/company-logo-saved.jpg');
+  const [companyName, setCompanyName] = useState<string>('Nexora Group & HR Solutions');
   const [userProfile, setUserProfile] = useState<{
     fullName: string;
     designation: string;
@@ -75,6 +75,16 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
           if (json.data.logoUrl) {
             setCompanyLogo(json.data.logoUrl);
             localStorage.setItem('nexora_persistent_company_logo', json.data.logoUrl);
+          } else {
+            // Auto sync local logo to database so all mobile devices & other browsers get it
+            const localLogo = localStorage.getItem('nexora_persistent_company_logo');
+            if (localLogo) {
+              fetch('/api/v1/company', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logoUrl: localLogo }),
+              }).catch(() => {});
+            }
           }
           if (json.data.commercialName) setCompanyName(json.data.commercialName);
         }
@@ -430,10 +440,24 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 flex-shrink-0"
+              className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 flex-shrink-0 cursor-pointer"
             >
               <Menu className="w-5 h-5" />
             </button>
+
+            {/* Mobile Brand Logo Pill (Always visible on mobile topbar) */}
+            <div className="lg:hidden flex items-center gap-2 flex-shrink-0 mr-1.5">
+              <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shadow-2xs border border-slate-200/90 flex-shrink-0">
+                {companyLogo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={companyLogo} alt={companyName} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-[#265AE3] via-[#3B82F6] to-[#8B5CF6] flex items-center justify-center text-white font-bold text-xs">
+                    N
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Global Search Input */}
             <div className="relative w-full">

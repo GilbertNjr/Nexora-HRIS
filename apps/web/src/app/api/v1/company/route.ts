@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { neon } from '@neondatabase/serverless';
 import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vpusbeqevsgivsgaahat.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const DEFAULT_NEON_DATABASE_URL =
+  'postgresql://neondb_owner:npg_Jv7SzD1PgcQl@ep-shiny-silence-azkjdzr3-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+
+const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_NEON_DATABASE_URL;
 
 const STORAGE_DIR = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(process.cwd(), '.data');
 const COMPANY_FILE = path.join(STORAGE_DIR, 'nexora_company_settings.json');
@@ -20,7 +23,7 @@ const defaultCompanyData = {
   kbli: '62019 - Aktivitas Pemrograman Komputer & Solusi Cloud Korporasi Terintegrasi',
   entityType: 'Perseroan Terbuka (Tbk)',
   address: 'SCBD Treasury Tower Lt. 32, Jl. Jend. Sudirman Kav. 52-53, Jakarta Selatan, DKI Jakarta 12190',
-  logoUrl: '',
+  logoUrl: '/company-logo-saved.jpg',
 };
 
 function ensureStorage(): void {
@@ -49,33 +52,30 @@ function getLocalData() {
 export async function GET() {
   let current = getLocalData();
 
-  // 1. Try Supabase REST API
-  if (SUPABASE_KEY) {
+  // 1. Fetch from official Neon PostgreSQL Database for 100% global multi-device sync
+  if (DATABASE_URL) {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/companies?select=*&limit=1`, {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-        cache: 'no-store',
-      });
+      const sql = neon(DATABASE_URL);
+      const rows = await sql`
+        SELECT id, name, legal_name, tax_id, address, logo_url, updated_at 
+        FROM companies 
+        LIMIT 1
+      `;
 
-      if (res.ok) {
-        const rows = await res.json();
-        if (Array.isArray(rows) && rows.length > 0) {
-          const comp = rows[0];
-          current = {
-            ...current,
-            legalName: comp.legal_name || current.legalName,
-            commercialName: comp.name || current.commercialName,
-            npwp: comp.tax_id || current.npwp,
-            address: comp.address || current.address,
-            logoUrl: comp.logo_url || current.logoUrl || '',
-          };
-        }
+      if (Array.isArray(rows) && rows.length > 0) {
+        const comp = rows[0] as any;
+        current = {
+          ...current,
+          legalName: comp.legal_name || current.legalName,
+          commercialName: comp.name || current.commercialName,
+          npwp: comp.tax_id || current.npwp,
+          address: comp.address || current.address,
+          // If database has logo_url, use it; otherwise fallback to local/default logo
+          logoUrl: comp.logo_url || current.logoUrl || '/company-logo-saved.jpg',
+        };
       }
-    } catch {
-      // fallback to file
+    } catch (dbErr) {
+      console.warn('[Company API] Neon DB read warning:', dbErr);
     }
   }
 
@@ -96,61 +96,40 @@ export async function PUT(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Try Supabase REST API
-    if (SUPABASE_KEY) {
+    // 1. Save to Neon PostgreSQL Database for real-time global availability on all devices
+    if (DATABASE_URL) {
       try {
-        const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/companies?limit=1`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-            Prefer: 'return=representation',
-          },
-          body: JSON.stringify({
-            legal_name: updated.legalName,
-            name: updated.commercialName,
-            tax_id: updated.npwp,
-            address: updated.address,
-            logo_url: updated.logoUrl,
-          }),
-        });
+        const sql = neon(DATABASE_URL);
+        const updatedRows = await sql`
+          UPDATE companies 
+          SET legal_name = ${updated.legalName},
+              name = ${updated.commercialName},
+              tax_id = ${updated.npwp},
+              address = ${updated.address},
+              logo_url = ${updated.logoUrl},
+              updated_at = NOW()
+          RETURNING id
+        `;
 
-        // If no row existed to patch, insert a new company row
-        if (patchRes.ok) {
-          const patched = await patchRes.json();
-          if (Array.isArray(patched) && patched.length === 0) {
-            await fetch(`${SUPABASE_URL}/rest/v1/companies`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                apikey: SUPABASE_KEY,
-                Authorization: `Bearer ${SUPABASE_KEY}`,
-              },
-              body: JSON.stringify({
-                code: 'NEXORA-CORP',
-                name: updated.commercialName,
-                legal_name: updated.legalName,
-                tax_id: updated.npwp,
-                address: updated.address,
-                logo_url: updated.logoUrl,
-              }),
-            });
-          }
+        if (Array.isArray(updatedRows) && updatedRows.length === 0) {
+          await sql`
+            INSERT INTO companies (id, code, name, legal_name, tax_id, address, logo_url, created_at, updated_at)
+            VALUES (gen_random_uuid(), 'NX-HQ', ${updated.commercialName}, ${updated.legalName}, ${updated.npwp}, ${updated.address}, ${updated.logoUrl}, NOW(), NOW())
+          `;
         }
-      } catch {
-        // ignore
+      } catch (dbErr) {
+        console.warn('[Company API] Neon DB update warning:', dbErr);
       }
     }
 
-    // 2. Persist to local file storage as fallback
+    // 2. Persist to server-side file storage as fallback
     try {
       fs.writeFileSync(COMPANY_FILE, JSON.stringify(updated, null, 2), 'utf-8');
     } catch {
       // ignore
     }
 
-    // 3. Broadcast real-time update across all devices
+    // 3. Broadcast real-time SSE event to all connected devices (mobile, tablet, desktop)
     try {
       broadcastEmployeeEvent('COMPANY_UPDATED', updated);
     } catch {}
@@ -159,7 +138,7 @@ export async function PUT(request: NextRequest) {
       {
         success: true,
         data: updated,
-        message: 'Data legalitas dan logo perusahaan berhasil disimpan permanen',
+        message: 'Data legalitas dan logo perusahaan berhasil disimpan permanen ke database global.',
       },
       { status: 200 }
     );

@@ -52,7 +52,7 @@ export function EmployeeSidebar({
   onShowToast,
   subtitle,
 }: EmployeeSidebarProps) {
-  const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [companyLogo, setCompanyLogo] = useState<string>('/company-logo-saved.jpg');
   const [companyName, setCompanyName] = useState<string>('Nexora Group & HR Solutions');
 
   useEffect(() => {
@@ -80,6 +80,16 @@ export function EmployeeSidebar({
             try {
               localStorage.setItem('nexora_persistent_company_logo', json.data.logoUrl);
             } catch {}
+          } else {
+            // Auto sync: if database doesn't have logo yet but this device has it, upload it!
+            const localLogo = localStorage.getItem('nexora_persistent_company_logo');
+            if (localLogo) {
+              fetch('/api/v1/company', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logoUrl: localLogo }),
+              }).catch(() => {});
+            }
           }
           if (json.data.commercialName) setCompanyName(json.data.commercialName);
         }

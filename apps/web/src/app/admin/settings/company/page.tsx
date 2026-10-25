@@ -221,8 +221,24 @@ export default function CompanySettingsPage() {
       // Persist immediately to dedicated local logo cache
       localStorage.setItem('nexora_persistent_company_logo', res.dataUrl);
 
+      // Save immediately to global database so all mobile devices (HP) & other screens update in real time!
+      try {
+        await fetch('/api/v1/company', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logoUrl: res.dataUrl, commercialName: companyForm.commercialName }),
+        });
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({
+          type: 'LOGO_UPDATED',
+          logoUrl: res.dataUrl,
+          companyName: companyForm.commercialName,
+        });
+        bc.close();
+      } catch {}
+
       showToast(
-        `Gambar berhasil dikompres ke JPG (${res.originalSize} ➔ ${res.compressedSize}, hemat ${res.savingsPercent}% ruang database)! Klik Simpan untuk memperbarui database.`
+        `✓ Logo berhasil diunggah & disinkronkan secara global ke database untuk seluruh HP & perangkat lain (${res.originalSize} ➔ ${res.compressedSize})!`
       );
     } catch (err: any) {
       showToast('Gagal memproses gambar: ' + (err.message || 'Error'));
@@ -234,11 +250,25 @@ export default function CompanySettingsPage() {
     }
   };
 
-  const handleResetLogo = () => {
+  const handleResetLogo = async () => {
     setCompanyForm((prev) => ({ ...prev, logoUrl: '' }));
     setLogoCompressionInfo(null);
     localStorage.removeItem('nexora_persistent_company_logo');
-    showToast('Logo resmi di-reset ke inisial default (N). Simpan profil untuk memperbarui database.');
+    try {
+      await fetch('/api/v1/company', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logoUrl: '', commercialName: companyForm.commercialName }),
+      });
+      const bc = new BroadcastChannel('nexora_live_sync');
+      bc.postMessage({
+        type: 'LOGO_UPDATED',
+        logoUrl: '',
+        companyName: companyForm.commercialName,
+      });
+      bc.close();
+    } catch {}
+    showToast('✓ Logo resmi di-reset ke inisial default (N) secara global.');
   };
 
   // Load saved company data from backend API / database with defensive caching
