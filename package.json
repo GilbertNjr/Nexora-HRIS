@@ -32,5 +32,9 @@
     "typescript"
   ],
   "author": "Ahmat Gebyar Gumelar <ahmadgebyar90@gmail.com>",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "overrides": {
+    "picomatch": "^4.0.3",
+    "postcss-selector-parser": "^7.1.6"
+  }
 }
