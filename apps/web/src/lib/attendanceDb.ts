@@ -185,10 +185,10 @@ export async function getAttendancesFromDb(): Promise<AttendanceItem[]> {
         date: r.date_str,
         status,
         location: isWfh 
-          ? 'Remote Residence (WFH Tervalidasi)'
+          ? 'Remote Residence (WFH)'
           : (r.clock_in_lat && r.clock_in_lng 
-              ? `HQ SCBD (${r.clock_in_lat}, ${r.clock_in_lng})`
-              : 'HQ Jakarta — Pacific Century Place SCBD Lt. 7'),
+              ? `HQ SCBD (${parseFloat(r.clock_in_lat).toFixed(8)}, ${parseFloat(r.clock_in_lng).toFixed(8)})`
+              : 'HQ SCBD (-6.22550000, 106.80890000)'),
         coordinates: r.clock_in_lat && r.clock_in_lng ? `${r.clock_in_lat}, ${r.clock_in_lng}` : '-6.2255, 106.8089',
         device: 'Selfie Liveness Camera (NX-Biometric v4.2)',
         photoUrl: r.clock_in_photo || undefined,

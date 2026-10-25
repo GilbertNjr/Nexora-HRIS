@@ -114,6 +114,73 @@ function getTodayDateStr(): string {
   return `${year}-${month}-${day}`;
 }
 
+function calculateAccurateDuration(
+  checkInStr?: string | null,
+  checkOutStr?: string | null,
+  isCurrentlyWorking: boolean = false
+): { durationText: string; effectiveHours: number; overtimeHours: number } {
+  if (!checkInStr || checkInStr === '—' || checkInStr.includes('--')) {
+    return { durationText: '—', effectiveHours: 0, overtimeHours: 0 };
+  }
+
+  const cleanTime = (t: string) => t.replace(' WIB', '').trim();
+  const parseParts = (t: string) => {
+    const parts = cleanTime(t).split(/[:.]/);
+    if (parts.length < 2) return null;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    return isNaN(h) || isNaN(m) ? null : h * 60 + m;
+  };
+
+  const inMins = parseParts(checkInStr);
+  if (inMins === null) return { durationText: '—', effectiveHours: 0, overtimeHours: 0 };
+
+  let outMins: number;
+  if (isCurrentlyWorking) {
+    const now = new Date();
+    outMins = now.getHours() * 60 + now.getMinutes();
+  } else {
+    if (!checkOutStr || checkOutStr === '—' || checkOutStr.includes('Aktif') || checkOutStr.includes('--')) {
+      return { durationText: '—', effectiveHours: 0, overtimeHours: 0 };
+    }
+    const parsedOut = parseParts(checkOutStr);
+    if (parsedOut === null) return { durationText: '—', effectiveHours: 0, overtimeHours: 0 };
+    outMins = parsedOut;
+  }
+
+  let totalMins = outMins - inMins;
+  if (totalMins < 0) totalMins = 0;
+
+  // Indonesian HR rule: Deduct 1-hour lunch break (60 mins) if span is >= 5 hours (300 mins)
+  let effectiveMins = totalMins;
+  if (totalMins >= 300) {
+    effectiveMins = totalMins - 60;
+  }
+
+  const decHours = Number((effectiveMins / 60).toFixed(1));
+
+  // Overtime if shift ends at 17:00 and check-out is after 17:30
+  let overtimeHours = 0;
+  if (!isCurrentlyWorking && outMins > (17 * 60 + 30)) {
+    const otMins = outMins - (17 * 60);
+    overtimeHours = Number((Math.floor(otMins / 30) * 0.5).toFixed(1));
+  }
+
+  if (isCurrentlyWorking) {
+    return {
+      durationText: `${decHours} Jam (Berjalan)`,
+      effectiveHours: decHours,
+      overtimeHours
+    };
+  }
+
+  return {
+    durationText: `${decHours} Jam`,
+    effectiveHours: decHours,
+    overtimeHours
+  };
+}
+
 function computeEmployeeMonthlyStats(
   employeeId: string,
   employeeName: string,
@@ -199,38 +266,20 @@ function computeEmployeeMonthlyStats(
       }
     }
 
-    let dayEffective = 7.5;
-    let dayOt = 0;
+    const isCurrentlyWorking = isToday && isCheckedIn && !hasClockedOut;
+    const durInfo = calculateAccurateDuration(
+      rec.checkInTime,
+      rec.checkOutTime,
+      isCurrentlyWorking
+    );
 
-    if (isToday) {
-      if (hasClockedOut) {
-        dayEffective = 7.5;
-      } else if (isCheckedIn) {
-        dayEffective = 7.5;
-      } else {
-        dayEffective = 0;
-      }
-    } else {
-      if (rec.notes && rec.notes.includes('Lembur')) {
-        const match = rec.notes.match(/Lembur\s+(?:SPL\s+)?([0-9.]+)\s*Jam/i);
-        if (match && match[1]) {
-          dayOt = parseFloat(match[1]);
-        } else {
-          dayOt = 1.0;
-        }
-      } else if (rec.checkOutTime && rec.checkOutTime !== '—') {
-        const cleanOut = rec.checkOutTime.replace(' WIB', '').trim();
-        const outParts = cleanOut.split(/[:.]/);
-        if (outParts.length >= 2) {
-          const outH = parseInt(outParts[0], 10);
-          const outM = parseInt(outParts[1], 10);
-          if (!isNaN(outH) && outH >= 17) {
-            const extraMin = (outH - 17) * 60 + (outM || 0);
-            if (extraMin >= 30) {
-              dayOt = Number((Math.floor(extraMin / 30) * 0.5).toFixed(1));
-            }
-          }
-        }
+    let dayEffective = durInfo.effectiveHours;
+    let dayOt = durInfo.overtimeHours;
+
+    if (rec.notes && rec.notes.includes('Lembur')) {
+      const match = rec.notes.match(/Lembur\s+(?:SPL\s+)?([0-9.]+)\s*Jam/i);
+      if (match && match[1]) {
+        dayOt = parseFloat(match[1]);
       }
     }
 
@@ -238,15 +287,7 @@ function computeEmployeeMonthlyStats(
     overtimeHours += dayOt;
   }
 
-  // Standard past 20 days effective: 152.5 hr standard + 8.5 hr overtime = 161.0 Jam
-  // When checked in today: +7.5 hr standard = 168.5 Jam
-  if (overtimeHours < 8.5 && userMonthRecords.length >= 15) {
-    overtimeHours = 8.5;
-  }
-
-  const baseEffective = userMonthRecords.length >= 20 ? 152.5 : totalEffectiveHours;
-  const todayAdd = isCheckedIn ? 7.5 : 0;
-  totalEffectiveHours = Number((baseEffective + overtimeHours + todayAdd).toFixed(1));
+  totalEffectiveHours = Number(totalEffectiveHours.toFixed(1));
   overtimeHours = Number(overtimeHours.toFixed(1));
 
   // Average check-in time
@@ -300,50 +341,57 @@ function computeEmployeeMonthlyStats(
     .map((r) => {
       const d = new Date(r.date + 'T00:00:00');
       const isToday = r.date === todayStr;
-      const dayName = isToday ? 'Hari Ini' : indonesianDays[d.getDay()];
+      const dayName = indonesianDays[d.getDay()];
       const isWfh = r.workLocation === 'WFH' || (r.notes && r.notes.includes('WFH'));
       const isRecordLate = r.status === 'TERLAMBAT' || (r.lateMinutes !== undefined && r.lateMinutes > 0);
 
       let statusLabel = 'Tepat Waktu';
       if (isRecordLate) {
-        statusLabel = 'Terlambat Masuk';
+        statusLabel = 'Terlambat';
       } else if (isWfh) {
         statusLabel = 'WFH (Tervalidasi)';
       }
 
+      let checkInDisp = r.checkInTime || '—';
       let checkOutDisp = r.checkOutTime || '—';
-      let durationDisp = '7.5 Jam';
+      let isCurrentlyWorking = false;
+
       if (isToday) {
+        checkInDisp = checkInTimeStr;
         if (hasClockedOut) {
           checkOutDisp = clockOutTimeStr;
-          durationDisp = '7.5 Jam';
         } else if (isCheckedIn) {
           checkOutDisp = '— (Aktif Bekerja)';
-          durationDisp = 'Berjalan';
+          isCurrentlyWorking = true;
         } else {
           checkOutDisp = '—';
-          durationDisp = '—';
         }
       }
 
-      let itemOt = 0;
+      const durInfo = calculateAccurateDuration(checkInDisp, checkOutDisp, isCurrentlyWorking);
+
+      let itemOt = durInfo.overtimeHours;
       if (r.notes && r.notes.includes('Lembur')) {
         const match = r.notes.match(/Lembur\s+(?:SPL\s+)?([0-9.]+)\s*Jam/i);
-        itemOt = match && match[1] ? parseFloat(match[1]) : 1.0;
+        if (match && match[1]) {
+          itemOt = parseFloat(match[1]);
+        }
       }
+
+      let locDisp = isWfh ? 'Remote Residence (WFH)' : (r.location || 'HQ SCBD (-6.22550000, 106.80890000)');
 
       return {
         id: r.id || `att-${r.date}`,
         date: r.date,
         dayName,
         shiftName: r.shiftName || 'Reguler HQ (08:00 - 17:00)',
-        checkIn: r.checkInTime || '—',
+        checkIn: checkInDisp,
         checkOut: checkOutDisp,
         status: isRecordLate ? 'TERLAMBAT' : (isWfh ? 'WFH' : 'TEPAT_WAKTU'),
         statusLabel,
-        workLocation: isWfh ? 'Remote Residence (WFH)' : (r.location || 'HQ Pacific SCBD Lt. 7'),
-        duration: durationDisp,
-        effectiveHours: 7.5,
+        workLocation: locDisp,
+        duration: durInfo.durationText,
+        effectiveHours: durInfo.effectiveHours,
         overtimeHours: itemOt,
         lateMinutes: r.lateMinutes || (isRecordLate ? 15 : 0),
         verificationMethod: 'Biometrik Face Scan + GPS',

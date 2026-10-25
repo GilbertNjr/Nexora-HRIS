@@ -237,9 +237,11 @@ export default function EmployeeAttendancePage() {
     } catch {}
   }, [fetchAttendanceData]);
 
-  // Cross-tab real-time listener via BroadcastChannel
+  // Cross-tab and Server-Sent Events (SSE) real-time listener + polling heartbeat
   useEffect(() => {
     let bc: BroadcastChannel | null = null;
+    let eventSource: EventSource | null = null;
+
     try {
       bc = new BroadcastChannel('nexora_live_sync');
       bc.onmessage = (event) => {
@@ -254,23 +256,55 @@ export default function EmployeeAttendancePage() {
       };
     } catch {}
 
+    try {
+      eventSource = new EventSource('/api/v1/employees/stream');
+      eventSource.addEventListener('ATTENDANCE_RECORDED', (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed.payload?.employeeStats?.history) {
+            setAttendanceHistory(parsed.payload.employeeStats.history);
+            setAttendanceStats(parsed.payload.employeeStats);
+          } else {
+            fetchAttendanceData();
+          }
+        } catch {
+          fetchAttendanceData();
+        }
+      });
+    } catch {}
+
+    // 8-second periodic sync heartbeat when tab is active
+    const heartbeatInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchAttendanceData();
+      }
+    }, 8000);
+
     return () => {
       if (bc) bc.close();
+      if (eventSource) eventSource.close();
+      clearInterval(heartbeatInterval);
     };
   }, [fetchAttendanceData]);
 
   // Filtered attendance history for Section 3
   const filteredHistory = useMemo(() => {
     return attendanceHistory.filter((item) => {
+      const q = historySearchQuery.toLowerCase();
       const matchesSearch =
         !historySearchQuery ||
-        item.date.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
-        item.dayName.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
-        item.statusLabel.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
-        item.workLocation.toLowerCase().includes(historySearchQuery.toLowerCase());
+        item.date.toLowerCase().includes(q) ||
+        item.dayName.toLowerCase().includes(q) ||
+        item.statusLabel.toLowerCase().includes(q) ||
+        item.workLocation.toLowerCase().includes(q) ||
+        item.shiftName.toLowerCase().includes(q) ||
+        item.checkIn.toLowerCase().includes(q) ||
+        item.checkOut.toLowerCase().includes(q);
 
       const matchesStatus =
-        historyStatusFilter === 'ALL' || item.status === historyStatusFilter;
+        historyStatusFilter === 'ALL' ||
+        item.status === historyStatusFilter ||
+        (historyStatusFilter === 'WFH' && (item.status === 'WFH' || item.statusLabel.includes('WFH')));
 
       return matchesSearch && matchesStatus;
     });
@@ -1532,9 +1566,15 @@ export default function EmployeeAttendancePage() {
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-900 leading-tight">
-                      Riwayat Presensi Mandiri Bulan Ini
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                        Riwayat Presensi Mandiri Bulan Ini
+                      </h3>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Live DB Sync
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-400">
                       Sinkronisasi otomatis dengan NX-Biometric Server &amp; Database HRIS
                     </p>
@@ -1563,7 +1603,19 @@ export default function EmployeeAttendancePage() {
                   <option value="ALL">Semua Status</option>
                   <option value="TEPAT_WAKTU">Tepat Waktu</option>
                   <option value="TERLAMBAT">Terlambat</option>
+                  <option value="WFH">WFH (Tervalidasi)</option>
                 </select>
+
+                <button
+                  type="button"
+                  onClick={fetchAttendanceData}
+                  disabled={isLoadingStats}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  title="Sinkronisasi Data Real-Time"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isLoadingStats ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Sinkronisasi</span>
+                </button>
 
                 <button
                   type="button"
@@ -1611,7 +1663,7 @@ export default function EmployeeAttendancePage() {
                               </span>
                             </div>
                             {row.isToday && (
-                              <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-[9px] font-bold text-emerald-800">
+                              <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-[9px] font-bold text-emerald-800">
                                 Hari Ini
                               </span>
                             )}
@@ -1622,12 +1674,23 @@ export default function EmployeeAttendancePage() {
                           {row.checkIn}
                         </td>
                         <td className="py-3.5 px-3.5 font-mono text-slate-600">{row.checkOut}</td>
-                        <td className="py-3.5 px-3.5 font-bold text-blue-700">{row.duration}</td>
+                        <td className="py-3.5 px-3.5 font-bold text-blue-700">
+                          {row.isToday && isCheckedIn && !hasClockedOut ? (
+                            <span className="inline-flex items-center gap-1.5 text-blue-700 font-bold bg-blue-50/80 px-2 py-0.5 rounded-md text-xs border border-blue-100">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
+                              {row.duration}
+                            </span>
+                          ) : (
+                            <span>{row.duration}</span>
+                          )}
+                        </td>
                         <td className="py-3.5 px-3.5">
                           <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                               row.status === 'TERLAMBAT'
                                 ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : row.status === 'WFH' || row.statusLabel.includes('WFH')
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                 : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                             }`}
                           >
