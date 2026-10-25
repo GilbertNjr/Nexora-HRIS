@@ -11,6 +11,7 @@ import {
   X,
   Loader2,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function CompanySettingsPage() {
@@ -292,6 +293,34 @@ export default function CompanySettingsPage() {
     }
   };
 
+  const handleClearAllFields = () => {
+    setCompanyForm((prev) => ({
+      ...prev,
+      legalName: '',
+      commercialName: '',
+      nib: '',
+      npwp: '',
+      kbli: '',
+      entityType: '',
+      address: '',
+    }));
+    showToast('✓ Form dikosongkan. Contoh format kini ditampilkan sebagai panduan pengisian.');
+  };
+
+  const handleLoadSampleTemplate = () => {
+    setCompanyForm((prev) => ({
+      ...prev,
+      legalName: 'PT Nexora Teknologi Nusantara Tbk',
+      commercialName: 'Nexora Group & HR Solutions',
+      nib: '0220108920194001',
+      npwp: '01.234.567.8-901.000',
+      kbli: '62019 - Aktivitas Pemrograman Komputer & Solusi Cloud Korporasi Terintegrasi',
+      entityType: 'Perseroan Terbuka (Tbk)',
+      address: 'Nexora Tower Lt. 18, Jl. Jend. Sudirman Kav. 52-53, Jakarta Selatan 12190',
+    }));
+    showToast('✓ Template contoh korporasi berhasil dimuat.');
+  };
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -322,22 +351,42 @@ export default function CompanySettingsPage() {
           </p>
         </div>
 
-        {/* Action Buttons Top Right matching screenshot */}
+        {/* Action Buttons Top Right */}
         <div className="flex flex-wrap items-center gap-2.5 flex-shrink-0">
           <button
             type="button"
+            onClick={handleClearAllFields}
+            title="Kosongkan seluruh isian form agar dapat melihat contoh format placeholder dan mengetik baru"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-700 shadow-xs transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-500" />
+            <span>Kosongkan Form</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleLoadSampleTemplate}
+            title="Muat contoh format legalitas korporasi standar"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            <span>Contoh Template</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowHistoryModal(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all"
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all cursor-pointer"
           >
             <History className="w-3.5 h-3.5 text-slate-500" />
-            <span>Riwayat Perubahan Legalitas</span>
+            <span>Riwayat Perubahan</span>
           </button>
 
           <button
             type="button"
             disabled={isSaving}
             onClick={handleSaveProfile}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95 disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95 disabled:opacity-60 cursor-pointer"
           >
             {isSaving ? (
               <Loader2 className="w-4 h-4 text-white animate-spin" />
@@ -472,88 +521,291 @@ export default function CompanySettingsPage() {
 
         {/* Legal Form Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* 1. Nama Resmi Badan Usaha */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Nama Resmi Badan Usaha (Sesuai Akta AHU)
-            </label>
-            <input
-              type="text"
-              value={companyForm.legalName}
-              onChange={(e) => setCompanyForm({ ...companyForm, legalName: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Nama Resmi Badan Usaha (Sesuai Akta AHU)
+              </label>
+              {companyForm.legalName && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, legalName: '' })}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  title="Hapus isian ini"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={companyForm.legalName}
+                onChange={(e) => setCompanyForm({ ...companyForm, legalName: e.target.value })}
+                placeholder="Contoh: PT Nexora Teknologi Nusantara Tbk"
+                className="w-full px-3.5 py-2.5 pr-8 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+              {companyForm.legalName && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, legalName: '' })}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Contoh: PT [Nama Perusahaan] Tbk atau CV [Nama Usaha]
+            </span>
           </div>
 
+          {/* 2. Nama Komersial / Brand Tagline */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Nama Komersial / Brand Tagline
-            </label>
-            <input
-              type="text"
-              value={companyForm.commercialName}
-              onChange={(e) => setCompanyForm({ ...companyForm, commercialName: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Nama Komersial / Brand Tagline
+              </label>
+              {companyForm.commercialName && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, commercialName: '' })}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  title="Hapus isian ini"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={companyForm.commercialName}
+                onChange={(e) => setCompanyForm({ ...companyForm, commercialName: e.target.value })}
+                placeholder="Contoh: Nexora Group & HR Solutions"
+                className="w-full px-3.5 py-2.5 pr-8 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+              {companyForm.commercialName && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, commercialName: '' })}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Nama merek dagang atau brand yang ditampilkan ke publik
+            </span>
           </div>
 
+          {/* 3. Bentuk Entitas Hukum */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Bentuk Entitas Hukum
-            </label>
-            <input
-              type="text"
-              value={companyForm.entityType}
-              onChange={(e) => setCompanyForm({ ...companyForm, entityType: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Bentuk Entitas Hukum
+              </label>
+              {companyForm.entityType && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, entityType: '' })}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  title="Hapus isian ini"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={companyForm.entityType}
+                onChange={(e) => setCompanyForm({ ...companyForm, entityType: e.target.value })}
+                placeholder="Contoh: Perseroan Terbuka (Tbk)"
+                className="w-full px-3.5 py-2.5 pr-8 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+              {companyForm.entityType && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, entityType: '' })}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Pilihan: PT / Perseroan Terbuka (Tbk) / CV / Firma
+            </span>
           </div>
 
+          {/* 4. Nomor Induk Berusaha (NIB OSS RBA) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Nomor Induk Berusaha (NIB OSS RBA)
-            </label>
-            <input
-              type="text"
-              value={companyForm.nib}
-              onChange={(e) => setCompanyForm({ ...companyForm, nib: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Nomor Induk Berusaha (NIB OSS RBA)
+              </label>
+              {companyForm.nib && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, nib: '' })}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  title="Hapus isian ini"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={companyForm.nib}
+                onChange={(e) => setCompanyForm({ ...companyForm, nib: e.target.value })}
+                placeholder="Contoh: 0220108920194001"
+                className="w-full px-3.5 py-2.5 pr-8 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-900 font-mono placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+              {companyForm.nib && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, nib: '' })}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              13–16 digit NIB resmi dari sistem Online Single Submission (OSS)
+            </span>
           </div>
 
+          {/* 5. Nomor Pokok Wajib Pajak (NPWP 16 Digit) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Nomor Pokok Wajib Pajak (NPWP 16 Digit)
-            </label>
-            <input
-              type="text"
-              value={companyForm.npwp}
-              onChange={(e) => setCompanyForm({ ...companyForm, npwp: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Nomor Pokok Wajib Pajak (NPWP 16 Digit)
+              </label>
+              {companyForm.npwp && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, npwp: '' })}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  title="Hapus isian ini"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={companyForm.npwp}
+                onChange={(e) => setCompanyForm({ ...companyForm, npwp: e.target.value })}
+                placeholder="Contoh: 01.234.567.8-901.000"
+                className="w-full px-3.5 py-2.5 pr-8 text-xs font-bold rounded-xl border border-slate-200 bg-white text-slate-900 font-mono placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+              {companyForm.npwp && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, npwp: '' })}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              16 digit NPWP perseroan resmi (terintegrasi Coretax DJP)
+            </span>
           </div>
 
+          {/* 6. Klasifikasi Baku Lapangan Usaha (KBLI) */}
           <div className="lg:col-span-1">
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Klasifikasi Baku Lapangan Usaha (KBLI)
-            </label>
-            <input
-              type="text"
-              value={companyForm.kbli}
-              onChange={(e) => setCompanyForm({ ...companyForm, kbli: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Klasifikasi Baku Lapangan Usaha (KBLI)
+              </label>
+              {companyForm.kbli && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, kbli: '' })}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  title="Hapus isian ini"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={companyForm.kbli}
+                onChange={(e) => setCompanyForm({ ...companyForm, kbli: e.target.value })}
+                placeholder="Contoh: 62019 - Aktivitas Pemrograman Komputer"
+                className="w-full px-3.5 py-2.5 pr-8 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+              {companyForm.kbli && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, kbli: '' })}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Kode KBLI 5 digit & deskripsi kegiatan usaha resmi
+            </span>
           </div>
 
+          {/* 7. Alamat Kantor Pusat Terdaftar (Legal AHU) */}
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Alamat Kantor Pusat Terdaftar (Legal AHU)
-            </label>
-            <textarea
-              rows={2}
-              value={companyForm.address}
-              onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Alamat Kantor Pusat Terdaftar (Legal AHU)
+              </label>
+              {companyForm.address && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, address: '' })}
+                  className="text-[10px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5 cursor-pointer"
+                  title="Hapus isian ini"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Hapus</span>
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <textarea
+                rows={2}
+                value={companyForm.address}
+                onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
+                placeholder="Contoh: Gedung Treasury Tower Lt. 32, SCBD Kav. 52-53, Jl. Jend. Sudirman, Jakarta Selatan 12190"
+                className="w-full px-3.5 py-2.5 pr-8 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed transition-all"
+              />
+              {companyForm.address && (
+                <button
+                  type="button"
+                  onClick={() => setCompanyForm({ ...companyForm, address: '' })}
+                  className="absolute right-2.5 top-3 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Alamat domisili perseroan yang tercantum pada SK Kemenkumham & NPWP DJP
+            </span>
           </div>
         </div>
       </div>
