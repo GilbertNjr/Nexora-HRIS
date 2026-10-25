@@ -6,6 +6,7 @@ import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import {
   ChevronRight,
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   Clock,
   AlertTriangle,
@@ -37,6 +38,7 @@ import {
   KeyRound,
   Send,
   Flag,
+  RotateCcw,
 } from 'lucide-react';
 
 interface AnomalyItem {
@@ -102,6 +104,10 @@ export default function PayrollExecutionPage() {
   // Toast notification
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
+  // Stepper state (1 to 4)
+  const [currentStep, setCurrentStep] = useState<number>(2);
+  const [viewMode, setViewMode] = useState<'stepper' | 'full'>('stepper');
+
   // Modals state
   const [isAuthorizeModalOpen, setIsAuthorizeModalOpen] = useState(false);
   const [selectedAnomalyForModal, setSelectedAnomalyForModal] = useState<AnomalyItem | null>(null);
@@ -143,6 +149,12 @@ export default function PayrollExecutionPage() {
         const json = await res.json();
         if (json.data) {
           setPayrollData(json.data);
+          if (json.data.status === 'DISBURSED') {
+            setExecutionSuccess(true);
+            setCurrentStep(4);
+          } else if (json.data.currentStep && json.data.currentStep >= 1 && json.data.currentStep <= 4) {
+            setCurrentStep(json.data.currentStep);
+          }
         }
       }
     } catch (err) {
@@ -177,6 +189,70 @@ export default function PayrollExecutionPage() {
       } catch {}
     };
   }, []);
+
+  const isDisbursed = payrollData?.status === 'DISBURSED' || executionSuccess;
+
+  // Advance Stepper and synchronize with server
+  const advanceStep = async (nextStep: number) => {
+    if (nextStep < 1 || nextStep > 4) return;
+    setCurrentStep(nextStep);
+
+    try {
+      await fetch('/api/v1/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate',
+          periodKey: payrollData?.periodKey || '2025-03',
+          step: nextStep,
+        }),
+      });
+
+      try {
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({ type: 'PAYROLL_UPDATED', periodKey: payrollData?.periodKey || '2025-03', step: nextStep });
+        bc.close();
+      } catch {}
+    } catch (err) {
+      console.error('Failed to persist step on server:', err);
+    }
+
+    if (nextStep === 1) {
+      showToast('Langkah 1 Aktif: Data presensi biometrik karyawan terkunci resmi.', 'info');
+    } else if (nextStep === 2) {
+      showToast('Langkah 2 Aktif: Lembar kompensasi, PPh 21 TER & BPJS siap ditinjau.', 'info');
+    } else if (nextStep === 3) {
+      showToast('Langkah 3 Aktif: Uji rekonsiliasi anomali siap diverifikasi.', 'info');
+    } else if (nextStep === 4) {
+      showToast('Langkah 4 Aktif: Siap diotorisasi untuk pengiriman batch bank.', 'info');
+    }
+  };
+
+  // Reset or Re-calculate Payroll Run
+  const handleResetRun = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/v1/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate',
+          periodKey: payrollData?.periodKey || '2025-03',
+          step: 1,
+        }),
+      });
+      if (res.ok) {
+        setExecutionSuccess(false);
+        setCurrentStep(1);
+        await fetchPayrollProcessData(true);
+        showToast('Sesi proses payroll berhasil dihitung ulang dari Langkah 1.');
+      }
+    } catch {
+      showToast('Gagal mereset sesi payroll.', 'info');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Employee Preview Records mapped dynamically from live DB
   const employeePreviews: EmployeePayrollPreview[] = useMemo(() => {
@@ -376,6 +452,7 @@ export default function PayrollExecutionPage() {
         } catch {}
 
         setExecutionSuccess(true);
+        setCurrentStep(4);
         fetchPayrollProcessData(true);
         showToast('Batch Transfer Payroll sukses diotorisasi dan dikirim ke Kliring Perbankan!');
       } else {
@@ -432,6 +509,12 @@ export default function PayrollExecutionPage() {
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 Live Database Synchronization
               </span>
+              {isDisbursed && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-600 text-white shadow-xs">
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  Batch Berhasil Disalurkan ke Bank
+                </span>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
               Verifikasi rekonsiliasi presensi, kalkulasi otomatis PPh 21 TER &amp; BPJS
@@ -451,6 +534,17 @@ export default function PayrollExecutionPage() {
               <span>Kembali ke Ikhtisar</span>
             </Link>
 
+            {/* Hitung Ulang / Reset */}
+            <button
+              type="button"
+              onClick={handleResetRun}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all"
+              title="Hitung ulang proses payroll dari Langkah 1"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Hitung Ulang</span>
+            </button>
+
             {/* Simpan Draf Sesi */}
             <button
               type="button"
@@ -462,30 +556,79 @@ export default function PayrollExecutionPage() {
             </button>
 
             {/* Otorisasi & Eksekusi Payroll */}
-            <button
-              type="button"
-              onClick={() => setIsAuthorizeModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95"
-            >
-              <ShieldCheck className="w-4 h-4 text-white" />
-              <span>Otorisasi &amp; Eksekusi Payroll</span>
-            </button>
+            {!isDisbursed ? (
+              <button
+                type="button"
+                onClick={() => {
+                  advanceStep(4);
+                  setIsAuthorizeModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95"
+              >
+                <ShieldCheck className="w-4 h-4 text-white" />
+                <span>Otorisasi &amp; Eksekusi Payroll</span>
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Penggajian Selesai</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 4 Step Cards Progress Wizard matching screenshot */}
+        {/* ========================================================= */}
+        {/* 4 Step Cards Progress Wizard (FULLY INTERACTIVE & REAL-TIME) */}
+        {/* ========================================================= */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Langkah 1: Selesai */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden">
+          {/* Langkah 1: Kunci Presensi & Rekap */}
+          <button
+            type="button"
+            onClick={() => advanceStep(1)}
+            className={`text-left rounded-2xl p-4 border transition-all duration-200 relative overflow-hidden group ${
+              currentStep === 1 && !isDisbursed
+                ? 'bg-blue-50/80 border-2 border-blue-600 shadow-sm ring-2 ring-blue-500/10'
+                : currentStep > 1 || isDisbursed
+                ? 'bg-white border-slate-200/90 hover:border-emerald-300 shadow-xs'
+                : 'bg-white border-slate-200/80 shadow-xs hover:border-slate-300'
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                <CheckCircle2 className="w-5 h-5" />
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                  currentStep === 1 && !isDisbursed
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : currentStep > 1 || isDisbursed
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {currentStep > 1 || isDisbursed ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                ) : (
+                  <Lock className="w-4 h-4" />
+                )}
               </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-                  LANGKAH 1 • SELESAI
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 truncate">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider block ${
+                      currentStep === 1 && !isDisbursed
+                        ? 'text-blue-700'
+                        : currentStep > 1 || isDisbursed
+                        ? 'text-emerald-600'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {currentStep > 1 || isDisbursed ? 'LANGKAH 1 • SELESAI' : 'LANGKAH 1 • AKTIF'}
+                  </span>
+                  {currentStep === 1 && !isDisbursed && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      Terkunci
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-xs font-bold text-slate-900 truncate mt-0.5">
                   Kunci Presensi &amp; Rekap
                 </h3>
                 <p className="text-[11px] text-slate-500 truncate mt-0.5">
@@ -493,24 +636,64 @@ export default function PayrollExecutionPage() {
                 </p>
               </div>
             </div>
-          </div>
+          </button>
 
-          {/* Langkah 2: Aktif (100% Selesai) */}
-          <div className="bg-blue-50/70 rounded-2xl p-4 border-2 border-blue-600 shadow-sm relative overflow-hidden ring-2 ring-blue-500/10">
+          {/* Langkah 2: Kalkulasi Gaji, Pajak & BPJS */}
+          <button
+            type="button"
+            onClick={() => advanceStep(2)}
+            className={`text-left rounded-2xl p-4 border transition-all duration-200 relative overflow-hidden group ${
+              currentStep === 2 && !isDisbursed
+                ? 'bg-blue-50/80 border-2 border-blue-600 shadow-sm ring-2 ring-blue-500/10'
+                : currentStep > 2 || isDisbursed
+                ? 'bg-white border-slate-200/90 hover:border-emerald-300 shadow-xs'
+                : 'bg-white border-slate-200/80 opacity-85 hover:opacity-100 shadow-xs'
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-                <FileSpreadsheet className="w-4 h-4" />
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                  currentStep === 2 && !isDisbursed
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : currentStep > 2 || isDisbursed
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {currentStep > 2 || isDisbursed ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                ) : (
+                  <FileSpreadsheet className="w-4 h-4" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">
-                    LANGKAH 2 • AKTIF
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider ${
+                      currentStep === 2 && !isDisbursed
+                        ? 'text-blue-700'
+                        : currentStep > 2 || isDisbursed
+                        ? 'text-emerald-600'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {currentStep > 2 || isDisbursed
+                      ? 'LANGKAH 2 • SELESAI'
+                      : currentStep === 2
+                      ? 'LANGKAH 2 • AKTIF'
+                      : 'LANGKAH 2 • ANTREAN'}
                   </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-200/80 text-blue-800">
-                    100% Selesai
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      currentStep >= 2 || isDisbursed
+                        ? 'bg-blue-200/80 text-blue-800'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {currentStep > 2 || isDisbursed ? '100% Selesai' : 'Kalkulasi Siap'}
                   </span>
                 </div>
-                <h3 className="text-xs font-bold text-slate-900 truncate">
+                <h3 className="text-xs font-bold text-slate-900 truncate mt-0.5">
                   Kalkulasi Gaji, Pajak &amp; BPJS
                 </h3>
                 <p className="text-[11px] text-slate-600 truncate mt-0.5">
@@ -518,39 +701,68 @@ export default function PayrollExecutionPage() {
                 </p>
               </div>
             </div>
-          </div>
+          </button>
 
-          {/* Langkah 3: Perlu Tindakan / Bersih */}
-          <div
-            className={`rounded-2xl p-4 border shadow-sm relative overflow-hidden ${
-              anomalies.length > 0
-                ? 'bg-amber-50/50 border-amber-200'
-                : 'bg-emerald-50/50 border-emerald-200'
+          {/* Langkah 3: Uji Kelayakan & Rekonsiliasi */}
+          <button
+            type="button"
+            onClick={() => advanceStep(3)}
+            className={`text-left rounded-2xl p-4 border transition-all duration-200 relative overflow-hidden group ${
+              currentStep === 3 && !isDisbursed
+                ? 'bg-blue-50/80 border-2 border-blue-600 shadow-sm ring-2 ring-blue-500/10'
+                : currentStep > 3 || isDisbursed
+                ? 'bg-white border-slate-200/90 hover:border-emerald-300 shadow-xs'
+                : 'bg-white border-slate-200/80 opacity-85 hover:opacity-100 shadow-xs'
             }`}
           >
             <div className="flex items-center gap-3">
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  anomalies.length > 0
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-emerald-100 text-emerald-700'
+                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                  currentStep === 3 && !isDisbursed
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : currentStep > 3 || isDisbursed
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'bg-slate-100 text-slate-500'
                 }`}
               >
-                {anomalies.length > 0 ? (
-                  <Flag className="w-4 h-4" />
+                {currentStep > 3 || isDisbursed ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                ) : anomalies.length > 0 ? (
+                  <Flag className="w-4 h-4 text-amber-600" />
                 ) : (
                   <CheckCircle2 className="w-4 h-4" />
                 )}
               </div>
-              <div className="min-w-0">
-                <span
-                  className={`text-[10px] font-bold uppercase tracking-wider block ${
-                    anomalies.length > 0 ? 'text-amber-700' : 'text-emerald-700'
-                  }`}
-                >
-                  {anomalies.length > 0 ? 'LANGKAH 3 • PERLU TINDAKAN' : 'LANGKAH 3 • TERVERIFIKASI'}
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 truncate">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider block ${
+                      currentStep === 3 && !isDisbursed
+                        ? 'text-blue-700'
+                        : currentStep > 3 || isDisbursed
+                        ? 'text-emerald-600'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {currentStep > 3 || isDisbursed
+                      ? 'LANGKAH 3 • SELESAI'
+                      : currentStep === 3
+                      ? anomalies.length > 0
+                        ? 'LANGKAH 3 • PERLU TINDAKAN'
+                        : 'LANGKAH 3 • AKTIF'
+                      : 'LANGKAH 3 • ANTREAN'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      currentStep >= 3 || isDisbursed
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {anomalies.length === 0 ? '0 Anomali' : `${anomalies.length} Catatan`}
+                  </span>
+                </div>
+                <h3 className="text-xs font-bold text-slate-900 truncate mt-0.5">
                   Uji Kelayakan &amp; Rekonsiliasi
                 </h3>
                 <p className="text-[11px] text-slate-600 truncate mt-0.5">
@@ -560,26 +772,184 @@ export default function PayrollExecutionPage() {
                 </p>
               </div>
             </div>
-          </div>
+          </button>
 
-          {/* Langkah 4: Antrean */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden opacity-80">
+          {/* Langkah 4: Otorisasi Pembayaran & Batch */}
+          <button
+            type="button"
+            onClick={() => advanceStep(4)}
+            className={`text-left rounded-2xl p-4 border transition-all duration-200 relative overflow-hidden group ${
+              currentStep === 4 && !isDisbursed
+                ? 'bg-blue-50/80 border-2 border-blue-600 shadow-sm ring-2 ring-blue-500/10'
+                : isDisbursed
+                ? 'bg-emerald-50/70 border-emerald-300 shadow-xs'
+                : 'bg-white border-slate-200/80 opacity-80 hover:opacity-100 shadow-xs'
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
-                <Building2 className="w-4 h-4" />
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                  isDisbursed
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : currentStep === 4
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {isDisbursed ? (
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                ) : (
+                  <Building2 className="w-4 h-4" />
+                )}
               </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  LANGKAH 4 • ANTREAN
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 truncate">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider block ${
+                      isDisbursed
+                        ? 'text-emerald-700'
+                        : currentStep === 4
+                        ? 'text-blue-700'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {isDisbursed
+                      ? 'LANGKAH 4 • SELESAI'
+                      : currentStep === 4
+                      ? 'LANGKAH 4 • AKTIF'
+                      : 'LANGKAH 4 • ANTREAN'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      isDisbursed
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : currentStep === 4
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {isDisbursed ? 'Terkirim 100%' : 'Dual-Approval'}
+                  </span>
+                </div>
+                <h3 className="text-xs font-bold text-slate-900 truncate mt-0.5">
                   Otorisasi Pembayaran &amp; Batch
                 </h3>
                 <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                  Menunggu Dual-Approval Direksi
+                  {isDisbursed
+                    ? 'Dana Sukses Disalurkan ke Host-to-Host'
+                    : currentStep === 4
+                    ? 'Siap Memasukkan PIN Otorisasi Direksi'
+                    : 'Menunggu Dual-Approval Direksi'}
                 </p>
               </div>
             </div>
+          </button>
+        </div>
+
+        {/* ========================================================= */}
+        {/* STEPPER CONTROLLER BAR: Navigasi Langkah demi Langkah     */}
+        {/* ========================================================= */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 w-full md:w-auto">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs ${
+                isDisbursed
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-blue-600 text-white'
+              }`}
+            >
+              {isDisbursed ? '✓' : currentStep}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">
+                  {isDisbursed
+                    ? 'Penggajian Selesai & Terdistribusi 100%'
+                    : currentStep === 1
+                    ? 'Langkah 1: Kunci Presensi & Rekapitulasi Kehadiran'
+                    : currentStep === 2
+                    ? 'Langkah 2: Kalkulasi Gaji, Pajak PPh 21 TER & Iuran BPJS'
+                    : currentStep === 3
+                    ? 'Langkah 3: Uji Kelayakan & Rekonsiliasi Anomali'
+                    : 'Langkah 4: Otorisasi Dual-Approval & Rilis Batch Bank'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  {isDisbursed ? 'Status: DISBURSED' : `Tahap ${currentStep} dari 4`}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {isDisbursed
+                  ? 'Seluruh perintah transfer payroll telah sukses disalurkan ke host-to-host bank dan notifikasi slip gaji terkirim.'
+                  : currentStep === 1
+                  ? 'Verifikasi kunci absensi biometrik untuk memastikan tidak ada pengajuan tanggal mundur sebelum kompensasi dihitung.'
+                  : currentStep === 2
+                  ? 'Periksa nilai gaji pokok, tunjangan operasional, dan kalkulasi PPh 21 TER (PP 58/2023) pada lembar kompensasi staf.'
+                  : currentStep === 3
+                  ? 'Tinjau rekonsiliasi anomali lembur, potongan unpaid leave, atau validasi buku rekening bank penerima.'
+                  : 'Masukkan 6-digit Security PIN Otorisasi Direksi untuk merilis pengiriman batch dana payroll.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Stepper Control Buttons */}
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-shrink-0">
+            {/* View Mode Toggle */}
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === 'stepper' ? 'full' : 'stepper')}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-all"
+            >
+              <Layers className="w-3.5 h-3.5 text-slate-400" />
+              <span>{viewMode === 'stepper' ? 'Tampilkan Semua Seksi' : 'Mode Langkah Fokus'}</span>
+            </button>
+
+            {/* Previous Step */}
+            {currentStep > 1 && !isDisbursed && (
+              <button
+                type="button"
+                onClick={() => advanceStep(currentStep - 1)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+                <span>Sebelumnya</span>
+              </button>
+            )}
+
+            {/* Next Step / Complete */}
+            {currentStep < 4 && !isDisbursed ? (
+              <button
+                type="button"
+                onClick={() => advanceStep(currentStep + 1)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95"
+              >
+                <span>
+                  {currentStep === 1
+                    ? 'Lanjut ke Langkah 2 (Kalkulasi Gaji)'
+                    : currentStep === 2
+                    ? 'Lanjut ke Langkah 3 (Uji Rekonsiliasi)'
+                    : 'Lanjut ke Langkah 4 (Otorisasi Pembayaran)'}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-white" />
+              </button>
+            ) : isDisbursed ? (
+              <button
+                type="button"
+                onClick={handleDownloadReconciliation}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all"
+              >
+                <Download className="w-3.5 h-3.5 text-white" />
+                <span>Unduh Lembar Bukti Payroll (.xlsx)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAuthorizeModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all transform active:scale-95"
+              >
+                <ShieldCheck className="w-4 h-4 text-white" />
+                <span>Buka Form PIN Otorisasi Direksi</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -589,310 +959,561 @@ export default function PayrollExecutionPage() {
           {/* LEFT COLUMN: Data Presensi, Anomalies & Full Preview Table */}
           {/* ========================================================= */}
           <div className="lg:col-span-8 space-y-5">
-            {/* 1. Data Presensi Dikunci Resmi Card */}
-            <div className="bg-blue-50/60 rounded-2xl p-5 border border-blue-200/80 shadow-xs flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                    Data Presensi Periode 26 Feb - 25 Mar 2025 Telah Dikunci Resmi
-                  </h3>
-                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                    Seluruh data absensi biometrik, potongan ketidakhadiran (unpaid leave &amp; mangkir),
-                    serta insentif lembur terverifikasi telah dikonversikan ke dalam formula nominal
-                    payroll. Modul absensi ditutup untuk permohonan tanggal mundur.
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right flex-shrink-0 sm:self-start">
-                <span className="text-[11px] text-slate-500 font-medium block">Kunci Otomatis:</span>
-                <span className="text-xs font-bold text-slate-800">25 Mar 2025, 23:59 WIB</span>
-              </div>
-            </div>
-
-            {/* 2. Anomali & Rekonsiliasi Card matching screenshot & CONTINUING CUT-OFF PART */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
-              {/* Card Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      anomalies.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    {anomalies.length > 0 ? (
-                      <AlertTriangle className="w-4 h-4" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                      {anomalies.length > 0
-                        ? `${anomalies.length} Pengecualian & Anomali Terdeteksi`
-                        : '0 Pengecualian & Anomali Terdeteksi'}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {anomalies.length > 0
-                        ? `Sistem mendeteksi ${anomalies.length} berkas memerlukan konfirmasi manual sebelum rilis akhir batch.`
-                        : 'Seluruh berkas kehadiran, kompensasi, dan saluran rekening perbankan karyawan terverifikasi valid tanpa anomali. Batch siap diotorisasi.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleDownloadReconciliation}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Unduh Lembar Rekonsiliasi (.xlsx)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleApproveAllAdjustments}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5 text-white" />
-                    <span>Setujui Seluruh Penyesuaian</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Anomaly Items List or Zero Anomaly State */}
-              {anomalies.length === 0 ? (
-                <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-50/80 to-blue-50/30 border border-emerald-200/80 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+            {/* SUCCESS BANNER IF DISBURSED */}
+            {isDisbursed && (
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-md space-y-3 animate-in fade-in duration-300">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                      <h4 className="text-sm font-bold text-slate-900">
-                        Data Kompensasi &amp; Rekonsiliasi 100% Terverifikasi Bersih
-                      </h4>
-                      <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        Siap Eksekusi
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-bold">
+                        Batch Transfer Penggajian Periode Maret 2025 Sukses Disalurkan!
+                      </h3>
+                      <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-white text-emerald-800">
+                        100% Selesai
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      Tidak ada anomali lembur ilegal, potongan presensi tertunda, maupun nomor rekening tidak valid
-                      pada {payrollData?.totalEmployees || employeePreviews.length} akun karyawan terdaftar. Seluruh formula
-                      PPh 21 TER (PP 58/2023) dan iuran BPJS sinkron dengan database master.
+                    <p className="text-xs text-emerald-100 leading-relaxed">
+                      Total dana bersih sebesar <strong>{formatRupiah(totalNet)}</strong> telah sukses
+                      ditransmisikan ke host-to-host kliring Bank BCA untuk seluruh{' '}
+                      <strong>{payrollData?.totalEmployees ?? employeePreviews.length} staf aktif</strong>. Notifikasi
+                      slip gaji digital via email/WhatsApp telah dijadwalkan efektif.
                     </p>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {anomalies.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`p-4 rounded-xl border transition-all ${
-                        item.isResolved
-                          ? 'bg-slate-50/70 border-slate-200'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          {/* Number Badge */}
-                          <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${
-                              item.typeVariant === 'warning'
-                                ? 'bg-amber-100 text-amber-800'
-                                : item.typeVariant === 'info'
-                                ? 'bg-blue-100 text-blue-800'
-                                : item.typeVariant === 'purple'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            {item.id}
-                          </div>
-
-                          {/* Content */}
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-bold text-slate-900">{item.name}</span>
-                              <span className="text-[11px] text-slate-500 font-medium px-2 py-0.5 bg-slate-100 rounded-md">
-                                {item.nik}
-                              </span>
-                            </div>
-
-                            {/* Pill Tag */}
-                            <div>
-                              <span
-                                className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                                  item.typeVariant === 'warning'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : item.typeVariant === 'info'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : item.typeVariant === 'purple'
-                                    ? 'bg-purple-100 text-purple-800'
-                                    : 'bg-emerald-100 text-emerald-800'
-                                }`}
-                              >
-                                {item.type}
-                              </span>
-                            </div>
-
-                            <p className="text-xs text-slate-600 leading-relaxed max-w-2xl pt-0.5">
-                              {item.description}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons for Anomaly */}
-                        <div className="flex items-center gap-2 sm:self-center flex-shrink-0">
-                          {/* Status Badge Button */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAnomalyForModal(item)}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
-                              item.isResolved
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                            }`}
-                          >
-                            {item.statusBadge}
-                          </button>
-
-                          {/* Secondary Outline Action */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAnomalyForModal(item)}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all"
-                          >
-                            {item.secondaryActionText}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 3. CONTINUATION: Full Payroll Breakdown & Reconciliation Table */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                    Pratinjau Lembar Kompensasi Gaji Bersih Karyawan (
-                    {payrollData?.totalEmployees ?? employeePreviews.length} Staf)
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Rincian nominal sebelum perintah transfer batch disalurkan ke host-to-host kliring
-                    perbankan secara real-time.
-                  </p>
-                </div>
-
-                {/* Filter and Search */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Cari nama atau NIK..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 w-44 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    />
-                  </div>
-
-                  <div className="relative">
-                    <select
-                      value={selectedDeptFilter}
-                      onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                      className="appearance-none px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white pr-7 cursor-pointer"
-                    >
-                      {availableDepartments.map((dept) => (
-                        <option key={dept} value={dept}>
-                          {dept}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
+                <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-white/20 text-xs">
+                  <span className="text-emerald-100">Referensi Batch:</span>
+                  <span className="font-mono font-bold bg-black/20 px-2.5 py-0.5 rounded text-white">
+                    TRX-202503-BATCH-BCA-H2H
+                  </span>
+                  <span className="text-emerald-100 ml-auto">
+                    Tanggal Efektif:{' '}
+                    <strong>{payrollData?.releaseDateStr || '28 Maret 2025'}</strong>
+                  </span>
                 </div>
               </div>
+            )}
 
-              {/* Table */}
-              <div className="overflow-x-auto">
-                {isLoading ? (
-                  <div className="py-12 text-center text-slate-500 space-y-2">
-                    <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                    <p className="text-xs font-medium">Sinkronisasi data payroll real-time dari database...</p>
+            {/* 1. Data Presensi Dikunci Resmi Card (Step 1 or Full View) */}
+            {(viewMode === 'full' || currentStep === 1) && (
+              <div
+                className={`rounded-2xl p-5 border shadow-xs transition-all ${
+                  currentStep === 1
+                    ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-500/10'
+                    : 'bg-blue-50/60 border-blue-200/80'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-200/70 text-blue-800 uppercase tracking-wider">
+                          Langkah 1 • Kunci Presensi
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                          Terkunci Otomatis
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 leading-tight mt-1">
+                        Data Presensi Periode 26 Feb - 25 Mar 2025 Telah Dikunci Resmi
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                        Seluruh data absensi biometrik, potongan ketidakhadiran (unpaid leave &amp; mangkir),
+                        serta insentif lembur terverifikasi telah dikonversikan ke dalam formula nominal
+                        payroll. Modul absensi ditutup untuk permohonan tanggal mundur.
+                      </p>
+                    </div>
                   </div>
-                ) : filteredEmployees.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 space-y-2">
-                    <Users className="w-8 h-8 text-slate-300 mx-auto" />
-                    <p className="text-xs font-medium">
-                      Tidak ada data karyawan yang cocok dengan kriteria pencarian.
-                    </p>
+
+                  <div className="text-right flex-shrink-0 sm:self-start">
+                    <span className="text-[11px] text-slate-500 font-medium block">Kunci Otomatis:</span>
+                    <span className="text-xs font-bold text-slate-800">25 Mar 2025, 23:59 WIB</span>
                   </div>
-                ) : (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                        <th className="py-2.5 px-3">KARYAWAN &amp; NIK</th>
-                        <th className="py-2.5 px-3">DEPARTEMEN</th>
-                        <th className="py-2.5 px-3">GAJI KOTOR</th>
-                        <th className="py-2.5 px-3">POTONGAN TOTAL</th>
-                        <th className="py-2.5 px-3">TAKE HOME PAY</th>
-                        <th className="py-2.5 px-3">SALURAN BANK</th>
-                        <th className="py-2.5 px-3 text-right">AKSI</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
-                      {filteredEmployees.map((emp) => (
-                        <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-3">
-                            <div>
-                              <p className="font-bold text-slate-900 leading-tight">{emp.name}</p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">
-                                {emp.nik} • {emp.designation}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 whitespace-nowrap text-slate-600">
-                            {emp.department}
-                          </td>
-                          <td className="py-3 px-3 whitespace-nowrap font-bold text-slate-800">
-                            {formatRupiah(emp.grossSalary)}
-                          </td>
-                          <td className="py-3 px-3 whitespace-nowrap text-rose-600 font-semibold">
-                            -{formatRupiah(emp.deductions)}
-                          </td>
-                          <td className="py-3 px-3 whitespace-nowrap">
-                            <span className="font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                              {formatRupiah(emp.netSalary)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 whitespace-nowrap text-slate-600 text-[11px]">
-                            <span className="font-semibold text-slate-800 block">{emp.bank}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">{emp.accountNumber}</span>
-                          </td>
-                          <td className="py-3 px-3 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedEmployeeDetail(emp)}
-                              className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
-                            >
-                              Slip Gaji
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                </div>
+
+                {/* Attendance Summary Grid */}
+                <div className="mt-4 pt-4 border-t border-blue-200/60 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-blue-100">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Karyawan Terkunci</span>
+                    <span className="text-sm font-extrabold text-slate-900">
+                      {payrollData?.totalEmployees ?? employeePreviews.length} Staf
+                    </span>
+                  </div>
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-blue-100">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Disiplin Rata-rata</span>
+                    <span className="text-sm font-extrabold text-emerald-600">100.0%</span>
+                  </div>
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-blue-100">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Unpaid Leave / Alpa</span>
+                    <span className="text-sm font-extrabold text-slate-900">0 Hari</span>
+                  </div>
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-blue-100">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Lembur Terakumulasi</span>
+                    <span className="text-sm font-extrabold text-slate-900">0 Jam</span>
+                  </div>
+                </div>
+
+                {currentStep === 1 && !isDisbursed && (
+                  <div className="mt-4 pt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => advanceStep(2)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                    >
+                      <span>Presensi Terverifikasi — Lanjut ke Langkah 2: Kalkulasi Gaji</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
+            )}
+
+            {/* 2. Anomali & Rekonsiliasi Card (Step 3 or Full View) */}
+            {(viewMode === 'full' || currentStep === 3) && (
+              <div
+                className={`bg-white rounded-2xl p-5 border shadow-sm space-y-4 transition-all ${
+                  currentStep === 3 ? 'border-blue-400 ring-2 ring-blue-500/10' : 'border-slate-200/80'
+                }`}
+              >
+                {/* Card Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        anomalies.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {anomalies.length > 0 ? (
+                        <AlertTriangle className="w-4 h-4" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase tracking-wider">
+                          Langkah 3 • Uji Kelayakan
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 leading-tight mt-1">
+                        {anomalies.length > 0
+                          ? `${anomalies.length} Pengecualian & Anomali Terdeteksi`
+                          : '0 Pengecualian & Anomali Terdeteksi'}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {anomalies.length > 0
+                          ? `Sistem mendeteksi ${anomalies.length} berkas memerlukan konfirmasi manual sebelum rilis akhir batch.`
+                          : 'Seluruh berkas kehadiran, kompensasi, dan saluran rekening perbankan karyawan terverifikasi valid tanpa anomali. Batch siap diotorisasi.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDownloadReconciliation}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Unduh Lembar Rekonsiliasi (.xlsx)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleApproveAllAdjustments}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs transition-all"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5 text-white" />
+                      <span>Setujui Seluruh Penyesuaian</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Anomaly Items List or Zero Anomaly State */}
+                {anomalies.length === 0 ? (
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-50/80 to-blue-50/30 border border-emerald-200/80 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <h4 className="text-sm font-bold text-slate-900">
+                          Data Kompensasi &amp; Rekonsiliasi 100% Terverifikasi Bersih
+                        </h4>
+                        <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Siap Eksekusi
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Tidak ada anomali lembur ilegal, potongan presensi tertunda, maupun nomor rekening tidak valid
+                        pada {payrollData?.totalEmployees || employeePreviews.length} akun karyawan terdaftar. Seluruh formula
+                        PPh 21 TER (PP 58/2023) dan iuran BPJS sinkron dengan database master.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {anomalies.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`p-4 rounded-xl border transition-all ${
+                          item.isResolved
+                            ? 'bg-slate-50/70 border-slate-200'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${
+                                item.typeVariant === 'warning'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : item.typeVariant === 'info'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : item.typeVariant === 'purple'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {item.id}
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900">{item.name}</span>
+                                <span className="text-[11px] text-slate-500 font-medium px-2 py-0.5 bg-slate-100 rounded-md">
+                                  {item.nik}
+                                </span>
+                              </div>
+
+                              <div>
+                                <span
+                                  className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                                    item.typeVariant === 'warning'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : item.typeVariant === 'info'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : item.typeVariant === 'purple'
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : 'bg-emerald-100 text-emerald-800'
+                                  }`}
+                                >
+                                  {item.type}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-slate-600 leading-relaxed max-w-2xl pt-0.5">
+                                {item.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 sm:self-center flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAnomalyForModal(item)}
+                              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                                item.isResolved
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                              }`}
+                            >
+                              {item.statusBadge}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAnomalyForModal(item)}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all"
+                            >
+                              {item.secondaryActionText}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {currentStep === 3 && !isDisbursed && (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => advanceStep(4)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                    >
+                      <span>Uji Kelayakan Lolos — Lanjut ke Langkah 4: Otorisasi Pembayaran</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 3. Lembar Kompensasi Gaji Bersih Karyawan Table (Step 2 or Full View) */}
+            {(viewMode === 'full' || currentStep === 2) && (
+              <div
+                className={`bg-white rounded-2xl p-5 border shadow-sm space-y-4 transition-all ${
+                  currentStep === 2 ? 'border-blue-400 ring-2 ring-blue-500/10' : 'border-slate-200/80'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 uppercase tracking-wider">
+                        Langkah 2 • Kalkulasi Kompensasi
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900 leading-tight mt-1">
+                      Pratinjau Lembar Kompensasi Gaji Bersih Karyawan (
+                      {payrollData?.totalEmployees ?? employeePreviews.length} Staf)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Rincian nominal sebelum perintah transfer batch disalurkan ke host-to-host kliring
+                      perbankan secara real-time.
+                    </p>
+                  </div>
+
+                  {/* Filter and Search */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Cari nama atau NIK..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 pr-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 w-44 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    <div className="relative">
+                      <select
+                        value={selectedDeptFilter}
+                        onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                        className="appearance-none px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white pr-7 cursor-pointer"
+                      >
+                        {availableDepartments.map((dept) => (
+                          <option key={dept} value={dept}>
+                            {dept}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  {isLoading ? (
+                    <div className="py-12 text-center text-slate-500 space-y-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                      <p className="text-xs font-medium">Sinkronisasi data payroll real-time dari database...</p>
+                    </div>
+                  ) : filteredEmployees.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 space-y-2">
+                      <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-medium">
+                        Tidak ada data karyawan yang cocok dengan kriteria pencarian.
+                      </p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                          <th className="py-2.5 px-3">KARYAWAN &amp; NIK</th>
+                          <th className="py-2.5 px-3">DEPARTEMEN</th>
+                          <th className="py-2.5 px-3">GAJI KOTOR</th>
+                          <th className="py-2.5 px-3">POTONGAN TOTAL</th>
+                          <th className="py-2.5 px-3">TAKE HOME PAY</th>
+                          <th className="py-2.5 px-3">SALURAN BANK</th>
+                          <th className="py-2.5 px-3 text-right">AKSI</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
+                        {filteredEmployees.map((emp) => (
+                          <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-3">
+                              <div>
+                                <p className="font-bold text-slate-900 leading-tight">{emp.name}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  {emp.nik} • {emp.designation}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap text-slate-600">
+                              {emp.department}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap font-bold text-slate-800">
+                              {formatRupiah(emp.grossSalary)}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap text-rose-600 font-semibold">
+                              -{formatRupiah(emp.deductions)}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              <span className="font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                                {formatRupiah(emp.netSalary)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap text-slate-600 text-[11px]">
+                              <span className="font-semibold text-slate-800 block">{emp.bank}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">{emp.accountNumber}</span>
+                            </td>
+                            <td className="py-3 px-3 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedEmployeeDetail(emp)}
+                                className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                              >
+                                Slip Gaji
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {currentStep === 2 && !isDisbursed && (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => advanceStep(3)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                    >
+                      <span>Kompensasi Sesuai — Lanjut ke Langkah 3: Uji Rekonsiliasi Anomali</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. Otorisasi & Eksekusi Pembayaran Section (Step 4 Focus Card) */}
+            {(viewMode === 'full' || currentStep === 4) && (
+              <div
+                className={`bg-white rounded-2xl p-5 border shadow-sm space-y-4 transition-all ${
+                  currentStep === 4 ? 'border-blue-500 ring-2 ring-blue-500/10' : 'border-slate-200/80'
+                }`}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 uppercase tracking-wider">
+                          Langkah 4 • Otorisasi Akhir
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 mt-0.5">
+                        Dual-Approval &amp; Rilis Eksekusi Perbankan
+                      </h3>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                      isDisbursed
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                    }`}
+                  >
+                    {isDisbursed ? 'Telah Disalurkan' : 'Menunggu PIN Otorisasi'}
+                  </span>
+                </div>
+
+                {!isDisbursed ? (
+                  <form onSubmit={handleConfirmExecution} className="space-y-4 pt-1">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Penerima Transfer:</span>
+                        <span className="font-bold text-slate-900">
+                          {payrollData?.totalEmployees ?? employeePreviews.length} Staf Aktif
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Total Net Disbursement:</span>
+                        <span className="font-extrabold text-blue-700 text-sm">{formatRupiah(totalNet)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Jalur Kliring:</span>
+                        <span className="font-semibold text-slate-800">
+                          {payrollData?.bankDistribution && payrollData.bankDistribution.length > 0
+                            ? payrollData.bankDistribution.map((b) => b.bankName).join(', ')
+                            : 'BCA Host-to-Host (API)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-slate-700">
+                          Masukkan 6-Digit Security Token / PIN Direksi *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setAuthPin('123456')}
+                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
+                        >
+                          Gunakan PIN Demo (123456)
+                        </button>
+                      </div>
+                      <input
+                        type="password"
+                        maxLength={6}
+                        required
+                        value={authPin}
+                        onChange={(e) => setAuthPin(e.target.value)}
+                        placeholder="••••••"
+                        className="w-full text-center tracking-widest text-lg font-bold py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                      <p className="text-[11px] text-slate-400 text-center">
+                        Gunakan kode token HSM atau OTP autentikator CFO yang terdaftar.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isExecuting}
+                        className="px-6 py-2.5 text-xs font-bold rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isExecuting ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Memproses Kliring Bank...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Konfirmasi &amp; Eksekusi Batch Transfer Bank</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-emerald-800">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Instruksi Transfer Telah Diterima oleh Host-to-Host Perbankan</span>
+                    </div>
+                    <p className="text-emerald-700 text-[11px] leading-relaxed">
+                      Sesi transfer batch penggajian telah selesai dengan status <strong>DISBURSED</strong>. Slip gaji
+                      digital secara otomatis dapat diunduh oleh masing-masing karyawan melalui portal ESS Karyawan.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ========================================================= */}
@@ -1068,8 +1689,14 @@ export default function PayrollExecutionPage() {
                 <h3 className="text-xs font-bold text-slate-900 leading-tight">
                   Status Dual-Approval Otorisasi
                 </h3>
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                  1/2 Disetujui
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isDisbursed
+                      ? 'text-emerald-700 bg-emerald-50'
+                      : 'text-amber-700 bg-amber-50'
+                  }`}
+                >
+                  {isDisbursed ? '2/2 Disetujui' : '1/2 Disetujui'}
                 </span>
               </div>
 
@@ -1090,29 +1717,54 @@ export default function PayrollExecutionPage() {
                 </div>
 
                 {/* Checker 2 */}
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-amber-50/60 border border-amber-200">
-                  <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Clock className="w-3.5 h-3.5" />
+                <div
+                  className={`flex items-start gap-3 p-2.5 rounded-xl border transition-colors ${
+                    isDisbursed
+                      ? 'bg-emerald-50/60 border-emerald-100'
+                      : 'bg-amber-50/60 border-amber-200'
+                  }`}
+                >
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      isDisbursed
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {isDisbursed ? <Check className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">Direktur Finansial (CFO)</span>
-                      <span className="text-[10px] font-bold text-amber-700">Menunggu Rilis</span>
+                      <span
+                        className={`text-[10px] font-bold ${
+                          isDisbursed ? 'text-emerald-700' : 'text-amber-700'
+                        }`}
+                      >
+                        {isDisbursed ? 'Disetujui & Dirilis' : 'Menunggu Rilis'}
+                      </span>
                     </div>
                     <p className="text-[11px] text-slate-500">Chief Financial Officer (CFO)</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Menunggu konfirmasi tombol eksekusi</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {isDisbursed ? 'Token HSM Otorisasi Valid' : 'Menunggu konfirmasi tombol eksekusi'}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsAuthorizeModalOpen(true)}
-                className="w-full py-2.5 px-3 rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Buka Form Otorisasi Akhir</span>
-              </button>
+              {!isDisbursed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    advanceStep(4);
+                    setIsAuthorizeModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Buka Form Otorisasi Akhir</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1167,7 +1819,7 @@ export default function PayrollExecutionPage() {
                   type="button"
                   onClick={() => {
                     setIsAuthorizeModalOpen(false);
-                    setExecutionSuccess(false);
+                    setExecutionSuccess(true);
                   }}
                   className="px-5 py-2.5 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
                 >
@@ -1199,9 +1851,18 @@ export default function PayrollExecutionPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Masukkan 6-Digit Security Token / PIN Direksi *
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Masukkan 6-Digit Security Token / PIN Direksi *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setAuthPin('123456')}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
+                    >
+                      PIN Demo (123456)
+                    </button>
+                  </div>
                   <input
                     type="password"
                     maxLength={6}
@@ -1212,7 +1873,7 @@ export default function PayrollExecutionPage() {
                     className="w-full text-center tracking-widest text-lg font-bold py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   <p className="text-[11px] text-slate-400 text-center">
-                    Gunakan kode token HSM atau OTP autentikator CFO yang terdaftar (contoh: 123456).
+                    Gunakan kode token HSM atau OTP autentikator CFO yang terdaftar.
                   </p>
                 </div>
 
