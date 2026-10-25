@@ -1557,7 +1557,7 @@ export default function AdminPayrollPage() {
                 <div className="grid grid-cols-2 gap-6 text-xs">
                   {/* PENERIMAAN */}
                   <div className="space-y-3">
-                    <h4 className="font-bold text-slate-900 border-b border-slate-200 pb-1 uppercase tracking-wider text-[11px] text-emerald-700">
+                    <h4 className="font-bold text-emerald-700 border-b border-slate-200 pb-1 uppercase tracking-wider text-[11px]">
                       I. Penghasilan (Earnings)
                     </h4>
                     <div className="space-y-1.5">
@@ -1584,7 +1584,7 @@ export default function AdminPayrollPage() {
 
                   {/* POTONGAN */}
                   <div className="space-y-3">
-                    <h4 className="font-bold text-slate-900 border-b border-slate-200 pb-1 uppercase tracking-wider text-[11px] text-rose-700">
+                    <h4 className="font-bold text-rose-700 border-b border-slate-200 pb-1 uppercase tracking-wider text-[11px]">
                       II. Potongan (Deductions)
                     </h4>
                     <div className="space-y-1.5">
