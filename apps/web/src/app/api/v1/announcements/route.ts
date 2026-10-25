@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { neon } from '@neondatabase/serverless';
 import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 import { broadcastAuditEvent } from '@/lib/auditSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry } from '@/lib/auditDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+const DEFAULT_NEON_DATABASE_URL =
+  'postgresql://neondb_owner:npg_Jv7SzD1PgcQl@ep-shiny-silence-azkjdzr3-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+
+const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_NEON_DATABASE_URL;
+
+function getDb() {
+  return neon(DATABASE_URL);
+}
 
 const STORAGE_DIR = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(process.cwd(), '.data');
 const ANNOUNCEMENTS_FILE = path.join(STORAGE_DIR, 'nexora_announcements.json');
@@ -31,7 +41,7 @@ const defaultAnnouncements: HrAnnouncement[] = [
     id: 'ann-1',
     badge: 'PENGUMUMAN HRD',
     docNumber: 'No. 018/HR-NOTIF/X/2026',
-    title: 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026',
+    title: 'Ketentuan Core Hours & Fleksibilitas Hybrid Kerja Q4 2026',
     summary:
       'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.',
     content:
@@ -44,17 +54,32 @@ const defaultAnnouncements: HrAnnouncement[] = [
   },
   {
     id: 'ann-2',
-    badge: 'SURAT EDARAN',
-    docNumber: 'No. 015/SE-DIR/X/2026',
-    title: 'Kebijakan Skema Hybrid Working WFO & WFH 2026',
+    badge: 'PAYROLL & KOMPENSASI',
+    docNumber: 'No. 024/HR-PAY/X/2026',
+    title: 'Penyaluran Batch Payroll Periode Maret 2025 Sukses 100%',
     summary:
-      'Penegasan kuota WFH maksimal 2 hari per pekan dengan rasio kehadiran kantor minimal 60% per hari untuk mendukung sinergi antar departemen.',
+      'Perintah transfer penggajian batch periode berjalan telah sukses disalurkan ke host-to-host kliring perbankan. Slip gaji digital telah terbit dan dapat diunduh.',
     content:
-      'Mengingat pentingnya kolaborasi tatap muka pada kuartal berjalan, manajemen menetapkan bahwa:\n\n1. Setiap anggota tim berhak mengajukan preferensi WFH maksimal 2 hari kerja dalam sepekan.\n2. Roster kerja wajib dikoordinasikan bersama Team Lead / Head of Department.\n3. Presensi WFO diverifikasi melalui Geofencing SCBD Tower Lt. 7.',
-    buttonText: 'Lihat Kebijakan',
+      'Pemberitahuan kepada seluruh staf aktif PT Nexora Solusi Nusantara:\n\n1. Pemrosesan lembar kompensasi periode 26 Februari - 25 Maret 2025 telah selesai diotorisasi.\n2. Seluruh hak gaji pokok, tunjangan operasional, dan lembur telah ditransfer ke rekening payroll karyawan.\n3. Rincian pemotongan PPh 21 TER (PP 58/2023) dan iuran BPJS Ketenagakerjaan/Kesehatan tercantum lengkap di slip gaji digital.',
+    buttonText: 'Cek Rincian Payroll',
     priority: 'INFO',
-    publishedAt: '15 Oktober 2026, 09:30 WIB',
-    author: 'HR Operations Lead',
+    publishedAt: '25 Maret 2025, 14:30 WIB',
+    author: 'Finance & HR Operations Manager',
+    isEmergency: false,
+  },
+  {
+    id: 'ann-3',
+    badge: 'BENEFIT & ASURANSI',
+    docNumber: 'No. 012/HR-BENEFIT/X/2026',
+    title: 'Pembaruan Skema Manfaat Asuransi Kesehatan & Medical Reimbursement',
+    summary:
+      'Peningkatan fasilitas rawat jalan dan integrasi klaim digital cashless melalui portal ESS Karyawan dengan jaringan rumah sakit rekanan tier-1.',
+    content:
+      'Manajemen HR dengan bangga mengumumkan pembaruan fasilitas asuransi kesehatan karyawan:\n\n1. Plafon rawat jalan ditingkatkan sebesar 15% untuk seluruh staf tetap.\n2. Klaim rawat inap dan obat resep dapat diproses secara cashless via kartu digital ESS.\n3. Buku panduan klaim reimbursement dapat diakses di Pusat Dokumen & Surat.',
+    buttonText: 'Rincian Polis Asuransi',
+    priority: 'INFO',
+    publishedAt: '12 Oktober 2026, 10:00 WIB',
+    author: 'Benefit & People Development Lead',
     isEmergency: false,
   },
 ];
@@ -67,7 +92,7 @@ function ensureStorage(): void {
   } catch {}
 }
 
-function getStoredAnnouncements(): HrAnnouncement[] {
+function getStoredFileAnnouncements(): HrAnnouncement[] {
   try {
     ensureStorage();
     if (fs.existsSync(ANNOUNCEMENTS_FILE)) {
@@ -80,27 +105,85 @@ function getStoredAnnouncements(): HrAnnouncement[] {
   return defaultAnnouncements;
 }
 
-function saveStoredAnnouncements(data: HrAnnouncement[]): void {
+function saveStoredFileAnnouncements(data: HrAnnouncement[]): void {
   try {
     ensureStorage();
     fs.writeFileSync(ANNOUNCEMENTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch {}
 }
 
+async function getAnnouncementsFromDb(): Promise<HrAnnouncement[]> {
+  try {
+    const sql = getDb();
+    await sql`
+      CREATE TABLE IF NOT EXISTS hr_announcements (
+        id VARCHAR(100) PRIMARY KEY,
+        badge VARCHAR(100) NOT NULL,
+        doc_number VARCHAR(100) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        summary TEXT NOT NULL,
+        content TEXT NOT NULL,
+        button_text VARCHAR(100) NOT NULL,
+        priority VARCHAR(50) NOT NULL,
+        published_at VARCHAR(100) NOT NULL,
+        author VARCHAR(150) NOT NULL,
+        is_emergency BOOLEAN DEFAULT FALSE,
+        attachment_url TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `;
+
+    const rows = await sql`
+      SELECT id, badge, doc_number AS "docNumber", title, summary, content,
+             button_text AS "buttonText", priority, published_at AS "publishedAt",
+             author, is_emergency AS "isEmergency", attachment_url AS "attachmentUrl"
+      FROM hr_announcements
+      ORDER BY created_at DESC
+      LIMIT 20;
+    `;
+
+    if (rows && rows.length > 0) {
+      return rows as unknown as HrAnnouncement[];
+    }
+
+    // Seed default announcements if table is empty
+    for (const item of defaultAnnouncements) {
+      await sql`
+        INSERT INTO hr_announcements (
+          id, badge, doc_number, title, summary, content, button_text,
+          priority, published_at, author, is_emergency, attachment_url
+        ) VALUES (
+          ${item.id}, ${item.badge}, ${item.docNumber}, ${item.title},
+          ${item.summary}, ${item.content}, ${item.buttonText}, ${item.priority},
+          ${item.publishedAt}, ${item.author}, ${item.isEmergency || false}, ${item.attachmentUrl || null}
+        ) ON CONFLICT (id) DO NOTHING;
+      `;
+    }
+
+    return defaultAnnouncements;
+  } catch (err) {
+    console.error('Error fetching announcements from DB, using file fallback:', err);
+    return getStoredFileAnnouncements();
+  }
+}
+
 // GET /api/v1/announcements
 export async function GET() {
   try {
-    const list = getStoredAnnouncements();
+    const list = await getAnnouncementsFromDb();
+    saveStoredFileAnnouncements(list);
     return NextResponse.json({
       success: true,
       data: list,
       count: list.length,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, error: { message: err.message } },
-      { status: 500 }
-    );
+    const fallback = getStoredFileAnnouncements();
+    return NextResponse.json({
+      success: true,
+      data: fallback,
+      count: fallback.length,
+    });
   }
 }
 
@@ -140,16 +223,36 @@ export async function POST(request: NextRequest) {
       attachmentUrl: body.attachmentUrl || undefined,
     };
 
-    const currentList = getStoredAnnouncements();
-    const updatedList = [newAnnouncement, ...currentList.slice(0, 19)];
-    saveStoredAnnouncements(updatedList);
+    // 1. Insert into Neon PostgreSQL
+    try {
+      const sql = getDb();
+      await sql`
+        INSERT INTO hr_announcements (
+          id, badge, doc_number, title, summary, content, button_text,
+          priority, published_at, author, is_emergency, attachment_url, created_at
+        ) VALUES (
+          ${newAnnouncement.id}, ${newAnnouncement.badge}, ${newAnnouncement.docNumber},
+          ${newAnnouncement.title}, ${newAnnouncement.summary}, ${newAnnouncement.content},
+          ${newAnnouncement.buttonText}, ${newAnnouncement.priority}, ${newAnnouncement.publishedAt},
+          ${newAnnouncement.author}, ${newAnnouncement.isEmergency || false},
+          ${newAnnouncement.attachmentUrl || null}, NOW()
+        );
+      `;
+    } catch (dbErr) {
+      console.error('Failed to insert announcement to PostgreSQL:', dbErr);
+    }
 
-    // Multi-device SSE broadcast
+    // 2. Save to file storage
+    const currentList = getStoredFileAnnouncements();
+    const updatedList = [newAnnouncement, ...currentList.filter((a) => a.id !== newAnnouncement.id).slice(0, 19)];
+    saveStoredFileAnnouncements(updatedList);
+
+    // 3. Multi-device SSE broadcast
     try {
       broadcastEmployeeEvent('ANNOUNCEMENT_PUBLISHED', newAnnouncement);
     } catch {}
 
-    // Synchronize to persistent notifications center so every employee role sees it in the bell dropdown
+    // 4. Synchronize to persistent notifications center
     try {
       const NOTIFICATIONS_FILE = path.join(STORAGE_DIR, 'nexora_notifications.json');
       let notifs: any[] = [];
@@ -193,7 +296,6 @@ export async function POST(request: NextRequest) {
       ensureStorage();
       fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(updatedNotifs, null, 2), 'utf-8');
 
-      // Broadcast NEW_NOTIFICATION so bell icons ring and refresh unread counter
       try {
         broadcastEmployeeEvent('NEW_NOTIFICATION', notifItem);
       } catch {}
@@ -201,7 +303,7 @@ export async function POST(request: NextRequest) {
       console.error('[Announcements] Failed to sync notification:', notifErr);
     }
 
-    // Audit log
+    // 5. Audit log
     try {
       const auditLog: AuditLogEntry = {
         id: `aud-${Date.now()}`,

@@ -47,6 +47,7 @@ import {
   PanelLeft,
   PanelLeftClose,
   Menu,
+  ArrowRight,
 } from 'lucide-react';
 import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
@@ -179,7 +180,7 @@ export default function EmployeeDashboardOverhaulPage() {
       id: 'ann-1',
       badge: 'PENGUMUMAN HRD',
       docNumber: 'No. 018/HR-NOTIF/X/2026',
-      title: 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026',
+      title: 'Ketentuan Core Hours & Fleksibilitas Hybrid Kerja Q4 2026',
       summary:
         'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.',
       content:
@@ -187,13 +188,83 @@ export default function EmployeeDashboardOverhaulPage() {
       buttonText: 'Lihat SE Direksi',
       priority: 'IMPORTANT',
       publishedAt: '20 Oktober 2026, 08:00 WIB',
-      author: 'Dewan Direksi & HR Operations',
+      author: 'Direktur SDM & Operasional',
+      isEmergency: false,
+    },
+    {
+      id: 'ann-2',
+      badge: 'PAYROLL & KOMPENSASI',
+      docNumber: 'No. 024/HR-PAY/X/2026',
+      title: 'Penyaluran Batch Payroll Periode Maret 2025 Sukses 100%',
+      summary:
+        'Perintah transfer penggajian batch periode berjalan telah sukses disalurkan ke host-to-host kliring perbankan. Slip gaji digital telah terbit dan dapat diunduh.',
+      content:
+        'Pemberitahuan kepada seluruh staf aktif PT Nexora Solusi Nusantara:\n\n1. Pemrosesan lembar kompensasi periode 26 Februari - 25 Maret 2025 telah selesai diotorisasi.\n2. Seluruh hak gaji pokok, tunjangan operasional, dan lembur telah ditransfer ke rekening payroll karyawan.\n3. Rincian pemotongan PPh 21 TER (PP 58/2023) dan iuran BPJS Ketenagakerjaan/Kesehatan tercantum lengkap di slip gaji digital.',
+      buttonText: 'Cek Rincian Payroll',
+      priority: 'INFO',
+      publishedAt: '25 Maret 2025, 14:30 WIB',
+      author: 'Finance & HR Operations Manager',
+      isEmergency: false,
+    },
+    {
+      id: 'ann-3',
+      badge: 'BENEFIT & ASURANSI',
+      docNumber: 'No. 012/HR-BENEFIT/X/2026',
+      title: 'Pembaruan Skema Manfaat Asuransi Kesehatan & Medical Reimbursement',
+      summary:
+        'Peningkatan fasilitas rawat jalan dan integrasi klaim digital cashless melalui portal ESS Karyawan dengan jaringan rumah sakit rekanan tier-1.',
+      content:
+        'Manajemen HR dengan bangga mengumumkan pembaruan fasilitas asuransi kesehatan karyawan:\n\n1. Plafon rawat jalan ditingkatkan sebesar 15% untuk seluruh staf tetap.\n2. Klaim rawat inap dan obat resep dapat diproses secara cashless via kartu digital ESS.\n3. Buku panduan klaim reimbursement dapat diakses di Pusat Dokumen & Surat.',
+      buttonText: 'Rincian Polis Asuransi',
+      priority: 'INFO',
+      publishedAt: '12 Oktober 2026, 10:00 WIB',
+      author: 'Benefit & People Development Lead',
       isEmergency: false,
     },
   ]);
   const [activeAnnouncementIdx, setActiveAnnouncementIdx] = useState(0);
   const [isAnnouncementGlowing, setIsAnnouncementGlowing] = useState(false);
   const [isAnnouncementLiveConnected, setIsAnnouncementLiveConnected] = useState(false);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const [carouselProgress, setCarouselProgress] = useState(0);
+
+  // Auto-advance announcement carousel every 8 seconds, pausing on mouse hover
+  useEffect(() => {
+    if (announcements.length <= 1 || isCarouselPaused) return;
+
+    const intervalTime = 8000;
+    const tickRate = 50;
+    const step = (tickRate / intervalTime) * 100;
+
+    const timer = setInterval(() => {
+      setCarouselProgress((prev) => {
+        if (prev >= 100) {
+          setActiveAnnouncementIdx((curr) => (curr + 1) % announcements.length);
+          return 0;
+        }
+        return prev + step;
+      });
+    }, tickRate);
+
+    return () => clearInterval(timer);
+  }, [announcements.length, isCarouselPaused]);
+
+  const handleSelectAnnouncement = (idx: number) => {
+    setActiveAnnouncementIdx(idx);
+    setCarouselProgress(0);
+  };
+
+  const handlePrevAnnouncement = () => {
+    setActiveAnnouncementIdx((curr) =>
+      curr === 0 ? announcements.length - 1 : curr - 1
+    );
+    setCarouselProgress(0);
+  };
+
+  const handleNextAnnouncement = () => {
+    setActiveAnnouncementIdx((curr) => (curr + 1) % announcements.length);
+    setCarouselProgress(0);
+  };
 
   // Live Date & Greeting
   const [currentDateStr, setCurrentDateStr] = useState('');
@@ -1100,106 +1171,160 @@ export default function EmployeeDashboardOverhaulPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* LEFT COLUMN (8 COLS) */}
             <div className="lg:col-span-8 space-y-6">
-              {/* CARD 1: PENGUMUMAN HRD - Real-time Live & Dynamic */}
+              {/* CARD 1: PENGUMUMAN HRD - Clean Premium & Dynamic Executive Bulletin */}
               {(() => {
                 const currentAnnouncement =
                   announcements[activeAnnouncementIdx] || announcements[0];
+                const isUrgent = currentAnnouncement?.priority === 'URGENT';
                 return (
                   <div
-                    className={`rounded-3xl p-6 sm:p-7 text-white shadow-md relative overflow-hidden transition-all duration-500 ${
+                    onMouseEnter={() => setIsCarouselPaused(true)}
+                    onMouseLeave={() => setIsCarouselPaused(false)}
+                    className={`group relative rounded-3xl p-6 sm:p-7 text-white shadow-xl transition-all duration-500 overflow-hidden ${
                       isAnnouncementGlowing
-                        ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-white shadow-[0_0_35px_rgba(251,191,36,0.6)] scale-[1.01]'
+                        ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-900 shadow-[0_0_35px_rgba(251,191,36,0.5)] scale-[1.01]'
                         : ''
                     } ${
-                      currentAnnouncement?.priority === 'URGENT'
-                        ? 'bg-gradient-to-r from-rose-900 via-rose-800 to-indigo-950'
-                        : 'bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900'
+                      isUrgent
+                        ? 'bg-gradient-to-br from-slate-950 via-rose-950/80 to-slate-900 border border-rose-800/50 shadow-rose-950/20'
+                        : 'bg-gradient-to-br from-[#0F172A] via-[#111C38] to-[#0A1128] border border-slate-700/60 shadow-slate-950/20'
                     }`}
                   >
-                    {/* Decorative background pattern */}
-                    <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none flex items-center justify-end pr-6">
-                      <Building2 className="w-44 h-44 text-white" />
-                    </div>
+                    {/* Top ambient progress bar */}
+                    {announcements.length > 1 && (
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-white/5 z-20 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 via-indigo-400 to-cyan-300 transition-all duration-75"
+                          style={{ width: `${carouselProgress}%` }}
+                        />
+                      </div>
+                    )}
 
-                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                      <div className="space-y-2 max-w-xl">
+                    {/* Subtle luxury ambient glows */}
+                    <div className="absolute -right-12 -top-12 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+                    <div className="absolute -left-12 -bottom-12 w-60 h-60 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+                    <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.04] pointer-events-none" />
+
+                    <div className="relative z-10 flex flex-col justify-between gap-5 min-h-[160px]">
+                      {/* Top Row: Category badge, Doc number, Live HR Sync, and Direct Slide Switcher */}
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="p-1.5 rounded-xl bg-white/10 text-white inline-flex items-center justify-center">
-                            <Megaphone className="w-4 h-4" />
+                          <span className="p-1.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-300 inline-flex items-center justify-center shadow-xs">
+                            <Megaphone className="w-3.5 h-3.5" />
                           </span>
-                          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/30 text-blue-100 border border-white/20 uppercase tracking-wider">
+
+                          <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${
+                            isUrgent
+                              ? 'bg-rose-500/20 text-rose-200 border-rose-400/30'
+                              : 'bg-blue-500/15 text-blue-200 border-blue-400/25'
+                          }`}>
                             {currentAnnouncement?.badge || 'PENGUMUMAN HRD'}
                           </span>
-                          <span className="text-[11px] text-blue-200 font-medium">
+
+                          <span className="text-[11px] font-mono text-slate-300 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
                             {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/X/2026'}
                           </span>
 
                           {/* Live SSE / Broadcast Indicator */}
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 text-[10px] font-semibold">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                             <span>Live HR Sync</span>
                           </span>
 
                           {isAnnouncementGlowing && (
-                            <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase tracking-wider animate-bounce">
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase tracking-wider animate-bounce shadow-md shadow-amber-400/30">
                               ✨ Pengumuman Baru
                             </span>
                           )}
                         </div>
 
-                        <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white pt-1">
-                          {currentAnnouncement?.title || 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026'}
-                        </h3>
-
-                        <p className="text-xs text-blue-100/90 leading-relaxed">
-                          {currentAnnouncement?.summary ||
-                            'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.'}
-                        </p>
-
-                        {/* Navigation dots / arrows if multiple announcements exist */}
+                        {/* Interactive Slide Switcher Pills (Top-Right) */}
                         {announcements.length > 1 && (
-                          <div className="flex items-center gap-2 pt-1 text-[11px] text-blue-200">
-                            <span className="text-[10px] font-medium opacity-80">
-                              {activeAnnouncementIdx + 1} dari {announcements.length} Pengumuman
-                            </span>
-                            <div className="inline-flex items-center gap-1 bg-white/10 rounded-lg p-0.5 border border-white/15">
+                          <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-2.5 py-1 backdrop-blur-md">
+                            {announcements.map((item, idx) => (
                               <button
+                                key={item.id || idx}
                                 type="button"
-                                onClick={() =>
-                                  setActiveAnnouncementIdx((prev) =>
-                                    prev === 0 ? announcements.length - 1 : prev - 1
-                                  )
-                                }
-                                className="p-1 hover:bg-white/20 rounded text-white transition-colors"
-                                title="Pengumuman sebelumnya"
-                              >
-                                <ChevronLeft className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setActiveAnnouncementIdx((prev) =>
-                                    (prev + 1) % announcements.length
-                                  )
-                                }
-                                className="p-1 hover:bg-white/20 rounded text-white transition-colors"
-                                title="Pengumuman berikutnya"
-                              >
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                                onClick={() => handleSelectAnnouncement(idx)}
+                                title={`Beralih ke: ${item.title}`}
+                                className={`transition-all duration-300 rounded-full ${
+                                  idx === activeAnnouncementIdx
+                                    ? 'w-6 h-2 bg-gradient-to-r from-blue-400 to-indigo-300 shadow-xs'
+                                    : 'w-2 h-2 bg-white/20 hover:bg-white/50'
+                                }`}
+                              />
+                            ))}
+                            {isCarouselPaused && (
+                              <span className="text-[9px] font-semibold text-slate-400 pl-1 uppercase tracking-wider">
+                                Jeda
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setIsAnnouncementModalOpen(true)}
-                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs shadow-md transition-all active:scale-95 flex-shrink-0 self-start sm:self-center"
-                      >
-                        <span>{currentAnnouncement?.buttonText || 'Lihat SE Direksi'}</span>
-                      </button>
+                      {/* Middle: Title & Summary */}
+                      <div className="space-y-1.5 max-w-3xl">
+                        <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white leading-snug">
+                          {currentAnnouncement?.title || 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026'}
+                        </h3>
+
+                        <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed font-normal">
+                          {currentAnnouncement?.summary ||
+                            'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.'}
+                        </p>
+                      </div>
+
+                      {/* Bottom Row: Metadata, Pagination Controls, and Luxury Action Button */}
+                      <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                          <span>
+                            Diterbitkan: <strong className="text-slate-300 font-medium">{currentAnnouncement?.publishedAt}</strong>
+                          </span>
+                          <span className="text-slate-600">•</span>
+                          <span>
+                            Otorisasi: <strong className="text-slate-300 font-medium">{currentAnnouncement?.author}</strong>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between sm:justify-end gap-3">
+                          {/* Navigation Controls: Arrows and Indicator */}
+                          {announcements.length > 1 && (
+                            <div className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl p-1 backdrop-blur-md">
+                              <button
+                                type="button"
+                                onClick={handlePrevAnnouncement}
+                                className="p-1 hover:bg-white/15 rounded-lg text-slate-300 hover:text-white transition-colors"
+                                title="Pengumuman sebelumnya"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              <span className="text-[11px] font-mono text-slate-300 px-1 font-medium">
+                                {activeAnnouncementIdx + 1} / {announcements.length}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={handleNextAnnouncement}
+                                className="p-1 hover:bg-white/15 rounded-lg text-slate-300 hover:text-white transition-colors"
+                                title="Pengumuman berikutnya"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Executive CTA Button */}
+                          <button
+                            type="button"
+                            onClick={() => setIsAnnouncementModalOpen(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-600/25 border border-blue-400/30 transition-all hover:scale-[1.02] active:scale-95 flex-shrink-0 group"
+                          >
+                            <span>{currentAnnouncement?.buttonText || 'Lihat SE Direksi'}</span>
+                            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1613,23 +1738,27 @@ export default function EmployeeDashboardOverhaulPage() {
         </div>
       )}
 
-      {/* MODAL 3: LIHAT SE DIREKSI (Dynamic Content) */}
+      {/* MODAL 3: LIHAT SE DIREKSI (Dynamic Content & Executive Official Format) */}
       {isAnnouncementModalOpen && (() => {
         const currentAnnouncement =
           announcements[activeAnnouncementIdx] || announcements[0];
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-            <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 p-6 sm:p-7 space-y-5 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+              {/* Official Document Header */}
+              <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
                     <Megaphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    <span className="text-[10px] font-extrabold tracking-wider text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                      PT NEXORA SOLUSI NUSANTARA • SURAT RESMI
+                    </span>
+                    <h3 className="text-base font-extrabold text-slate-900 leading-snug pt-1">
                       {currentAnnouncement?.title || 'Surat Edaran Direksi'}
                     </h3>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-xs font-mono text-slate-400 mt-0.5">
                       Nomor: {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/X/2026'}
                     </p>
                   </div>
@@ -1637,48 +1766,72 @@ export default function EmployeeDashboardOverhaulPage() {
                 <button
                   type="button"
                   onClick={() => setIsAnnouncementModalOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3 text-xs text-slate-700 leading-relaxed">
-                <div className="flex items-center justify-between text-[11px] text-slate-500 pb-2 border-b border-slate-200/60">
-                  <span>Diterbitkan: <strong>{currentAnnouncement?.publishedAt}</strong></span>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold text-[10px]">
-                    {currentAnnouncement?.badge || 'PENGUMUMAN HRD'}
+              {/* Document Meta Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Kategori Klasifikasi</span>
+                  <span className="font-bold text-slate-800">{currentAnnouncement?.badge || 'PENGUMUMAN HRD'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Tanggal Efektif</span>
+                  <span className="font-bold text-slate-800">{currentAnnouncement?.publishedAt}</span>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <span className="text-[10px] text-slate-400 block font-medium">Prioritas Regulasi</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                    currentAnnouncement?.priority === 'URGENT'
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {currentAnnouncement?.priority || 'IMPORTANT'}
                   </span>
                 </div>
+              </div>
 
-                <div>
-                  <p className="font-bold text-slate-900 pb-1">Ringkasan Eksekutif:</p>
-                  <p className="text-slate-700">{currentAnnouncement?.summary}</p>
+              {/* Document Body */}
+              <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
+                <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100/80 space-y-1">
+                  <p className="font-bold text-blue-950 text-[11px] uppercase tracking-wide">Ringkasan Eksekutif:</p>
+                  <p className="text-slate-700 leading-relaxed">{currentAnnouncement?.summary}</p>
                 </div>
 
-                <div className="pt-2 border-t border-slate-200/60">
-                  <p className="font-bold text-slate-900 pb-1">Ketentuan & Dokumen Lengkap:</p>
-                  <div className="whitespace-pre-line text-slate-600 leading-relaxed">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <p className="font-bold text-slate-900 text-[11px] uppercase tracking-wide">Ketentuan & Butir Instruksi Resmi:</p>
+                  <div className="whitespace-pre-line text-slate-600 leading-relaxed font-sans">
                     {currentAnnouncement?.content}
                   </div>
                 </div>
 
-                <div className="pt-2 text-[11px] text-slate-500 border-t border-slate-200/60 flex items-center justify-between">
-                  <span>Otorisator: <strong>{currentAnnouncement?.author || 'Dewan Direksi'}</strong></span>
-                  <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" /> Terverifikasi Sistem HR
+                <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    Dokumen ini disahkan & diotorisasi oleh <strong>{currentAnnouncement?.author || 'Dewan Direksi'}</strong>
                   </span>
+                  <span className="text-[10px] font-mono text-emerald-600">ID: {currentAnnouncement?.id}</span>
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">
-                  PT Nexora Solusi Nusantara
-                </span>
+              {/* Action Buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDoc(`Dokumen_${currentAnnouncement?.docNumber?.replace(/[^a-zA-Z0-9]/g, '_') || 'SE_Direksi'}`)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+                >
+                  <Download className="w-4 h-4 text-slate-600" />
+                  <span>Unduh Salinan Resmi (PDF)</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsAnnouncementModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all active:scale-95"
                 >
                   Tutup Dokumen
                 </button>
