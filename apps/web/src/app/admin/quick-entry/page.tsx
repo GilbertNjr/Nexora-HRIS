@@ -34,7 +34,78 @@ import {
   FileText,
   Laptop,
   ChevronDown,
+  RotateCcw,
+  Camera,
+  User,
 } from 'lucide-react';
+
+// Helper function to generate clean initial form data with dynamic NIP
+const generateInitialNip = () => `NX-${new Date().getFullYear()}${Math.floor(100 + Math.random() * 900)}`;
+
+const getBlankFormData = (autoId?: string) => ({
+  fullName: '',
+  nik: '',
+  npwp: '',
+  birthPlace: '',
+  birthDate: '',
+  gender: 'Laki-laki',
+  ptkp: 'TK/0 - Tidak Kawin Tanpa Tanggungan',
+  emailPersonal: '',
+  emailCorporate: '',
+  phone: '',
+  address: '',
+  department: 'Divisi Teknologi & Produk',
+  directorate: 'Product Eng Directorate',
+  role: '',
+  contractType: 'PKWTT',
+  employeeId: autoId || generateInitialNip(),
+  reportingManager: '',
+  startDate: new Date().toISOString().split('T')[0],
+  workLocation: 'HQ SCBD Jakarta (Hybrid)',
+  baseSalary: '',
+  allowance: '',
+  bankName: 'BCA',
+  bankAccount: '',
+  bpjsTk: '',
+  bpjsKes: '',
+  essRole: 'Karyawan Mandiri (ESS)',
+  avatarUrl: '',
+});
+
+// High quality sample data for 1-click Demo Fill
+const DEMO_SAMPLE_DATA = {
+  fullName: 'Raden Aria Pratama, S.Kom.',
+  nik: '3174092408960003',
+  npwp: '3174.0924.0896.0003',
+  birthPlace: 'Jakarta Selatan',
+  birthDate: '1996-08-24',
+  gender: 'Laki-laki',
+  ptkp: 'TK/0 - Tidak Kawin Tanpa Tanggungan',
+  emailPersonal: 'aria.pratama@gmail.com',
+  emailCorporate: 'aria.pratama@nexora.co.id',
+  phone: '+62 812-8899-7766',
+  address: 'Jl. Senopati No. 42, Kebayoran Baru, Jakarta Selatan',
+  department: 'Divisi Teknologi & Produk',
+  directorate: 'Product Eng Directorate',
+  role: 'Sr. Cloud Backend Engineer',
+  contractType: 'PKWTT',
+  employeeId: 'NX-2026089',
+  reportingManager: 'Rian Pratama, S.Kom (Lead Architect)',
+  startDate: '2026-04-01',
+  workLocation: 'HQ SCBD Jakarta (Hybrid)',
+  baseSalary: '24000000',
+  allowance: '4000000',
+  bankName: 'BCA',
+  bankAccount: '8820491823',
+  bpjsTk: '00012984920',
+  bpjsKes: '00092837411',
+  essRole: 'Karyawan Mandiri (ESS)',
+  avatarUrl:
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+};
+
+const DEMO_PHOTO_PREVIEW =
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400';
 
 export default function AdminQuickEntryPage() {
   // Navigation & Sub-Tabs in Quick Entry Center
@@ -45,42 +116,11 @@ export default function AdminQuickEntryPage() {
   // Step wizard for Employee Registration
   const [currentStep, setCurrentStep] = useState<number>(1);
 
-  // Form State - Employee Registration
-  const [formData, setFormData] = useState({
-    fullName: 'Raden Aria Pratama, S.Kom.',
-    nik: '3174092408960003',
-    npwp: '3174.0924.0896.0003',
-    birthPlace: 'Jakarta Selatan',
-    birthDate: '1996-08-24',
-    gender: 'Laki-laki',
-    ptkp: 'TK/0 - Tidak Kawin Tanpa Tanggungan',
-    emailPersonal: 'aria.pratama@gmail.com',
-    emailCorporate: 'aria.pratama@nexora.co.id',
-    phone: '+62 812-8899-7766',
-    address: 'Jl. Senopati No. 42, Kebayoran Baru, Jakarta Selatan',
-    department: 'Divisi Teknologi & Produk',
-    directorate: 'Product Eng Directorate',
-    role: 'Sr. Cloud Backend Engineer',
-    contractType: 'PKWTT',
-    employeeId: 'NX-2025089',
-    reportingManager: 'Rian Pratama, S.Kom (Lead Architect)',
-    startDate: '2025-04-01',
-    workLocation: 'HQ SCBD Jakarta (Hybrid)',
-    baseSalary: '24000000',
-    allowance: '4000000',
-    bankName: 'BCA',
-    bankAccount: '8820491823',
-    bpjsTk: '00012984920',
-    bpjsKes: '00092837411',
-    essRole: 'Karyawan Mandiri (ESS)',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
-  });
+  // Form State - Employee Registration (Professional Blank Default)
+  const [formData, setFormData] = useState(getBlankFormData());
 
-  // Photo preview state
-  const [photoPreview, setPhotoPreview] = useState<string>(
-    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400'
-  );
+  // Photo preview state (Starts empty by default)
+  const [photoPreview, setPhotoPreview] = useState<string>('');
 
   // Toast State
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(
@@ -92,14 +132,61 @@ export default function AdminQuickEntryPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  // 1-Click Demo Auto Fill
+  const handleLoadDemoData = () => {
+    setFormData({ ...DEMO_SAMPLE_DATA });
+    setPhotoPreview(DEMO_PHOTO_PREVIEW);
+    showToast('Data contoh demo berhasil dimuat otomatis!', 'info');
+  };
+
+  // Reset / Clear Form Back to Blank
+  const handleResetForm = () => {
+    setFormData(getBlankFormData());
+    setPhotoPreview('');
+    setCurrentStep(1);
+    showToast('Formulir berhasil dikosongkan untuk pendaftaran baru.', 'info');
+  };
+
+  // Generate Fresh NIP
+  const handleGenerateNewNip = () => {
+    const freshNip = generateInitialNip();
+    setFormData((prev) => ({ ...prev, employeeId: freshNip }));
+    showToast(`NIP baru dihasilkan: ${freshNip}`, 'info');
+  };
+
+  // Smart Name Input with Corporate Email Auto-Suggest
+  const handleFullNameChange = (name: string) => {
+    setFormData((prev) => {
+      const cleanWords = name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(Boolean);
+
+      const suggestedEmail =
+        cleanWords.length > 0 ? `${cleanWords.slice(0, 2).join('.')}@nexora.co.id` : '';
+
+      // Only auto-suggest corporate email if it is currently empty or was previously auto-suggested
+      const shouldUpdateEmail =
+        !prev.emailCorporate || prev.emailCorporate.endsWith('@nexora.co.id');
+
+      return {
+        ...prev,
+        fullName: name,
+        emailCorporate: shouldUpdateEmail && suggestedEmail ? suggestedEmail : prev.emailCorporate,
+      };
+    });
+  };
+
   // Completion percentage calculation
   const completionPercent = useMemo(() => {
     let score = 0;
-    if (formData.fullName) score += 20;
-    if (formData.nik.length === 16) score += 15;
-    if (formData.emailCorporate) score += 15;
-    if (formData.role && formData.department) score += 25;
-    if (formData.baseSalary && formData.bankAccount) score += 15;
+    if (formData.fullName.trim()) score += 20;
+    if (formData.nik.trim().length === 16) score += 15;
+    if (formData.emailCorporate.trim()) score += 15;
+    if (formData.role.trim() && formData.department) score += 25;
+    if (formData.baseSalary && formData.bankAccount.trim()) score += 15;
     if (photoPreview) score += 10;
     return Math.min(100, score);
   }, [formData, photoPreview]);
@@ -258,6 +345,28 @@ export default function AdminQuickEntryPage() {
 
           {/* Action Buttons Top Right */}
           <div className="flex flex-wrap items-center gap-2.5 flex-shrink-0">
+            {/* Isi Data Contoh (Demo) */}
+            <button
+              type="button"
+              onClick={handleLoadDemoData}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-amber-300 bg-amber-50/80 hover:bg-amber-100 text-amber-900 shadow-xs transition-all cursor-pointer"
+              title="Isi otomatis seluruh kolom formulir dengan data contoh untuk simulasi demo"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>Isi Data Contoh (Demo)</span>
+            </button>
+
+            {/* Kosongkan Form */}
+            <button
+              type="button"
+              onClick={handleResetForm}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-xs transition-all cursor-pointer"
+              title="Bersihkan semua input kembali kosong"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              <span>Kosongkan Form</span>
+            </button>
+
             {/* Simpan Draf (.draft) */}
             <button
               type="button"
@@ -548,15 +657,23 @@ export default function AdminQuickEntryPage() {
                   </span>
                 </div>
 
-                {/* Photo Upload Container (Light blue box matching screenshot) */}
+                {/* Photo Upload Container */}
                 <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 flex flex-col sm:flex-row items-center gap-5">
-                  {/* Photo Preview */}
-                  <div className="w-24 h-32 rounded-xl bg-slate-200 border-2 border-white shadow-sm overflow-hidden flex-shrink-0 relative group">
-                    <img
-                      src={photoPreview}
-                      alt="Pasfoto Karyawan"
-                      className="w-full h-full object-cover"
-                    />
+                  {/* Photo Preview Container */}
+                  <div className="w-24 h-32 rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 sm:border-solid sm:border-white shadow-sm overflow-hidden flex-shrink-0 relative group flex items-center justify-center">
+                    {photoPreview ? (
+                      <img
+                        src={photoPreview}
+                        alt="Pasfoto Karyawan"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-slate-50 text-slate-400">
+                        <Camera className="w-6 h-6 mb-1 text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500">Pasfoto 3:4</span>
+                        <span className="text-[9px] text-slate-400">Belum ada foto</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Upload Controls & Description */}
@@ -564,7 +681,7 @@ export default function AdminQuickEntryPage() {
                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                       <label className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-xs cursor-pointer transition-all">
                         <Upload className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Unggah Foto Resmi</span>
+                        <span>{photoPreview ? 'Ganti Foto Resmi' : 'Unggah Foto Resmi'}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -573,16 +690,18 @@ export default function AdminQuickEntryPage() {
                         />
                       </label>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPhotoPreview('');
-                          showToast('Foto karyawan dihapus');
-                        }}
-                        className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors"
-                      >
-                        Hapus
-                      </button>
+                      {photoPreview && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoPreview('');
+                            showToast('Foto karyawan berhasil dihapus');
+                          }}
+                          className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                        >
+                          Hapus Foto
+                        </button>
+                      )}
                     </div>
 
                     <p className="text-[11px] text-slate-500 leading-relaxed max-w-md">
@@ -607,9 +726,9 @@ export default function AdminQuickEntryPage() {
                     <input
                       type="text"
                       value={formData.fullName}
-                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      onChange={(e) => handleFullNameChange(e.target.value)}
                       placeholder="Contoh: Raden Aria Pratama, S.Kom."
-                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
 
@@ -620,20 +739,31 @@ export default function AdminQuickEntryPage() {
                         <label className="text-xs font-bold text-slate-700">
                           Nomor Induk Kependudukan (NIK) *
                         </label>
-                        <span className="text-[11px] font-semibold text-blue-600 flex items-center gap-1">
-                          <Check className="w-3 h-3 text-blue-600" />
-                          Terverifikasi
-                        </span>
+                        {formData.nik.trim().length === 16 ? (
+                          <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            16 Digit Valid
+                          </span>
+                        ) : formData.nik.trim().length > 0 ? (
+                          <span className="text-[11px] font-semibold text-amber-600">
+                            {formData.nik.trim().length}/16 Digit
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">16 digit KTP</span>
+                        )}
                       </div>
                       <div className="relative flex items-center">
                         <input
                           type="text"
                           maxLength={16}
                           value={formData.nik}
-                          onChange={(e) => setFormData({ ...formData, nik: e.target.value })}
-                          className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                          onChange={(e) => setFormData({ ...formData, nik: e.target.value.replace(/\D/g, '') })}
+                          placeholder="Masukkan 16 digit NIK KTP"
+                          className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 pr-9 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
-                        <CheckCircle2 className="w-4 h-4 text-blue-600 absolute right-3 pointer-events-none" />
+                        {formData.nik.trim().length === 16 && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 absolute right-3 pointer-events-none" />
+                        )}
                       </div>
                     </div>
 
@@ -645,7 +775,8 @@ export default function AdminQuickEntryPage() {
                         type="text"
                         value={formData.npwp}
                         onChange={(e) => setFormData({ ...formData, npwp: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="Contoh: 3174.0924.0896.0003"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -660,7 +791,8 @@ export default function AdminQuickEntryPage() {
                         type="text"
                         value={formData.birthPlace}
                         onChange={(e) => setFormData({ ...formData, birthPlace: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="Contoh: Jakarta Selatan"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
 
@@ -673,7 +805,7 @@ export default function AdminQuickEntryPage() {
                           type="date"
                           value={formData.birthDate}
                           onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                          className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                          className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                       </div>
                     </div>
@@ -688,7 +820,7 @@ export default function AdminQuickEntryPage() {
                       <select
                         value={formData.gender}
                         onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       >
                         <option value="Laki-laki">Laki-laki</option>
                         <option value="Perempuan">Perempuan</option>
@@ -702,7 +834,7 @@ export default function AdminQuickEntryPage() {
                       <select
                         value={formData.ptkp}
                         onChange={(e) => setFormData({ ...formData, ptkp: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       >
                         <option value="TK/0 - Tidak Kawin Tanpa Tanggungan">
                           TK/0 - Tidak Kawin Tanpa Tanggungan
@@ -726,7 +858,8 @@ export default function AdminQuickEntryPage() {
                       type="text"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="Contoh: Jl. Senopati No. 42, Kebayoran Baru, Jakarta Selatan"
+                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
                 </div>
@@ -788,7 +921,8 @@ export default function AdminQuickEntryPage() {
                         type="text"
                         value={formData.role}
                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        placeholder="Contoh: Sr. Cloud Backend Engineer"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -801,7 +935,7 @@ export default function AdminQuickEntryPage() {
                       <select
                         value={formData.contractType}
                         onChange={(e) => setFormData({ ...formData, contractType: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       >
                         <option value="PKWTT">PKWTT (Karyawan Tetap)</option>
                         <option value="PKWT">PKWT (Karyawan Kontrak)</option>
@@ -810,14 +944,26 @@ export default function AdminQuickEntryPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Nomor Induk Karyawan (NIK Internal)
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Nomor Induk Karyawan (NIK Internal)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleGenerateNewNip}
+                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                          title="Generate NIP baru otomatis"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Acak NIP</span>
+                        </button>
+                      </div>
                       <input
                         type="text"
                         value={formData.employeeId}
                         onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-slate-50"
+                        placeholder="Contoh: NX-2026101"
+                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -831,7 +977,8 @@ export default function AdminQuickEntryPage() {
                         type="text"
                         value={formData.reportingManager}
                         onChange={(e) => setFormData({ ...formData, reportingManager: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        placeholder="Contoh: Rian Pratama, S.Kom (Lead Architect)"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
 
@@ -843,7 +990,7 @@ export default function AdminQuickEntryPage() {
                         type="date"
                         value={formData.startDate}
                         onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -856,7 +1003,8 @@ export default function AdminQuickEntryPage() {
                       type="text"
                       value={formData.workLocation}
                       onChange={(e) => setFormData({ ...formData, workLocation: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                      placeholder="Contoh: HQ SCBD Jakarta (Hybrid)"
+                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
                 </div>
@@ -910,7 +1058,8 @@ export default function AdminQuickEntryPage() {
                         type="number"
                         value={formData.baseSalary}
                         onChange={(e) => setFormData({ ...formData, baseSalary: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        placeholder="Contoh: 15000000"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
 
@@ -922,7 +1071,8 @@ export default function AdminQuickEntryPage() {
                         type="number"
                         value={formData.allowance}
                         onChange={(e) => setFormData({ ...formData, allowance: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        placeholder="Contoh: 3000000"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -937,7 +1087,6 @@ export default function AdminQuickEntryPage() {
                       />
                     </div>
 
-
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
                         Nomor Rekening Bank *
@@ -945,8 +1094,9 @@ export default function AdminQuickEntryPage() {
                       <input
                         type="text"
                         value={formData.bankAccount}
-                        onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white"
+                        onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value.replace(/\D/g, '') })}
+                        placeholder="Nomor rekening tanpa spasi"
+                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -959,8 +1109,9 @@ export default function AdminQuickEntryPage() {
                       <input
                         type="text"
                         value={formData.bpjsTk}
-                        onChange={(e) => setFormData({ ...formData, bpjsTk: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white"
+                        onChange={(e) => setFormData({ ...formData, bpjsTk: e.target.value.replace(/\D/g, '') })}
+                        placeholder="Contoh: 00012984920 (11 digit)"
+                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
 
@@ -971,8 +1122,9 @@ export default function AdminQuickEntryPage() {
                       <input
                         type="text"
                         value={formData.bpjsKes}
-                        onChange={(e) => setFormData({ ...formData, bpjsKes: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white"
+                        onChange={(e) => setFormData({ ...formData, bpjsKes: e.target.value.replace(/\D/g, '') })}
+                        placeholder="Contoh: 00092837411 (13 digit)"
+                        className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -1020,13 +1172,14 @@ export default function AdminQuickEntryPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Email Korporat Resmi (Google Workspace SSO)
+                      Email Korporat Resmi (Google Workspace SSO) *
                     </label>
                     <input
                       type="email"
                       value={formData.emailCorporate}
                       onChange={(e) => setFormData({ ...formData, emailCorporate: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50"
+                      placeholder="Contoh: nama.karyawan@nexora.co.id"
+                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
                       Kredensial dan instruksi aktivasi 2FA akan dikirimkan otomatis ke email ini.
@@ -1041,7 +1194,7 @@ export default function AdminQuickEntryPage() {
                       <select
                         value={formData.essRole}
                         onChange={(e) => setFormData({ ...formData, essRole: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       >
                         <option value="Karyawan Mandiri (ESS)">Karyawan Mandiri (ESS Portal)</option>
                         <option value="Department Head / Reviewer">Department Head / Reviewer</option>
@@ -1057,7 +1210,8 @@ export default function AdminQuickEntryPage() {
                         type="text"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white"
+                        placeholder="Contoh: +62 812-8899-7766"
+                        className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -1137,45 +1291,99 @@ export default function AdminQuickEntryPage() {
               <div className="space-y-3 pt-1 text-xs">
                 {/* 1. NIK KTP Valid */}
                 <div className="flex items-start gap-2.5">
-                  <div className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Check className="w-2.5 h-2.5" />
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                      formData.nik.trim().length === 16
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : 'border border-slate-300 text-transparent'
+                    }`}
+                  >
+                    {formData.nik.trim().length === 16 && <Check className="w-2.5 h-2.5" />}
                   </div>
                   <div>
-                    <p className="font-bold text-slate-900 leading-tight">Format NIK KTP Valid</p>
-                    <p className="text-[11px] text-slate-400">16 digit sinkron dengan database Dukcapil</p>
+                    <p
+                      className={`font-bold leading-tight ${
+                        formData.nik.trim().length === 16 ? 'text-slate-900' : 'text-slate-600'
+                      }`}
+                    >
+                      Format NIK KTP {formData.nik.trim().length === 16 ? 'Valid' : '(16 Digit)'}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {formData.nik.trim().length > 0
+                        ? `${formData.nik.trim().length}/16 digit terisi`
+                        : '16 digit sinkron dengan database Dukcapil'}
+                    </p>
                   </div>
                 </div>
 
                 {/* 2. Email Belum Terdaftar */}
                 <div className="flex items-start gap-2.5">
-                  <div className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Check className="w-2.5 h-2.5" />
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                      formData.emailCorporate.trim().includes('@')
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : 'border border-slate-300 text-transparent'
+                    }`}
+                  >
+                    {formData.emailCorporate.trim().includes('@') && <Check className="w-2.5 h-2.5" />}
                   </div>
                   <div>
-                    <p className="font-bold text-slate-900 leading-tight">Alamat Email Belum Terdaftar</p>
-                    <p className="text-[11px] text-slate-400">
-                      {formData.emailCorporate} tersedia
+                    <p
+                      className={`font-bold leading-tight ${
+                        formData.emailCorporate.trim().includes('@') ? 'text-slate-900' : 'text-slate-600'
+                      }`}
+                    >
+                      Alamat Email Korporat
+                    </p>
+                    <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                      {formData.emailCorporate.trim()
+                        ? `${formData.emailCorporate.trim()} siap didaftarkan`
+                        : 'Gunakan email resmi @nexora.co.id'}
                     </p>
                   </div>
                 </div>
 
                 {/* 3. Siklus Cut-Off Payroll */}
                 <div className="flex items-start gap-2.5">
-                  <div className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Check className="w-2.5 h-2.5" />
                   </div>
                   <div>
                     <p className="font-bold text-slate-900 leading-tight">Siklus Cut-Off Payroll Sesuai</p>
-                    <p className="text-[11px] text-slate-400">Mulai 1 April terhitung penuh bulan depan</p>
+                    <p className="text-[11px] text-slate-400">
+                      Mulai {formData.startDate || 'tanggal bergabung'} terhitung otomatis
+                    </p>
                   </div>
                 </div>
 
                 {/* 4. Rekening Bank & BPJS */}
                 <div className="flex items-start gap-2.5">
-                  <div className="w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center flex-shrink-0 mt-0.5" />
+                  <div
+                    className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                      formData.bankAccount.trim() && formData.bpjsTk.trim()
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : 'border border-slate-300 text-transparent'
+                    }`}
+                  >
+                    {formData.bankAccount.trim() && formData.bpjsTk.trim() && (
+                      <Check className="w-2.5 h-2.5" />
+                    )}
+                  </div>
                   <div>
-                    <p className="font-bold text-slate-600 leading-tight">Nomor Rekening Bank &amp; BPJS</p>
-                    <p className="text-[11px] text-slate-400">Diperlukan di Langkah ke-3</p>
+                    <p
+                      className={`font-bold leading-tight ${
+                        formData.bankAccount.trim() && formData.bpjsTk.trim()
+                          ? 'text-slate-900'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      Nomor Rekening Bank &amp; BPJS
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {formData.bankAccount.trim() && formData.bpjsTk.trim()
+                        ? 'Rekening & kartu BPJS terkonfirmasi'
+                        : 'Diperlukan di Langkah ke-3'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1193,7 +1401,7 @@ export default function AdminQuickEntryPage() {
                 </span>
               </div>
 
-              {/* Digital Smart Badge Card Graphic (Exact match with screenshot) */}
+              {/* Digital Smart Badge Card Graphic */}
               <div className="rounded-2xl bg-gradient-to-br from-[#1E40AF] via-[#1D4ED8] to-[#0F172A] p-5 text-white shadow-xl relative overflow-hidden space-y-4">
                 {/* Background decorative elements */}
                 <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
@@ -1207,13 +1415,13 @@ export default function AdminQuickEntryPage() {
                     <span className="text-xs font-bold tracking-tight">Nexora HRIS</span>
                   </div>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-white/20 text-white backdrop-blur-xs">
-                    {formData.contractType}
+                    {formData.contractType || 'PKWTT'}
                   </span>
                 </div>
 
                 {/* Card Middle: Photo + Info */}
                 <div className="flex items-center gap-3.5 relative z-10">
-                  <div className="w-14 h-16 rounded-xl bg-white/10 border-2 border-white/60 overflow-hidden flex-shrink-0 shadow-sm">
+                  <div className="w-14 h-16 rounded-xl bg-white/10 border-2 border-white/60 overflow-hidden flex-shrink-0 shadow-sm flex items-center justify-center">
                     {photoPreview ? (
                       <img
                         src={photoPreview}
@@ -1221,21 +1429,41 @@ export default function AdminQuickEntryPage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white/50 text-xs">
-                        No Foto
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-white/10 text-white">
+                        {formData.fullName.trim() ? (
+                          <span className="text-base font-extrabold tracking-wider">
+                            {formData.fullName
+                              .trim()
+                              .split(' ')
+                              .slice(0, 2)
+                              .map((n) => n[0])
+                              .join('')
+                              .toUpperCase()}
+                          </span>
+                        ) : (
+                          <User className="w-6 h-6 text-white/50" />
+                        )}
                       </div>
                     )}
                   </div>
 
                   <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-white truncate leading-tight">
-                      {formData.fullName || 'Nama Karyawan'}
+                    <h4
+                      className={`text-sm font-bold truncate leading-tight ${
+                        formData.fullName.trim() ? 'text-white' : 'text-white/60 italic'
+                      }`}
+                    >
+                      {formData.fullName.trim() || 'Nama Lengkap Karyawan'}
                     </h4>
-                    <p className="text-[11px] text-blue-200 truncate mt-0.5 font-medium">
-                      {formData.role || 'Jabatan'}
+                    <p
+                      className={`text-[11px] truncate mt-0.5 font-medium ${
+                        formData.role.trim() ? 'text-blue-200' : 'text-blue-200/60 italic'
+                      }`}
+                    >
+                      {formData.role.trim() || 'Posisi / Jabatan'}
                     </p>
                     <p className="text-[10px] text-slate-300 truncate font-normal">
-                      {formData.directorate || 'Directorate'}
+                      {formData.directorate.trim() || formData.department || 'Direktorat / Divisi'}
                     </p>
                   </div>
                 </div>
@@ -1247,7 +1475,7 @@ export default function AdminQuickEntryPage() {
                       NOMOR INDUK KARYAWAN
                     </p>
                     <p className="text-xs font-bold font-mono tracking-wider text-white mt-0.5">
-                      {formData.employeeId}
+                      {formData.employeeId.trim() || 'NX-OTOMATIS'}
                     </p>
                   </div>
 
