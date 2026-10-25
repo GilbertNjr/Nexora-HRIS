@@ -131,51 +131,51 @@ const defaultOkrsForRian: OkrItem[] = [
     category: 'teknikal',
     categoryLabel: 'Teknikal & Arsitektur',
     weight: 25,
-    progressPercent: 95,
+    progressPercent: 0,
     tag: 'Arsitektur Core',
-    selfRating: 4.9,
+    selfRating: 0,
     title: 'Migrasi Arsitektur Microservices Cloud Core Engine ke Kubernetes GKE',
     targetMetric: 'Target Metrik: Latency response time < 80ms dan zero downtime saat release payroll bulanan pada jam beban puncak.',
-    commentary: 'Migrasi 14 microservices selesai sesuai roadmap. Latency API turun rata-rata 32%, load test 50.000 concurrent user stabil tanpa packet drop.',
-    isDraft: false,
+    commentary: '',
+    isDraft: true,
   },
   {
     id: 'okr-2',
     category: 'teknikal',
     categoryLabel: 'Teknikal & Arsitektur',
     weight: 25,
-    progressPercent: 100,
+    progressPercent: 0,
     tag: 'Security & Compliance',
-    selfRating: 5.0,
+    selfRating: 0,
     title: 'Implementasi Enkripsi AES-256 & Audit Trail RFC-5424 Keamanan Data Karyawan',
     targetMetric: 'Target Metrik: Kepatuhan 100% terhadap regulasi UU PDP No. 27/2022 dan lulus security audit ISO 27001.',
-    commentary: 'Modul kriptografi data rest & transit rampung diimplementasikan dengan zero vulnerability pada penetration testing berkala.',
-    isDraft: false,
+    commentary: '',
+    isDraft: true,
   },
   {
     id: 'okr-3',
     category: 'operasional',
     categoryLabel: 'Efisiensi Operasional',
     weight: 30,
-    progressPercent: 90,
+    progressPercent: 0,
     tag: 'FinOps & Database',
-    selfRating: 4.8,
+    selfRating: 0,
     title: 'Optimasi Kueri Payroll Engine & Reduksi Biaya Komputasi Cloud (FinOps)',
     targetMetric: 'Target Metrik: Mempercepat proses kalkulasi payroll bulanan dari 45 menit menjadi < 15 menit serta efisiensi tagihan server 18%.',
-    commentary: 'Optimasi partisi tabel database dan query indexing berhasil memangkas runtime komputasi payroll hingga 68% lebih cepat.',
-    isDraft: false,
+    commentary: '',
+    isDraft: true,
   },
   {
     id: 'okr-4',
     category: 'budaya',
     categoryLabel: 'Kepemimpinan & Budaya',
     weight: 20,
-    progressPercent: 75,
+    progressPercent: 0,
     tag: 'Mentorship & Talent',
-    selfRating: 4.7,
+    selfRating: 0,
     title: 'Mentoring Rekayasa Perangkat Lunak & Knowledge Sharing Squad Backend',
     targetMetric: 'Target Metrik: Mengadakan 6 sesi tech-talk arsitektur dan membimbing 3 junior backend engineers menuju kemandirian on-call.',
-    commentary: 'Telah menyelesaikan 4 dari 6 sesi tech-talk arsitektur backend. 2 junior engineer telah berhasil memimpin deployment mandiri tanpa kendala.',
+    commentary: '',
     isDraft: true,
   },
 ];
@@ -238,16 +238,7 @@ const defaultIdpForRian: IdpItem[] = [
   },
 ];
 
-const defaultPastCyclesForRian: PastCycleArchive[] = [
-  {
-    cycle: 'Q3 2026',
-    score: 4.7,
-    grade: 'Sangat Baik (Exceeds)',
-    approvalDate: '20 Oktober 2026',
-    bonusImpact: 'Bonus Kinerja Kuartalan 2.5x Gaji Pokok & Kenaikan Grade Band 4.',
-    approvers: 'Arya Wibowo (VP Eng) & Citra Lestari (Chief People Officer)',
-  },
-];
+const defaultPastCyclesForRian: PastCycleArchive[] = [];
 
 function ensureStorage(): void {
   try {
@@ -408,10 +399,16 @@ export async function POST(request: NextRequest) {
     let finalScore = Number(score);
     if (isNaN(finalScore) || finalScore <= 0) {
       if (Array.isArray(okrs) && okrs.length > 0) {
-        finalScore = okrs.reduce((acc: number, item: OkrItem) => acc + (item.selfRating || 4.5) * (item.weight / 100), 0);
-        finalScore = Math.round(finalScore * 100) / 100;
+        const rated = okrs.filter((item: OkrItem) => Number(item.selfRating) > 0);
+        if (rated.length > 0) {
+          const totalWeight = rated.reduce((acc: number, item: OkrItem) => acc + (item.weight || 25), 0);
+          const weightedSum = rated.reduce((acc: number, item: OkrItem) => acc + (Number(item.selfRating) || 0) * (item.weight || 25), 0);
+          finalScore = totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) / 100 : 0;
+        } else {
+          finalScore = 0;
+        }
       } else {
-        finalScore = 4.85;
+        finalScore = 0;
       }
     }
 
@@ -511,7 +508,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { id, nik, score, status, feedback, managerRating, selfRating, okrs } = body;
 
-    const numScore = typeof score === 'number' ? score : 4.85;
+    const numScore = typeof score === 'number' && !isNaN(score) ? score : (typeof selfRating === 'number' && !isNaN(selfRating) ? selfRating : 0);
     const { grade, gradeColor } = getGradeFromScore(numScore);
 
     await upsertPerformanceToDb({

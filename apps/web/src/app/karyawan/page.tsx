@@ -218,18 +218,19 @@ export default function EmployeeDashboardOverhaulPage() {
   const [payrollCycle, setPayrollCycle] = useState({
     paydayDateStr: '',
     daysLeft: 0,
-    statusLabel: 'Data Terkunci',
+    statusLabel: 'Cutoff Payroll Aktif',
     monthName: 'Oktober',
     daysInMonth: 31,
   });
 
   const [performanceKpi, setPerformanceKpi] = useState({
-    cycleCode: 'Q4 2026',
-    quarterName: 'Q4',
-    score: '4.85',
-    grade: 'Grade A (Outstanding)',
-    yoyChange: '+0.15 YoY',
-    okrAchievement: '105%',
+    cycleCode: `Q${Math.floor(new Date().getMonth() / 3) + 1} ${new Date().getFullYear()}`,
+    quarterName: `Q${Math.floor(new Date().getMonth() / 3) + 1}`,
+    score: '—',
+    grade: 'Belum Dinilai',
+    yoyChange: '—',
+    okrAchievement: '0%',
+    status: 'MENUNGGU SUBMISI',
   });
 
   // Real-time Dynamic Weekly Schedule State (100% Calculated from Live Clock)
@@ -316,9 +317,9 @@ export default function EmployeeDashboardOverhaulPage() {
       }
     } catch {}
 
-    // 2. Fetch real-time leave quota from approvals
+    // 2. Fetch real-time leave quota from approvals (including approved records)
     try {
-      const appRes = await fetch('/api/v1/approvals');
+      const appRes = await fetch('/api/v1/approvals?all=true');
       if (appRes.ok) {
         const appJson = await appRes.json();
         const approvals = appJson.data || [];
@@ -351,14 +352,16 @@ export default function EmployeeDashboardOverhaulPage() {
         const quarter = Math.floor(now.getMonth() / 3) + 1;
         if (perfJson.success && perfJson.data) {
           const p = perfJson.data;
-          const scoreNum = Number(p.score) || 4.85;
+          const scoreNum = Number(p.score) || 0;
+          const isEvaluated = scoreNum > 0 && p.status !== 'MENUNGGU SUBMISI';
           setPerformanceKpi({
             cycleCode: p.cycle || `Q${quarter} ${now.getFullYear()}`,
             quarterName: `Q${quarter}`,
-            score: scoreNum.toFixed(2),
-            grade: p.grade || 'Grade A (Outstanding)',
-            yoyChange: '+0.15 YoY',
-            okrAchievement: p.okrAchievement || '105%',
+            score: isEvaluated ? scoreNum.toFixed(2) : '—',
+            grade: isEvaluated ? (p.grade || 'Grade B (Meets)') : 'Belum Dinilai',
+            yoyChange: isEvaluated ? '+0.15 YoY' : '—',
+            okrAchievement: isEvaluated ? (p.okrAchievement || '100%') : '0%',
+            status: p.status || 'MENUNGGU SUBMISI',
           });
         }
       }
@@ -395,10 +398,20 @@ export default function EmployeeDashboardOverhaulPage() {
     }
     const diffDays = Math.ceil((targetPayday.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+    const todayDateNum = now.getDate();
+    let statusLabel = 'Sinkronisasi Presensi Aktif';
+    if (diffDays === 0) {
+      statusLabel = 'Hari Ini Pembayaran';
+    } else if (todayDateNum > 20 && todayDateNum < 28) {
+      statusLabel = 'Cutoff Payroll Aktif';
+    } else if (todayDateNum > 28) {
+      statusLabel = 'Periode Baru Aktif';
+    }
+
     setPayrollCycle({
       paydayDateStr: `28 ${monthNames[targetPayday.getMonth()]} ${targetPayday.getFullYear()}`,
       daysLeft: Math.max(0, diffDays),
-      statusLabel: diffDays <= 4 ? 'Data Terkunci' : 'Proses Sinkronisasi',
+      statusLabel,
       monthName: monthNames[month],
       daysInMonth: daysInCurrentMonth,
     });
@@ -449,6 +462,8 @@ export default function EmployeeDashboardOverhaulPage() {
           type === 'ATTENDANCE_RECORDED' ||
           type === 'LEAVE_ACTIONED' ||
           type === 'LEAVE_REQUESTED' ||
+          type === 'APPROVAL_STATUS_CHANGED' ||
+          type === 'NEW_APPROVAL_REQUEST' ||
           type === 'PERFORMANCE_UPDATED' ||
           type === 'PERFORMANCE_CALIBRATED' ||
           type === 'PROFILE_UPDATED'
@@ -946,12 +961,15 @@ export default function EmployeeDashboardOverhaulPage() {
             </div>
 
             {/* Card 2: Saldo Cuti Tahunan */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
+            <Link
+              href="/karyawan/leave"
+              className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3 hover:border-blue-400 hover:shadow-md transition-all group"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 group-hover:text-blue-600 transition-colors">
                   SALDO CUTI TAHUNAN
                 </span>
-                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Umbrella className="w-4 h-4" />
                 </div>
               </div>
@@ -982,15 +1000,18 @@ export default function EmployeeDashboardOverhaulPage() {
                 <span>Terpakai: {leaveStats.usedDays} Hari</span>
                 <span>Hangus: {leaveStats.expiryDate}</span>
               </div>
-            </div>
+            </Link>
 
             {/* Card 3: Siklus Penggajian */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
+            <Link
+              href="/karyawan/payroll"
+              className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3 hover:border-blue-400 hover:shadow-md transition-all group"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 group-hover:text-blue-600 transition-colors">
                   SIKLUS PENGGAJIAN
                 </span>
-                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <CreditCard className="w-4 h-4" />
                 </div>
               </div>
@@ -1014,15 +1035,18 @@ export default function EmployeeDashboardOverhaulPage() {
                   {payrollCycle.statusLabel}
                 </span>
               </div>
-            </div>
+            </Link>
 
             {/* Card 4: Kinerja (Berjalan) */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3">
+            <Link
+              href="/karyawan/performance"
+              className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3 hover:border-amber-400 hover:shadow-md transition-all group"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 group-hover:text-amber-600 transition-colors">
                   KINERJA {performanceKpi.quarterName} (BERJALAN)
                 </span>
-                <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Award className="w-4 h-4" />
                 </div>
               </div>
@@ -1036,14 +1060,18 @@ export default function EmployeeDashboardOverhaulPage() {
 
               <div className="flex items-center justify-between text-xs pt-1">
                 <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                  <span className="text-amber-500">★</span>
+                  <span className={performanceKpi.score === '—' ? 'text-slate-400' : 'text-amber-500'}>★</span>
                   <span>{performanceKpi.grade}</span>
                 </span>
-                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                  performanceKpi.score === '—'
+                    ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}>
                   {performanceKpi.okrAchievement}
                 </span>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* SECTION 2: 2-COLUMN LAYOUT (LEFT 8 COLS, RIGHT 4 COLS) matching screenshot */}

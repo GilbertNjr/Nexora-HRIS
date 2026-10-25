@@ -157,13 +157,16 @@ export default function EssPerformancePage() {
 
   // Calculated dynamic self-appraisal score based on current okrList weights
   const calculatedScore = useMemo(() => {
-    if (!okrList || okrList.length === 0) return 4.85;
-    const total = okrList.reduce((acc, item) => {
-      const weightFraction = (item.weight || 25) / 100;
-      const rating = Number(item.selfRating) || 4.5;
-      return acc + rating * weightFraction;
+    if (!okrList || okrList.length === 0) return 0;
+    const filledOkrs = okrList.filter((item) => !item.isDraft && Number(item.selfRating) > 0);
+    if (filledOkrs.length === 0) return 0;
+    const totalWeight = filledOkrs.reduce((sum, item) => sum + (item.weight || 25), 0);
+    if (totalWeight === 0) return 0;
+    const totalWeightedScore = filledOkrs.reduce((acc, item) => {
+      const rating = Number(item.selfRating) || 0;
+      return acc + rating * (item.weight || 25);
     }, 0);
-    return Math.round(total * 100) / 100;
+    return Math.round((totalWeightedScore / totalWeight) * 100) / 100;
   }, [okrList]);
 
   // Dynamic Grade & Predicate
@@ -172,12 +175,27 @@ export default function EssPerformancePage() {
     if (calculatedScore >= 4.5) return 'Grade A (Outstanding)';
     if (calculatedScore >= 4.0) return 'Grade B+ (Exceeds)';
     if (calculatedScore >= 3.0) return 'Grade B (Meets)';
-    return 'Grade C (Perlu Peningkatan)';
+    if (calculatedScore > 0) return 'Grade C (Perlu Peningkatan)';
+    return 'Belum Dinilai';
   }, [calculatedScore]);
 
   // YoY Comparison with past cycle score
   const yoyComparison = useMemo(() => {
-    const pastScore = performanceRecord?.pastCycles?.[0]?.score || 4.7;
+    if (calculatedScore === 0) {
+      return {
+        diffString: '—',
+        isPositive: true,
+        pastScore: 0,
+      };
+    }
+    const pastScore = performanceRecord?.pastCycles?.[0]?.score || 0;
+    if (pastScore === 0) {
+      return {
+        diffString: 'Baru',
+        isPositive: true,
+        pastScore: 0,
+      };
+    }
     const diff = calculatedScore - pastScore;
     const isPositive = diff >= 0;
     const diffString = `${isPositive ? '+' : ''}${diff.toFixed(2)}`;
@@ -291,18 +309,7 @@ export default function EssPerformancePage() {
 
   // Past cycles
   const pastCycles: PastCycleArchive[] = useMemo(() => {
-    return (
-      performanceRecord?.pastCycles || [
-        {
-          cycle: 'Q4 2024',
-          score: 4.7,
-          grade: 'Sangat Baik (Exceeds)',
-          approvalDate: '20 Januari 2025',
-          bonusImpact: 'Bonus Kinerja Akhir Tahun 2.5x Gaji Pokok & Kenaikan Grade Band 4.',
-          approvers: 'Arya Wibowo (VP Eng) & Citra Lestari (Chief People Officer)',
-        },
-      ]
-    );
+    return performanceRecord?.pastCycles || [];
   }, [performanceRecord]);
 
   // Filtered OKRs
@@ -336,14 +343,14 @@ export default function EssPerformancePage() {
   // Open edit for a specific OKR
   const handleStartEditOkr = (okr: OkrItem) => {
     setEditingOkrId(okr.id);
-    setTempRating(String(okr.selfRating || 4.7));
+    setTempRating(String(okr.selfRating && okr.selfRating > 0 ? okr.selfRating : '5.0'));
     setTempCommentary(okr.commentary || '');
   };
 
   // Save single OKR draft to API
   const handleSaveOkrDraft = async (okrId: string) => {
     setIsSavingOkr(true);
-    const numRating = parseFloat(tempRating) || 4.7;
+    const numRating = parseFloat(tempRating) || 5.0;
 
     const nextOkrs = okrList.map((o) => {
       if (o.id === okrId) {
