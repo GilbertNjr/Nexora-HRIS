@@ -35,6 +35,7 @@ import {
   CalendarCheck,
   ShieldCheck,
   Camera,
+  Edit3,
 } from 'lucide-react';
 
 interface AttendanceRecord {
@@ -70,6 +71,23 @@ interface OvertimeItem {
   dateBadge: string;
 }
 
+interface AttendanceCorrectionItem {
+  id: string;
+  name: string;
+  nik: string;
+  role: string;
+  department: string;
+  date: string;
+  targetTime: string;
+  type: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  submittedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  adminNotes?: string;
+}
+
 export default function AdminAttendancePage() {
   // Dynamic Real-Time KPI Summary State (Synchronized with Attendance Database & ESS Clock-in)
   const [kpiSummary, setKpiSummary] = useState({
@@ -103,6 +121,9 @@ export default function AdminAttendancePage() {
 
   // Overtime Pending Requests State (Dynamic from unified approvals API)
   const [overtimeList, setOvertimeList] = useState<OvertimeItem[]>([]);
+
+  // Attendance Correction Requests State (Dynamic from unified approvals API)
+  const [correctionList, setCorrectionList] = useState<AttendanceCorrectionItem[]>([]);
 
   // Attendance Records State (Dynamic from real-time database)
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -206,6 +227,30 @@ export default function AdminAttendancePage() {
                 dateBadge: a.submittedDate || 'Hari Ini',
               }));
             setOvertimeList(pendingOT);
+
+            const pendingCorrections: AttendanceCorrectionItem[] = appJson.data
+              .filter((a: any) => a.type === 'presensi' && a.status === 'PENDING')
+              .map((a: any) => ({
+                id: a.id,
+                name: a.name,
+                nik: a.nik || 'NX-2021008',
+                role: a.role || 'Karyawan',
+                department: a.department || 'Teknologi Informasi',
+                date: a.correctionDate || a.date || '',
+                targetTime: a.correctionTargetTime || a.targetTime || '08:30',
+                type: a.correctionType || a.title?.replace('Koreksi Presensi: ', '') || 'Koreksi Presensi',
+                reason:
+                  a.correctionReason ||
+                  (a.detail?.includes('• Alasan: ')
+                    ? a.detail.split('• Alasan: ')[1].replace(/^"/, '').replace(/"$/, '')
+                    : a.detail || ''),
+                status: a.status || 'PENDING',
+                submittedAt: a.submittedDate || a.timestamp || '',
+                reviewedBy: a.reviewedBy,
+                reviewedAt: a.reviewedAt,
+                adminNotes: a.adminNotes,
+              }));
+            setCorrectionList(pendingCorrections);
           }
         }
       } catch {
@@ -337,7 +382,10 @@ export default function AdminAttendancePage() {
           msg.type === 'APPROVAL_STATUS_CHANGED' ||
           msg.type === 'LEAVE_SUBMITTED' ||
           msg.type === 'LEAVE_STATUS_CHANGED' ||
-          msg.type === 'OVERTIME_REQUESTED'
+          msg.type === 'OVERTIME_REQUESTED' ||
+          msg.type === 'ATTENDANCE_CORRECTION_SUBMITTED' ||
+          msg.type === 'ATTENDANCE_CORRECTION_UPDATED' ||
+          msg.type === 'APPROVAL_SUBMITTED'
         ) {
           fetchAttendanceApi();
         }
@@ -476,6 +524,30 @@ export default function AdminAttendancePage() {
               dateBadge: a.submittedDate || 'Hari Ini',
             }));
           setOvertimeList(pendingOT);
+
+          const pendingCorrections: AttendanceCorrectionItem[] = appJson.data
+            .filter((a: any) => a.type === 'presensi' && a.status === 'PENDING')
+            .map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              nik: a.nik || 'NX-2021008',
+              role: a.role || 'Karyawan',
+              department: a.department || 'Teknologi Informasi',
+              date: a.correctionDate || a.date || '',
+              targetTime: a.correctionTargetTime || a.targetTime || '08:30',
+              type: a.correctionType || a.title?.replace('Koreksi Presensi: ', '') || 'Koreksi Presensi',
+              reason:
+                a.correctionReason ||
+                (a.detail?.includes('• Alasan: ')
+                  ? a.detail.split('• Alasan: ')[1].replace(/^"/, '').replace(/"$/, '')
+                  : a.detail || ''),
+              status: a.status || 'PENDING',
+              submittedAt: a.submittedDate || a.timestamp || '',
+              reviewedBy: a.reviewedBy,
+              reviewedAt: a.reviewedAt,
+              adminNotes: a.adminNotes,
+            }));
+          setCorrectionList(pendingCorrections);
         }
       }
     } catch {}
@@ -511,6 +583,75 @@ export default function AdminAttendancePage() {
       ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'REJECTED' });
       ch.close();
     } catch {}
+  };
+
+  const handleApproveCorrection = async (item: AttendanceCorrectionItem) => {
+    setCorrectionList((prev) => prev.filter((c) => c.id !== item.id));
+    showToast(
+      `✓ Koreksi presensi ${item.name} (${item.date} • ${item.targetTime} WIB) disetujui & jam kehadiran otomatis diperbarui!`
+    );
+
+    try {
+      await fetch('/api/v1/approvals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          status: 'APPROVED',
+          reviewedBy: 'HR Operations SCBD',
+          adminNotes: 'Disetujui melalui verifikasi presensi harian HRD',
+        }),
+      });
+
+      const ch = new BroadcastChannel('nexora_live_sync');
+      ch.postMessage({
+        type: 'ATTENDANCE_CORRECTION_UPDATED',
+        id: item.id,
+        status: 'APPROVED',
+        nik: item.nik,
+        name: item.name,
+      });
+      ch.postMessage({
+        type: 'ATTENDANCE_RECORDED',
+      });
+      ch.close();
+
+      handleRefresh();
+    } catch (err) {
+      console.error('Failed to approve correction:', err);
+    }
+  };
+
+  const handleRejectCorrection = async (item: AttendanceCorrectionItem) => {
+    setCorrectionList((prev) => prev.filter((c) => c.id !== item.id));
+    showToast(`✕ Pengajuan koreksi presensi ${item.name} ditolak.`);
+
+    try {
+      await fetch('/api/v1/approvals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          status: 'REJECTED',
+          reviewedBy: 'HR Operations SCBD',
+          adminNotes: 'Ditolak: data presensi tidak sesuai dengan log CCTV/Server SCBD',
+        }),
+      });
+
+      const ch = new BroadcastChannel('nexora_live_sync');
+      ch.postMessage({
+        type: 'ATTENDANCE_CORRECTION_UPDATED',
+        id: item.id,
+        status: 'REJECTED',
+        nik: item.nik,
+        name: item.name,
+      });
+      ch.close();
+
+      handleRefresh();
+    } catch (err) {
+      console.error('Failed to reject correction:', err);
+    }
   };
 
   const toggleSelectAll = () => {
@@ -1293,6 +1434,91 @@ export default function AdminAttendancePage() {
               RIGHT COLUMN: Verifikasi Lembur & Metode Check-In (4 cols)
           ----------------------------------------------------------------------- */}
           <div className="lg:col-span-4 space-y-5">
+            {/* Card 0: Verifikasi Koreksi Presensi Karyawan */}
+            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <Edit3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Verifikasi Koreksi Presensi
+                    </h3>
+                  </div>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                  {correctionList.length} Pengajuan
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Pengajuan koreksi presensi mandiri (lupa tap-out, kendala jaringan/biometrik) yang menunggu verifikasi HR.
+              </p>
+
+              <div className="space-y-3.5">
+                {correctionList.map((cor) => (
+                  <div
+                    key={cor.id}
+                    className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80 space-y-2.5 hover:border-amber-300 transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
+                          <span>{cor.name}</span>
+                          <span className="text-[10px] font-mono text-slate-400 font-normal">({cor.nik})</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          {cor.department}
+                        </p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 flex-shrink-0">
+                        {cor.type}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 bg-white/90 px-3 py-1.5 rounded-xl border border-amber-200/60">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Tgl: {cor.date}</span>
+                      <span className="text-slate-300">•</span>
+                      <Clock className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="text-blue-700 font-bold">Target: {cor.targetTime} WIB</span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-700 italic bg-white p-2.5 rounded-xl border border-slate-200/60">
+                      &ldquo;{cor.reason}&rdquo;
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        onClick={() => handleRejectCorrection(cor)}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Tolak
+                      </button>
+                      <button
+                        onClick={() => handleApproveCorrection(cor)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all transform active:scale-95 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Setujui &amp; Perbarui Jam</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {correctionList.length === 0 && (
+                  <div className="text-center py-6 text-slate-400 text-xs space-y-1">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                    <p className="font-semibold text-slate-700">
+                      Semua Koreksi Selesai Diverifikasi
+                    </p>
+                    <p className="text-[11px]">Tidak ada permohonan koreksi presensi tertunda.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Card 1: Verifikasi Lembur */}
             <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">

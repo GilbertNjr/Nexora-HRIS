@@ -14,6 +14,12 @@ import {
   getDocumentRequestsFromDb,
   updateDocumentRequestStepInDb,
 } from '@/lib/documentDb';
+import {
+  getAttendanceCorrectionsFromDb,
+  saveAttendanceCorrectionToDb,
+  updateAttendanceCorrectionStatusInDb,
+  AttendanceCorrectionItem,
+} from '@/lib/attendanceCorrectionDb';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,7 +34,7 @@ export interface ApprovalItem {
   role: string;
   department?: string;
   avatarUrl?: string;
-  type: 'cuti' | 'lembur' | 'dokumen';
+  type: 'cuti' | 'lembur' | 'dokumen' | 'presensi';
   leaveType?: string;
   typeCategory?: 'tahunan' | 'sakit' | 'khusus';
   title: string;
@@ -59,6 +65,13 @@ export interface ApprovalItem {
   targetOrg?: string;
   targetPurpose?: string;
   urgency?: string;
+  correctionDate?: string;
+  correctionTargetTime?: string;
+  correctionType?: string;
+  correctionReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  adminNotes?: string;
 }
 
 const defaultApprovals: ApprovalItem[] = [];
@@ -98,6 +111,7 @@ function saveStoredApprovals(data: ApprovalItem[]): void {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const includeAll = searchParams.get('all') === 'true';
+  const filterNik = searchParams.get('nik');
   const approvals = getStoredApprovals();
 
   // 1. Load real persistent leave requests from Neon PostgreSQL
@@ -156,6 +170,50 @@ export async function GET(request: NextRequest) {
     console.warn('[approvals/GET] Could not load document requests:', err);
   }
 
+  // 3. Load attendance corrections from Neon PostgreSQL / attendanceCorrectionDb
+  let dbCorrections: ApprovalItem[] = [];
+  try {
+    const corrections = await getAttendanceCorrectionsFromDb();
+    dbCorrections = corrections.map((c) => {
+      const initials = c.employeeName
+        .replace(/[^a-zA-Z\s]/g, '')
+        .split(' ')
+        .filter(Boolean)
+        .map((w: string) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'RP';
+
+      return {
+        id: c.id,
+        name: c.employeeName,
+        nik: c.nik,
+        role: c.employeeRole,
+        department: c.department,
+        avatarUrl: c.avatarUrl,
+        type: 'presensi' as const,
+        title: `Koreksi Presensi: ${c.correctionType}`,
+        highlightType: 'Koreksi Kehadiran',
+        detail: `Tanggal: ${c.date} • Target: ${c.targetTime} WIB • Alasan: "${c.reason}"`,
+        timestamp: c.submittedAt,
+        avatarColor: 'from-amber-500 to-orange-600',
+        initials,
+        verifiedBadge: 'alert' as const,
+        status: c.status,
+        submittedDate: c.submittedAt,
+        correctionDate: c.date,
+        correctionTargetTime: c.targetTime,
+        correctionType: c.correctionType,
+        correctionReason: c.reason,
+        reviewedBy: c.reviewedBy,
+        reviewedAt: c.reviewedAt,
+        adminNotes: c.adminNotes,
+      };
+    });
+  } catch (err) {
+    console.warn('[approvals/GET] Could not load attendance corrections:', err);
+  }
+
   let merged = approvals;
   if (Array.isArray(dbLeaves) && dbLeaves.length > 0) {
     const dbIds = new Set(dbLeaves.map((d) => d.id));
@@ -168,6 +226,18 @@ export async function GET(request: NextRequest) {
     const existingIds = new Set(merged.map((m) => m.id));
     const remainingDocs = dbDocs.filter((d) => !existingIds.has(d.id));
     merged = [...remainingDocs, ...merged];
+  }
+
+  // Merge attendance correction requests
+  if (Array.isArray(dbCorrections) && dbCorrections.length > 0) {
+    const existingIds = new Set(merged.map((m) => m.id));
+    const remainingCorrections = dbCorrections.filter((c) => !existingIds.has(c.id));
+    merged = [...remainingCorrections, ...merged];
+  }
+
+  if (filterNik) {
+    const targetNik = filterNik.toLowerCase();
+    merged = merged.filter((item) => item.nik && item.nik.toLowerCase() === targetNik);
   }
 
   if (includeAll) {
@@ -183,6 +253,71 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // 1. If it's an attendance correction request
+    if (body.type === 'presensi' || (body.title && body.title.toLowerCase().includes('koreksi'))) {
+      const corId = body.id || `cor-${Date.now()}`;
+      const nowStr =
+        new Intl.DateTimeFormat('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }).format(new Date()) +
+        ' • ' +
+        new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) +
+        ' WIB';
+
+      const newCorrection: AttendanceCorrectionItem = {
+        id: corId,
+        nik: body.nik || 'NX-2021008',
+        employeeName: body.name || 'Rian Pratama, S.Kom',
+        employeeRole: body.role || 'Lead Backend Architect',
+        department: body.department || 'Teknologi Informasi',
+        avatarUrl: body.avatarUrl,
+        date: body.correctionDate || body.date || new Date().toISOString().slice(0, 10),
+        targetTime: body.correctionTargetTime || body.targetTime || '16:30',
+        correctionType:
+          body.correctionType ||
+          body.title?.replace('Koreksi Presensi: ', '') ||
+          'Lupa Tap-Out Saat Pulang Kantor',
+        reason: body.correctionReason || body.reason || body.detail || 'Koreksi data presensi mandiri',
+        status: 'PENDING',
+        submittedAt: body.timestamp || nowStr,
+      };
+
+      await saveAttendanceCorrectionToDb(newCorrection);
+
+      // Broadcast SSE event
+      broadcastApprovalEvent('ATTENDANCE_CORRECTION_SUBMITTED', {
+        id: corId,
+        request: newCorrection,
+      });
+
+      // Record audit log
+      try {
+        await recordAuditLog({
+          module: 'ATTENDANCE',
+          action: 'ATTENDANCE_CORRECTION_SUBMITTED',
+          recordId: corId,
+          userName: newCorrection.employeeName,
+          userEmail: 'rian.pratama@nexora.co.id',
+          userNik: newCorrection.nik,
+          ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+          userAgent: request.headers.get('user-agent') || 'Portal Presensi Karyawan ESS',
+          oldData: null,
+          newData: {
+            date: newCorrection.date,
+            targetTime: newCorrection.targetTime,
+            correctionType: newCorrection.correctionType,
+            reason: newCorrection.reason,
+          },
+        });
+      } catch {}
+
+      return NextResponse.json({ success: true, data: newCorrection }, { status: 201 });
+    }
+
+    // 2. Regular approvals
     const approvals = getStoredApprovals();
 
     const name = body.name || 'Rian Pratama, S.Kom';
@@ -278,7 +413,61 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // 1. If it's a document request (id starts with 'req-')
+    // 1. If it's an attendance correction request (id starts with 'cor-')
+    if (id.startsWith('cor-')) {
+      const newStatus = status === 'APPROVED' ? 'APPROVED' : 'REJECTED';
+      const result = await updateAttendanceCorrectionStatusInDb(
+        id,
+        newStatus,
+        'Dewi Lestari, S.Psi (HR Admin)',
+        body.adminNotes || (status === 'APPROVED' ? 'Disetujui oleh HR Operations' : 'Ditolak oleh HR Operations')
+      );
+
+      if (!result.success || !result.item) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Data pengajuan koreksi presensi tidak ditemukan' } },
+          { status: 404 }
+        );
+      }
+
+      broadcastApprovalEvent('ATTENDANCE_CORRECTION_UPDATED', {
+        id,
+        status: result.item.status,
+        item: result.item,
+      });
+
+      try {
+        await recordAuditLog({
+          module: 'ATTENDANCE',
+          action: status === 'APPROVED' ? 'ATTENDANCE_CORRECTION_APPROVED' : 'ATTENDANCE_CORRECTION_REJECTED',
+          recordId: id,
+          userName: 'HR Administrator',
+          userEmail: 'admin@nexora.local',
+          ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+          userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+          oldData: { status: 'PENDING' },
+          newData: {
+            status: result.item.status,
+            date: result.item.date,
+            targetTime: result.item.targetTime,
+            type: result.item.correctionType,
+          },
+        });
+      } catch {}
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.item,
+          message: `Pengajuan koreksi presensi tanggal ${result.item.date} berhasil ${
+            status === 'APPROVED' ? 'disetujui dan data absensi telah diperbarui' : 'ditolak'
+          }.`,
+        },
+        { status: 200 }
+      );
+    }
+
+    // 2. If it's a document request (id starts with 'req-')
     if (id.startsWith('req-')) {
       const action = status === 'APPROVED' ? 'APPROVE_STEP' : 'REJECT';
       const result = await updateDocumentRequestStepInDb(id, action, 'Dewi Lestari, S.Psi (HR Admin)');
@@ -326,7 +515,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // 2. Regular Leave / Overtime request update in Neon PostgreSQL
+    // 3. Regular Leave / Overtime request update in Neon PostgreSQL
     let dbUpdated = false;
     try {
       dbUpdated = await updateLeaveRequestStatusInDb(
@@ -414,6 +603,16 @@ export async function DELETE(request: NextRequest) {
         { success: false, error: { message: 'ID permohonan dibutuhkan untuk pembatalan' } },
         { status: 400 }
       );
+    }
+
+    // If attendance correction
+    if (id.startsWith('cor-')) {
+      const result = await updateAttendanceCorrectionStatusInDb(id, 'REJECTED', 'HR Administrator', 'Dibatalkan oleh admin');
+      return NextResponse.json({
+        success: true,
+        message: 'Pengajuan koreksi presensi berhasil dibatalkan.',
+        data: result.item,
+      });
     }
 
     // If document request

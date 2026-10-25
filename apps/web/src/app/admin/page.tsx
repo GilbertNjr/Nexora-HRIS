@@ -38,7 +38,7 @@ interface ApprovalRequest {
   id: string;
   name: string;
   role: string;
-  type: 'cuti' | 'lembur' | 'dokumen';
+  type: 'cuti' | 'lembur' | 'dokumen' | 'presensi';
   title: string;
   highlightType: string;
   detail: string;
@@ -57,6 +57,10 @@ interface ApprovalRequest {
   targetOrg?: string;
   targetPurpose?: string;
   urgency?: string;
+  correctionDate?: string;
+  correctionTargetTime?: string;
+  correctionType?: string;
+  correctionReason?: string;
 }
 
 export default function AdminDashboardPage() {
@@ -81,7 +85,7 @@ export default function AdminDashboardPage() {
   });
 
   // State for interactive features
-  const [activeFilter, setActiveFilter] = useState<'all' | 'cuti' | 'lembur' | 'dokumen'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'cuti' | 'lembur' | 'dokumen' | 'presensi'>('all');
   const [selectedMonth, setSelectedMonth] = useState(currentMonthYear);
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -423,17 +427,18 @@ export default function AdminDashboardPage() {
           );
         }
 
-        // When employee submits leave or attendance is recorded/reset or document requested
+        // When employee submits leave or attendance is recorded/reset or document/correction requested
         if (
           msg.type === 'NEW_APPROVAL_REQUEST' ||
           msg.type === 'APPROVAL_SUBMITTED' ||
           msg.type === 'LEAVE_SUBMITTED' ||
-          msg.type === 'DOCUMENT_REQUEST_CREATED'
+          msg.type === 'DOCUMENT_REQUEST_CREATED' ||
+          msg.type === 'ATTENDANCE_CORRECTION_SUBMITTED'
         ) {
           fetchLiveMetrics();
           showToast(
-            `🔔 Pengajuan Real-Time Baru: ${msg.request?.name || msg.item?.name || msg.name || 'Karyawan'} baru saja mengajukan ${
-              msg.title || 'permohonan'
+            `🔔 Pengajuan Real-Time Baru: ${msg.request?.name || msg.request?.employeeName || msg.item?.name || msg.name || 'Karyawan'} baru saja mengajukan ${
+              msg.title || msg.request?.title || 'permohonan'
             }!`
           );
         }
@@ -445,7 +450,8 @@ export default function AdminDashboardPage() {
           msg.type === 'ATTENDANCE_LOGGED' ||
           msg.type === 'ATTENDANCE_RESET' ||
           msg.type === 'DOCUMENT_REQUEST_UPDATED' ||
-          msg.type === 'DOCUMENTS_UPDATED'
+          msg.type === 'DOCUMENTS_UPDATED' ||
+          msg.type === 'ATTENDANCE_CORRECTION_UPDATED'
         ) {
           fetchLiveMetrics();
         }
@@ -481,6 +487,8 @@ export default function AdminDashboardPage() {
       const bc = new BroadcastChannel('nexora_live_sync');
       bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'APPROVED' });
       bc.postMessage({ type: 'DOCUMENT_REQUEST_UPDATED', id, status: 'APPROVED' });
+      bc.postMessage({ type: 'ATTENDANCE_CORRECTION_UPDATED', id, status: 'APPROVED' });
+      bc.postMessage({ type: 'ATTENDANCE_RECORDED' });
       bc.close();
     } catch {
       // ignore
@@ -513,6 +521,7 @@ export default function AdminDashboardPage() {
       const bc = new BroadcastChannel('nexora_live_sync');
       bc.postMessage({ type: 'APPROVAL_UPDATED', id, status: 'REJECTED' });
       bc.postMessage({ type: 'DOCUMENT_REQUEST_UPDATED', id, status: 'REJECTED' });
+      bc.postMessage({ type: 'ATTENDANCE_CORRECTION_UPDATED', id, status: 'REJECTED' });
       bc.close();
     } catch {
       // ignore
@@ -537,6 +546,7 @@ export default function AdminDashboardPage() {
     if (activeFilter === 'cuti') return r.type === 'cuti';
     if (activeFilter === 'lembur') return r.type === 'lembur';
     if (activeFilter === 'dokumen') return r.type === 'dokumen';
+    if (activeFilter === 'presensi') return r.type === 'presensi';
     return true;
   });
 
@@ -907,6 +917,18 @@ export default function AdminDashboardPage() {
                     <FileText className="w-3 h-3" />
                     <span>Dokumen &amp; Surat ({requests.filter((r) => r.type === 'dokumen').length})</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilter('presensi')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${
+                      activeFilter === 'presensi'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Clock className="w-3 h-3 text-amber-500" />
+                    <span>Koreksi Presensi ({requests.filter((r) => r.type === 'presensi').length})</span>
+                  </button>
                 </div>
               </div>
 
@@ -935,6 +957,8 @@ export default function AdminDashboardPage() {
                           >
                             {req.type === 'dokumen' ? (
                               <FileText className="w-5 h-5 text-white" />
+                            ) : req.type === 'presensi' ? (
+                              <Clock className="w-5 h-5 text-white" />
                             ) : (
                               req.initials
                             )}
@@ -965,6 +989,11 @@ export default function AdminDashboardPage() {
                             {req.type === 'dokumen' && (
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                                 Permohonan Surat
+                              </span>
+                            )}
+                            {req.type === 'presensi' && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Koreksi Kehadiran
                               </span>
                             )}
                           </div>
@@ -1032,7 +1061,13 @@ export default function AdminDashboardPage() {
                           className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all transform active:scale-95 flex items-center gap-1 cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
-                          <span>{req.type === 'dokumen' ? '✓ Otorisasi Berkas' : 'Setujui'}</span>
+                          <span>
+                            {req.type === 'presensi'
+                              ? '✓ Setujui Koreksi'
+                              : req.type === 'dokumen'
+                              ? '✓ Otorisasi Berkas'
+                              : 'Setujui'}
+                          </span>
                         </button>
 
                         {req.type === 'dokumen' ? (
@@ -1042,6 +1077,14 @@ export default function AdminDashboardPage() {
                           >
                             <Eye className="w-3.5 h-3.5 text-slate-500" />
                             <span>Detail</span>
+                          </Link>
+                        ) : req.type === 'presensi' ? (
+                          <Link
+                            href="/admin/attendance"
+                            className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Tinjau</span>
                           </Link>
                         ) : req.hasAttachment ? (
                           <button
@@ -1069,7 +1112,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Bottom Link to Full Leave / Document Approval Page */}
+            {/* Bottom Link to Full Leave / Document / Attendance Approval Page */}
             <div className="pt-4 border-t border-slate-100 text-center">
               {activeFilter === 'dokumen' ? (
                 <Link
@@ -1077,6 +1120,14 @@ export default function AdminDashboardPage() {
                   className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
                 >
                   <span>Buka Modul Manajemen Dokumen &amp; Surat Lengkap</span>
+                  <span className="text-sm">→</span>
+                </Link>
+              ) : activeFilter === 'presensi' ? (
+                <Link
+                  href="/admin/attendance"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  <span>Buka Modul Manajemen Presensi &amp; Waktu Lengkap</span>
                   <span className="text-sm">→</span>
                 </Link>
               ) : (
