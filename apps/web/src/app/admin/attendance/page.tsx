@@ -38,6 +38,7 @@ import {
   Edit3,
   Trash2,
 } from 'lucide-react';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 interface AttendanceRecord {
   id: string;
@@ -395,42 +396,38 @@ export default function AdminAttendancePage() {
       // ignore
     }
 
-    // 3. Server-Sent Events (SSE) for multi-device live sync
-    let sse: EventSource | null = null;
-    let approvalSse: EventSource | null = null;
-    try {
-      sse = new EventSource('/api/v1/employees/stream');
-      sse.addEventListener('ATTENDANCE_RECORDED', (e: MessageEvent) => {
-        try {
-          const payload = JSON.parse(e.data);
-          const data = payload.payload;
-          if (data) {
-            processLiveAttendance(data);
-          }
-        } catch {}
-      });
-    } catch {}
+    // 3. Server-Sent Events (SSE) using shared socket
+    const unsubAttendance = subscribeSharedSSE('/api/v1/employees/stream', 'ATTENDANCE_RECORDED', (e: MessageEvent) => {
+      try {
+        const payload = JSON.parse(e.data);
+        const data = payload.payload;
+        if (data) {
+          processLiveAttendance(data);
+        }
+      } catch {}
+    });
 
-    try {
-      approvalSse = new EventSource('/api/v1/approvals/stream');
-      const handleApprovalEvent = () => {
-        fetchAttendanceApi();
-      };
-      approvalSse.addEventListener('APPROVAL_CREATED', handleApprovalEvent);
-      approvalSse.addEventListener('APPROVAL_STATUS_CHANGED', handleApprovalEvent);
-      approvalSse.addEventListener('APPROVAL_DELETED', handleApprovalEvent);
-    } catch {}
-
-    // 4. Background ticker every 15s to keep counters accurate
-    const ticker = setInterval(() => {
+    const handleApprovalEvent = () => {
       fetchAttendanceApi();
-    }, 15000);
+    };
+    const unsubApp1 = subscribeSharedSSE('/api/v1/employees/stream', 'APPROVAL_CREATED', handleApprovalEvent);
+    const unsubApp2 = subscribeSharedSSE('/api/v1/employees/stream', 'APPROVAL_STATUS_CHANGED', handleApprovalEvent);
+    const unsubApp3 = subscribeSharedSSE('/api/v1/employees/stream', 'APPROVAL_DELETED', handleApprovalEvent);
+
+    // 4. Relaxed background ticker (every 45s, only when tab is visible)
+    const ticker = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchAttendanceApi();
+      }
+    }, 45000);
 
     return () => {
       clearInterval(ticker);
       if (channel) channel.close();
-      if (sse) sse.close();
-      if (approvalSse) approvalSse.close();
+      unsubAttendance();
+      unsubApp1();
+      unsubApp2();
+      unsubApp3();
     };
   }, []);
 

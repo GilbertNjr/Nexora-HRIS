@@ -56,6 +56,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { usePreferences } from '@/components/providers/PreferencesProvider';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 export default function EmployeeProfilePage() {
   const router = useRouter();
@@ -373,52 +374,44 @@ export default function EmployeeProfilePage() {
 
     fetchLiveProfile();
 
-    // 3. Listen to SSE employee stream for instant real-time sync from Admin HR updates!
-    let sse: EventSource | null = null;
-    try {
-      sse = new EventSource('/api/v1/employees/stream');
-      sse.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (
-            (payload.type === 'EMPLOYEE_UPDATED' || payload.type === 'EMPLOYEE_CREATED') &&
-            payload.data
-          ) {
-            const updatedEmp = payload.data;
-            const currentEmpNum = currentUser.employeeNumber?.toLowerCase().trim();
-            const currentMail = currentUser.email?.toLowerCase().trim();
-            const isTarget =
-              (currentEmpNum && updatedEmp.employeeNumber?.toLowerCase().trim() === currentEmpNum) ||
-              (currentMail && updatedEmp.email?.toLowerCase().trim() === currentMail);
+    // 3. Listen to SSE employee stream using shared socket
+    const unsubEmpStream = subscribeSharedSSE('/api/v1/employees/stream', 'EMPLOYEE_UPDATED', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        const updatedEmp = payload.payload || payload.data;
+        if (!updatedEmp) return;
+        const currentEmpNum = currentUser.employeeNumber?.toLowerCase().trim();
+        const currentMail = currentUser.email?.toLowerCase().trim();
+        const isTarget =
+          (currentEmpNum && updatedEmp.employeeNumber?.toLowerCase().trim() === currentEmpNum) ||
+          (currentMail && updatedEmp.email?.toLowerCase().trim() === currentMail);
 
-            if (isTarget) {
-              setProfileData((prev) => {
-                const cleanName = updatedEmp.fullName || prev.fullName;
-                const nextMerged = {
-                  ...prev,
-                  fullName: cleanName,
-                  preferredName: cleanName.split(' ')[0],
-                  employeeNumber: updatedEmp.employeeNumber || prev.employeeNumber,
-                  department: updatedEmp.department || prev.department,
-                  designation: updatedEmp.designation || prev.designation,
-                  phone: updatedEmp.phone || prev.phone,
-                  avatarUrl: updatedEmp.avatarUrl !== undefined ? updatedEmp.avatarUrl : prev.avatarUrl,
-                  tenure: updatedEmp.tenure || prev.tenure,
-                  joinDate: updatedEmp.joinDate || prev.joinDate,
-                };
-                try {
-                  localStorage.setItem('nexora_employee_profile', JSON.stringify(nextMerged));
-                } catch {}
-                return nextMerged;
-              });
-              if (updatedEmp.avatarUrl !== undefined) {
-                updateLocalUser({ avatarUrl: updatedEmp.avatarUrl, fullName: updatedEmp.fullName });
-              }
-            }
+        if (isTarget) {
+          setProfileData((prev) => {
+            const cleanName = updatedEmp.fullName || prev.fullName;
+            const nextMerged = {
+              ...prev,
+              fullName: cleanName,
+              preferredName: cleanName.split(' ')[0],
+              employeeNumber: updatedEmp.employeeNumber || prev.employeeNumber,
+              department: updatedEmp.department || prev.department,
+              designation: updatedEmp.designation || prev.designation,
+              phone: updatedEmp.phone || prev.phone,
+              avatarUrl: updatedEmp.avatarUrl !== undefined ? updatedEmp.avatarUrl : prev.avatarUrl,
+              tenure: updatedEmp.tenure || prev.tenure,
+              joinDate: updatedEmp.joinDate || prev.joinDate,
+            };
+            try {
+              localStorage.setItem('nexora_employee_profile', JSON.stringify(nextMerged));
+            } catch {}
+            return nextMerged;
+          });
+          if (updatedEmp.avatarUrl !== undefined) {
+            updateLocalUser({ avatarUrl: updatedEmp.avatarUrl, fullName: updatedEmp.fullName });
           }
-        } catch {}
-      };
-    } catch {}
+        }
+      } catch {}
+    });
 
     // 4. Listen to real-time broadcast channel for employee profile updates across browser tabs
     let channel: BroadcastChannel | null = null;
@@ -445,7 +438,7 @@ export default function EmployeeProfilePage() {
 
     return () => {
       if (channel) channel.close();
-      if (sse) sse.close();
+      unsubEmpStream();
     };
   }, [currentUser.employeeNumber, currentUser.email, currentUser.fullName]);
 

@@ -30,6 +30,7 @@ import {
   User,
   FileText,
 } from 'lucide-react';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -150,23 +151,19 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
       // ignore
     }
 
-    // Listen to real-time multi-device SSE for company updates across different devices
-    let sse: EventSource | null = null;
-    try {
-      sse = new EventSource('/api/v1/employees/stream');
-      sse.addEventListener('COMPANY_UPDATED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          const data = parsed.payload;
-          if (data?.logoUrl !== undefined) setCompanyLogo(data.logoUrl || '');
-          if (data?.commercialName) setCompanyName(data.commercialName);
-        } catch {}
-      });
-    } catch {}
+    // Listen to real-time multi-device SSE for company updates using shared socket
+    const unsubCompany = subscribeSharedSSE('/api/v1/employees/stream', 'COMPANY_UPDATED', (event: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        const data = parsed.payload;
+        if (data?.logoUrl !== undefined) setCompanyLogo(data.logoUrl || '');
+        if (data?.commercialName) setCompanyName(data.commercialName);
+      } catch {}
+    });
 
     return () => {
       if (channel) channel.close();
-      if (sse) sse.close();
+      unsubCompany();
     };
   }, []);
 

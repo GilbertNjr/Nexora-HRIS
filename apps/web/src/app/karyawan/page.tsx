@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
 import { useApprovalsRealtime, playNotificationSound } from '@/hooks/useApprovalsRealtime';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 import {
   LayoutDashboard,
   User,
@@ -582,31 +583,24 @@ export default function EmployeeDashboardOverhaulPage() {
       };
     } catch {}
 
-    // 2. Server-Sent Events (SSE) for multi-device sync (e.g. Admin on PC, Employee on phone)
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource('/api/v1/employees/stream');
-      es.addEventListener('connected', () => {
-        if (isMounted) setIsAnnouncementLiveConnected(true);
-      });
-      es.addEventListener('ANNOUNCEMENT_PUBLISHED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          const newAnn = parsed.payload as HrAnnouncementItem;
-          if (newAnn && newAnn.title) {
-            setAnnouncements((prev) => {
-              const filtered = prev.filter((a) => a.id !== newAnn.id);
-              return [newAnn, ...filtered];
-            });
-            setActiveAnnouncementIdx(0);
-            setIsAnnouncementGlowing(true);
-            playNotificationSound();
-            showToast(`📣 [LIVE HR] ${newAnn.title}`);
-            setTimeout(() => setIsAnnouncementGlowing(false), 8000);
-          }
-        } catch {}
-      });
-    } catch {}
+    // 2. Server-Sent Events (SSE) using shared socket
+    const unsubAnnouncement = subscribeSharedSSE('/api/v1/employees/stream', 'ANNOUNCEMENT_PUBLISHED', (event: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        const newAnn = parsed.payload as HrAnnouncementItem;
+        if (newAnn && newAnn.title) {
+          setAnnouncements((prev) => {
+            const filtered = prev.filter((a) => a.id !== newAnn.id);
+            return [newAnn, ...filtered];
+          });
+          setActiveAnnouncementIdx(0);
+          setIsAnnouncementGlowing(true);
+          playNotificationSound();
+          showToast(`📣 [LIVE HR] ${newAnn.title}`);
+          setTimeout(() => setIsAnnouncementGlowing(false), 8000);
+        }
+      } catch {}
+    });
 
     // 3. Custom Event to open announcement modal directly
     const handleOpenModalEvent = (event: Event) => {
@@ -626,7 +620,7 @@ export default function EmployeeDashboardOverhaulPage() {
     return () => {
       isMounted = false;
       if (bc) bc.close();
-      if (es) es.close();
+      unsubAnnouncement();
       window.removeEventListener('nexora_open_announcement', handleOpenModalEvent);
     };
   }, []);

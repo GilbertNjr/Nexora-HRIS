@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 export interface ApprovalsRealtimeOptions {
   onLeaveSubmitted?: (newItem: any) => void;
@@ -44,49 +45,32 @@ export function useApprovalsRealtime(options: ApprovalsRealtimeOptions) {
   optionsRef.current = options;
 
   useEffect(() => {
-    let eventSource: EventSource | null = null;
     let pollInterval: NodeJS.Timeout | null = null;
-    let isConnected = false;
 
-    // 1. Establish Server-Sent Events (SSE) connection (Works across multiple devices & networks)
-    try {
-      eventSource = new EventSource('/api/v1/approvals/stream');
-
-      eventSource.addEventListener('connected', () => {
-        isConnected = true;
-      });
-
-      eventSource.addEventListener('LEAVE_SUBMITTED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          const item = parsed.payload;
-          if (optionsRef.current.playAudioAlert) {
-            playNotificationSound();
-          }
-          optionsRef.current.onLeaveSubmitted?.(item);
-          optionsRef.current.onRefresh?.();
-        } catch (err) {
-          console.error('[SSE] Failed to parse LEAVE_SUBMITTED:', err);
+    // 1. Subscribe to Shared SSE connection multiplexed across the browser tab
+    const unsubSubmitted = subscribeSharedSSE('/api/v1/employees/stream', 'LEAVE_SUBMITTED', (event: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        const item = parsed.payload;
+        if (optionsRef.current.playAudioAlert) {
+          playNotificationSound();
         }
-      });
+        optionsRef.current.onLeaveSubmitted?.(item);
+        optionsRef.current.onRefresh?.();
+      } catch (err) {
+        console.error('[SSE] Failed to parse LEAVE_SUBMITTED:', err);
+      }
+    });
 
-      eventSource.addEventListener('LEAVE_ACTIONED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          optionsRef.current.onLeaveActioned?.(parsed.payload);
-          optionsRef.current.onRefresh?.();
-        } catch (err) {
-          console.error('[SSE] Failed to parse LEAVE_ACTIONED:', err);
-        }
-      });
-
-      eventSource.onerror = () => {
-        isConnected = false;
-        // EventSource will automatically retry in the background
-      };
-    } catch (err) {
-      console.warn('[SSE] EventSource not supported, using smart polling fallback:', err);
-    }
+    const unsubActioned = subscribeSharedSSE('/api/v1/employees/stream', 'LEAVE_ACTIONED', (event: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        optionsRef.current.onLeaveActioned?.(parsed.payload);
+        optionsRef.current.onRefresh?.();
+      } catch (err) {
+        console.error('[SSE] Failed to parse LEAVE_ACTIONED:', err);
+      }
+    });
 
     // 2. Intra-browser BroadcastChannel (Instant <5ms sync for tabs on the same computer)
     let channel: BroadcastChannel | null = null;
@@ -112,21 +96,29 @@ export function useApprovalsRealtime(options: ApprovalsRealtimeOptions) {
       };
     } catch {}
 
-    // 3. Fallback Smart Polling (Runs every 10 seconds to ensure 100% data freshness)
+    // 3. Revalidate on Tab Focus
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        optionsRef.current.onRefresh?.();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // 4. Relaxed Smart Fallback Polling (Every 45 seconds when tab is active)
     pollInterval = setInterval(() => {
-      optionsRef.current.onRefresh?.();
-    }, 10000);
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        optionsRef.current.onRefresh?.();
+      }
+    }, 45000);
 
     return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-      if (channel) {
-        channel.close();
-      }
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
+      unsubSubmitted();
+      unsubActioned();
+      if (channel) channel.close();
+      if (pollInterval) clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, []);
 }

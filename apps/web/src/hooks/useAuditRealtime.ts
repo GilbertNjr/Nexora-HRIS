@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { playNotificationSound } from './useApprovalsRealtime';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 export interface AuditRealtimeOptions {
   onAuditCreated?: (newLog: any) => void;
@@ -14,33 +15,22 @@ export function useAuditRealtime(options: AuditRealtimeOptions) {
   optionsRef.current = options;
 
   useEffect(() => {
-    let eventSource: EventSource | null = null;
     let pollInterval: NodeJS.Timeout | null = null;
 
-    // 1. Establish Server-Sent Events (SSE) connection
-    try {
-      eventSource = new EventSource('/api/v1/audit/stream');
-
-      eventSource.addEventListener('AUDIT_LOG_CREATED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          const log = parsed.payload;
-          if (optionsRef.current.playAudioAlert) {
-            playNotificationSound();
-          }
-          optionsRef.current.onAuditCreated?.(log);
-          optionsRef.current.onRefresh?.();
-        } catch (err) {
-          console.error('[AuditSSE] Failed to parse AUDIT_LOG_CREATED:', err);
+    // 1. Subscribe to Shared SSE connection
+    const unsubAudit = subscribeSharedSSE('/api/v1/audit/stream', 'AUDIT_LOG_CREATED', (event: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        const log = parsed.payload;
+        if (optionsRef.current.playAudioAlert) {
+          playNotificationSound();
         }
-      });
-
-      eventSource.onerror = () => {
-        // EventSource will automatically retry in the background
-      };
-    } catch (err) {
-      console.warn('[AuditSSE] EventSource not supported, fallback to BroadcastChannel:', err);
-    }
+        optionsRef.current.onAuditCreated?.(log);
+        optionsRef.current.onRefresh?.();
+      } catch (err) {
+        console.error('[AuditSSE] Failed to parse AUDIT_LOG_CREATED:', err);
+      }
+    });
 
     // 2. Intra-browser BroadcastChannel (Instant <5ms sync across open tabs)
     let channel: BroadcastChannel | null = null;
@@ -57,13 +47,15 @@ export function useAuditRealtime(options: AuditRealtimeOptions) {
       };
     } catch {}
 
-    // 3. Fallback Smart Polling (Runs every 12 seconds to guarantee sync)
+    // 3. Relaxed Smart Polling (Runs every 45s only when visible)
     pollInterval = setInterval(() => {
-      optionsRef.current.onRefresh?.();
-    }, 12000);
+      if (typeof document !== 'undefined' && !document.hidden) {
+        optionsRef.current.onRefresh?.();
+      }
+    }, 45000);
 
     return () => {
-      if (eventSource) eventSource.close();
+      unsubAudit();
       if (channel) channel.close();
       if (pollInterval) clearInterval(pollInterval);
     };

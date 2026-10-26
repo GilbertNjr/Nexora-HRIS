@@ -274,9 +274,29 @@ export async function POST(request: NextRequest) {
       await recordAuditLog(auditLog);
     } catch {}
 
-    // 3. Register Active Session in Neon PostgreSQL user_sessions
+    // 3. Register Active Session in Neon PostgreSQL user_sessions (supports multi-device concurrent logins)
     let sessionId = `sess-${Date.now()}`;
-    if (DATABASE_URL && userId && userId !== 'usr-admin-unified') {
+    let targetSessionUserId = userId;
+
+    if (isAdminAccount && (!targetSessionUserId || targetSessionUserId === 'usr-admin-unified')) {
+      if (DATABASE_URL) {
+        try {
+          const sql = neon(DATABASE_URL);
+          const aRes = await sql.query(
+            `SELECT id FROM users WHERE email = 'admin@nexora.co.id' OR email = 'admin@nexora.local' LIMIT 1`
+          );
+          if (aRes && aRes[0]?.id) {
+            targetSessionUserId = aRes[0].id;
+          } else {
+            targetSessionUserId = '00000000-0000-0000-0000-000000000001';
+          }
+        } catch {
+          targetSessionUserId = '00000000-0000-0000-0000-000000000001';
+        }
+      }
+    }
+
+    if (DATABASE_URL && targetSessionUserId) {
       try {
         const sql = neon(DATABASE_URL);
         const tokenHash = `tok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -285,7 +305,7 @@ export async function POST(request: NextRequest) {
           `INSERT INTO user_sessions (id, user_id, refresh_token_hash, user_agent, ip_address, is_revoked, expires_at, created_at)
            VALUES (gen_random_uuid(), $1, $2, $3, $4, false, $5, NOW())
            RETURNING id`,
-          [userId, tokenHash, userAgent.substring(0, 250), ipAddress.substring(0, 45), expiresAt]
+          [targetSessionUserId, tokenHash, userAgent.substring(0, 250), ipAddress.substring(0, 45), expiresAt]
         );
         if (sessRes && sessRes[0]?.id) {
           sessionId = sessRes[0].id;

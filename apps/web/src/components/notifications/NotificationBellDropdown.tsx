@@ -24,6 +24,7 @@ import {
   Filter,
   Megaphone,
 } from 'lucide-react';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 export interface NotificationItem {
   id: string;
@@ -123,10 +124,12 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
 
     fetchNotifications(true);
 
-    // Real-time polling every 5 seconds
+    // Smart fallback polling every 45 seconds (only when tab is visible)
     const interval = setInterval(() => {
-      fetchNotifications(false);
-    }, 5000);
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchNotifications(false);
+      }
+    }, 45000);
 
     // Cross-tab BroadcastChannel listener for instantaneous live events
     let channel: BroadcastChannel | null = null;
@@ -148,19 +151,13 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
       // ignore
     }
 
-    // Server-Sent Events (SSE) listener for multi-device cross-browser live sync
-    let sse: EventSource | null = null;
-    try {
-      sse = new EventSource('/api/v1/employees/stream');
-      sse.addEventListener('ANNOUNCEMENT_PUBLISHED', () => {
-        fetchNotifications(false);
-      });
-      sse.addEventListener('NEW_NOTIFICATION', () => {
-        fetchNotifications(false);
-      });
-    } catch {
-      // ignore
-    }
+    // Server-Sent Events (SSE) listener using shared multiplexed socket
+    const unsubAnnouncement = subscribeSharedSSE('/api/v1/employees/stream', 'ANNOUNCEMENT_PUBLISHED', () => {
+      fetchNotifications(false);
+    });
+    const unsubNotification = subscribeSharedSSE('/api/v1/employees/stream', 'NEW_NOTIFICATION', () => {
+      fetchNotifications(false);
+    });
 
     // Refresh on window focus
     const handleFocus = () => fetchNotifications(false);
@@ -170,7 +167,8 @@ export function NotificationBellDropdown({ portal = 'admin' }: NotificationBellD
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       if (channel) channel.close();
-      if (sse) sse.close();
+      unsubAnnouncement();
+      unsubNotification();
     };
   }, [fetchNotifications]);
 

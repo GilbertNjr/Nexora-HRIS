@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { playNotificationSound } from './useApprovalsRealtime';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 export interface EmployeesRealtimeOptions {
   onEmployeeCreated?: (newEmp: any) => void;
@@ -17,65 +18,51 @@ export function useEmployeesRealtime(options: EmployeesRealtimeOptions) {
   optionsRef.current = options;
 
   useEffect(() => {
-    let eventSource: EventSource | null = null;
     let pollInterval: NodeJS.Timeout | null = null;
 
-    // 1. Establish Server-Sent Events (SSE) connection across multiple devices & networks
-    try {
-      eventSource = new EventSource('/api/v1/employees/stream');
+    // 1. Subscribe to Shared SSE Stream (Zero socket waste across components)
+    const unsubCreated = subscribeSharedSSE('/api/v1/employees/stream', 'EMPLOYEE_CREATED', (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (optionsRef.current.playAudioAlert) playNotificationSound();
+        optionsRef.current.onEmployeeCreated?.(parsed.payload);
+        optionsRef.current.onRefresh?.();
+      } catch (err) {
+        console.error('[EmployeeSSE] Failed to parse EMPLOYEE_CREATED:', err);
+      }
+    });
 
-      eventSource.addEventListener('EMPLOYEE_CREATED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          const emp = parsed.payload;
-          if (optionsRef.current.playAudioAlert) {
-            playNotificationSound();
-          }
-          optionsRef.current.onEmployeeCreated?.(emp);
-          optionsRef.current.onRefresh?.();
-        } catch (err) {
-          console.error('[EmployeeSSE] Failed to parse EMPLOYEE_CREATED:', err);
-        }
-      });
+    const unsubUpdated = subscribeSharedSSE('/api/v1/employees/stream', 'EMPLOYEE_UPDATED', (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        optionsRef.current.onEmployeeUpdated?.(parsed.payload);
+        optionsRef.current.onRefresh?.();
+      } catch (err) {
+        console.error('[EmployeeSSE] Failed to parse EMPLOYEE_UPDATED:', err);
+      }
+    });
 
-      eventSource.addEventListener('EMPLOYEE_UPDATED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          optionsRef.current.onEmployeeUpdated?.(parsed.payload);
-          optionsRef.current.onRefresh?.();
-        } catch (err) {
-          console.error('[EmployeeSSE] Failed to parse EMPLOYEE_UPDATED:', err);
-        }
-      });
+    const unsubDeleted = subscribeSharedSSE('/api/v1/employees/stream', 'EMPLOYEE_DELETED', (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        optionsRef.current.onEmployeeDeleted?.(parsed.payload);
+        optionsRef.current.onRefresh?.();
+      } catch (err) {
+        console.error('[EmployeeSSE] Failed to parse EMPLOYEE_DELETED:', err);
+      }
+    });
 
-      eventSource.addEventListener('EMPLOYEE_DELETED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          optionsRef.current.onEmployeeDeleted?.(parsed.payload);
-          optionsRef.current.onRefresh?.();
-        } catch (err) {
-          console.error('[EmployeeSSE] Failed to parse EMPLOYEE_DELETED:', err);
-        }
-      });
+    const unsubCompany = subscribeSharedSSE('/api/v1/employees/stream', 'COMPANY_UPDATED', (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        optionsRef.current.onCompanyUpdated?.(parsed.payload);
+        optionsRef.current.onRefresh?.();
+      } catch (err) {
+        console.error('[EmployeeSSE] Failed to parse COMPANY_UPDATED:', err);
+      }
+    });
 
-      eventSource.addEventListener('COMPANY_UPDATED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          optionsRef.current.onCompanyUpdated?.(parsed.payload);
-          optionsRef.current.onRefresh?.();
-        } catch (err) {
-          console.error('[EmployeeSSE] Failed to parse COMPANY_UPDATED:', err);
-        }
-      });
-
-      eventSource.onerror = () => {
-        // EventSource will automatically retry in the background
-      };
-    } catch (err) {
-      console.warn('[EmployeeSSE] EventSource not supported, fallback to polling:', err);
-    }
-
-    // 2. Intra-browser BroadcastChannel (Syncs tabs within the same machine instantly)
+    // 2. Intra-browser BroadcastChannel (Instant multi-tab sync without network)
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('nexora_live_sync');
@@ -101,13 +88,18 @@ export function useEmployeesRealtime(options: EmployeesRealtimeOptions) {
     window.addEventListener('focus', handleVisibilityOrFocus);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
 
-    // 4. Fallback Polling (Every 12 seconds to ensure 100% data fresh across any network condition)
+    // 4. Relaxed Fallback Polling (Every 45s, only when tab is visible)
     pollInterval = setInterval(() => {
-      optionsRef.current.onRefresh?.();
-    }, 12000);
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        optionsRef.current.onRefresh?.();
+      }
+    }, 45000);
 
     return () => {
-      if (eventSource) eventSource.close();
+      unsubCreated();
+      unsubUpdated();
+      unsubDeleted();
+      unsubCompany();
       if (channel) channel.close();
       if (pollInterval) clearInterval(pollInterval);
       window.removeEventListener('focus', handleVisibilityOrFocus);

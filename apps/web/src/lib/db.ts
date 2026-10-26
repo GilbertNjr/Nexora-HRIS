@@ -195,7 +195,21 @@ function ensureStorage(): void {
   }
 }
 
+let _cachedEmployees: EmployeeRecord[] | null = null;
+let _lastEmployeesFetchTime = 0;
+const EMPLOYEES_CACHE_TTL_MS = 3500; // 3.5s micro-cache prevents redundant DB hits during parallel page loads
+
+export function invalidateEmployeesCache(): void {
+  _cachedEmployees = null;
+  _lastEmployeesFetchTime = 0;
+}
+
 export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
+  const nowTime = Date.now();
+  if (_cachedEmployees && nowTime - _lastEmployeesFetchTime < EMPLOYEES_CACHE_TTL_MS) {
+    return _cachedEmployees;
+  }
+
   // 1. Primary: Neon Serverless PostgreSQL
   if (DATABASE_URL) {
     try {
@@ -258,12 +272,14 @@ export async function getEmployeesFromDb(): Promise<EmployeeRecord[]> {
           };
         });
 
-        // Sync to local fallback file cache as well
+        // Sync to local fallback file cache as well asynchronously
         try {
           ensureStorage();
-          fs.writeFileSync(STORAGE_FILE, JSON.stringify(mapped, null, 2), 'utf-8');
+          fs.promises.writeFile(STORAGE_FILE, JSON.stringify(mapped, null, 2), 'utf-8').catch(() => {});
         } catch {}
 
+        _cachedEmployees = mapped;
+        _lastEmployeesFetchTime = Date.now();
         return mapped;
       } else if (Array.isArray(rows) && rows.length === 0) {
         // Neon database has 0 employees: auto-seed initial master records!
@@ -307,6 +323,7 @@ export async function getEmployeeByIdFromDb(idOrNik: string): Promise<EmployeeRe
 }
 
 export async function saveEmployeeToDb(data: Partial<EmployeeRecord>): Promise<EmployeeRecord> {
+  invalidateEmployeesCache();
   const now = new Date();
   const year = now.getFullYear();
 
@@ -509,6 +526,7 @@ export async function updateEmployeeInDb(
   idOrNik: string,
   data: Partial<EmployeeRecord>
 ): Promise<EmployeeRecord | null> {
+  invalidateEmployeesCache();
   ensureStorage();
   const existing = await getEmployeesFromDb();
   const search = idOrNik.toLowerCase().trim();

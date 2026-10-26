@@ -14,6 +14,7 @@ import {
   Sparkles,
   AlertTriangle,
 } from 'lucide-react';
+import { subscribeSharedSSE } from '@/lib/sseClient';
 
 export interface HrAnnouncementItem {
   id: string;
@@ -103,22 +104,16 @@ export function EmployeeAnnouncementBroadcastListener() {
       // ignore
     }
 
-    // 2. Server-Sent Events (SSE) listener for multi-device sync
-    let sse: EventSource | null = null;
-    try {
-      sse = new EventSource('/api/v1/employees/stream');
-      sse.addEventListener('ANNOUNCEMENT_PUBLISHED', (event: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          const newAnn = parsed.payload as HrAnnouncementItem;
-          if (newAnn && newAnn.title) {
-            handleNewAnnouncement(newAnn);
-          }
-        } catch {}
-      });
-    } catch {
-      // ignore
-    }
+    // 2. Server-Sent Events (SSE) listener using shared socket
+    const unsubAnnouncement = subscribeSharedSSE('/api/v1/employees/stream', 'ANNOUNCEMENT_PUBLISHED', (event: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        const newAnn = parsed.payload as HrAnnouncementItem;
+        if (newAnn && newAnn.title) {
+          handleNewAnnouncement(newAnn);
+        }
+      } catch {}
+    });
 
     // 3. Custom event listener from NotificationBellDropdown or other triggers
     const handleOpenCustomEvent = (event: Event) => {
@@ -151,7 +146,7 @@ export function EmployeeAnnouncementBroadcastListener() {
     return () => {
       isMounted = false;
       if (bc) bc.close();
-      if (sse) sse.close();
+      unsubAnnouncement();
       window.removeEventListener('nexora_open_announcement', handleOpenCustomEvent);
     };
   }, []);
