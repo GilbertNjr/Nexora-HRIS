@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
+import { usePreferences } from '@/components/providers/PreferencesProvider';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   Palette,
   Bell,
@@ -32,93 +34,39 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 
-interface NotificationRow {
-  id: string;
-  category: string;
-  description: string;
-  badge?: { text: string; color: 'red' | 'amber' | 'blue' };
-  email: boolean;
-  whatsapp: boolean;
-  push: boolean;
-}
-
 export default function PreferencesAndNotificationsPage() {
-  // Theme & Appearance State
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('light');
-  const [tableDensity, setTableDensity] = useState<'compact' | 'normal' | 'spacious'>('normal');
-  const [fontSize, setFontSize] = useState<'standard' | 'large'>('standard');
-  const [microAnimations, setMicroAnimations] = useState(true);
-  const [highContrast, setHighContrast] = useState(false);
-  const [screenReaderSupport, setScreenReaderSupport] = useState(false);
-  const [audioFeedback, setAudioFeedback] = useState(true);
+  const { user: currentUser } = useCurrentUser();
+  const {
+    preferences,
+    setThemeMode,
+    setTableDensity,
+    setFontSize,
+    setMicroAnimations,
+    setHighContrast,
+    setScreenReaderSupport,
+    setAudioFeedback,
+    setLanguage,
+    setTimezone,
+    setDateFormat,
+    toggleNotificationChannel,
+    resetDefaults,
+    saveToServer,
+    playChime,
+  } = usePreferences();
 
-  // Localization State
-  const [language, setLanguage] = useState<'id' | 'en'>('id');
-  const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
-  const [timezone, setTimezone] = useState('Asia/Jakarta');
-
-  // Notification Matrix State
-  const [notifications, setNotifications] = useState<NotificationRow[]>([
-    {
-      id: 'leave',
-      category: 'Permohonan Cuti & Izin Staf',
-      description: 'Pengajuan cuti tahunan, sakit, dan izin dispensasi bawahan langsung',
-      email: true,
-      whatsapp: true,
-      push: true,
-    },
-    {
-      id: 'overtime',
-      category: 'Pengajuan Lembur (SPL) & Koreksi Absensi',
-      description: 'Surat Perintah Lembur dan verifikasi lupa tap check-in/out',
-      email: true,
-      whatsapp: false,
-      push: true,
-    },
-    {
-      id: 'payroll',
-      category: 'Rekonsiliasi & Cut-Off Payroll Bulanan',
-      description: 'Validasi kalkulasi BPJS, PPh 21, dan finalisasi transfer bank',
-      badge: { text: 'Kritis', color: 'red' },
-      email: true,
-      whatsapp: true,
-      push: true,
-    },
-    {
-      id: 'contract',
-      category: 'Notifikasi Kontrak & Probation Expired',
-      description: 'Peringatan H-30 berakhirnya PKWT atau masa evaluasi 3 bulan staf baru',
-      email: true,
-      whatsapp: false,
-      push: true,
-    },
-    {
-      id: 'discipline',
-      category: 'Eskalasi Pelanggaran & Surat Peringatan (SP)',
-      description: 'Penerbitan SP1/SP2/SP3 dan laporan investigasi kedisiplinan kerja',
-      badge: { text: 'Urgensi Tinggi', color: 'amber' },
-      email: true,
-      whatsapp: true,
-      push: true,
-    },
-    {
-      id: 'digest',
-      category: 'Ringkasan Laporan Mingguan & Analisis HR',
-      description: 'Digest otomatis rekap absensi, turnover, dan KPI divisi tiap Senin pagi',
-      email: true,
-      whatsapp: false,
-      push: false,
-    },
-    {
-      id: 'security_alert',
-      category: 'Log Keamanan Akun & Percobaan Login Asing',
-      description: 'Pemberitahuan login dari IP baru, browser asing, atau pergantian sandi',
-      badge: { text: 'Keamanan', color: 'blue' },
-      email: true,
-      whatsapp: true,
-      push: true,
-    },
-  ]);
+  const {
+    themeMode,
+    tableDensity,
+    fontSize,
+    microAnimations,
+    highContrast,
+    screenReaderSupport,
+    audioFeedback,
+    language,
+    dateFormat,
+    timezone,
+    notifications,
+  } = preferences;
 
   // UI Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -126,40 +74,36 @@ export default function PreferencesAndNotificationsPage() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 3800);
   };
 
   const handleToggleNotification = (
     id: string,
     channel: 'email' | 'whatsapp' | 'push'
   ) => {
-    setNotifications((prev) =>
-      prev.map((row) =>
-        row.id === id ? { ...row, [channel]: !row[channel] } : row
-      )
-    );
+    toggleNotificationChannel(id, channel);
   };
 
   const handleResetDefaults = () => {
-    setThemeMode('light');
-    setTableDensity('normal');
-    setFontSize('standard');
-    setMicroAnimations(true);
-    setHighContrast(false);
-    setScreenReaderSupport(false);
-    setAudioFeedback(true);
-    setLanguage('id');
-    setDateFormat('DD/MM/YYYY');
-    setTimezone('Asia/Jakarta');
-    showToast('Preferensi visual dan notifikasi dikembalikan ke pengaturan standar.');
+    resetDefaults();
+    showToast('Preferensi visual dan matriks notifikasi dikembalikan ke pengaturan standar sistem.');
   };
 
-  const handleSavePreferences = () => {
+  const handleSavePreferences = async () => {
     setIsSaving(true);
-    setTimeout(() => {
+    try {
+      const ok = await saveToServer();
+      if (ok) {
+        if (audioFeedback) playChime();
+        showToast('Perubahan preferensi visual & matriks notifikasi berhasil disinkronkan secara global ke Admin & Karyawan!');
+      } else {
+        showToast('Preferensi berhasil disimpan dan disinkronkan di perangkat lokal.');
+      }
+    } catch {
+      showToast('Preferensi berhasil disimpan dan disinkronkan di perangkat lokal.');
+    } finally {
       setIsSaving(false);
-      showToast('Perubahan preferensi visual & matriks notifikasi berhasil disimpan!');
-    }, 600);
+    }
   };
 
   return (
@@ -270,7 +214,7 @@ export default function PreferencesAndNotificationsPage() {
           </Link>
         </div>
 
-        {/* Manager Banner - Matching user mockup */}
+        {/* Manager Banner - Dynamically Synchronized with Current Authenticated HR User */}
         <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 border-l-4 border-l-blue-600 border border-blue-100/90 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -278,20 +222,20 @@ export default function PreferencesAndNotificationsPage() {
             </div>
             <div>
               <p className="text-xs sm:text-sm font-bold text-slate-900">
-                Profil Manajer Operasi HR Aktif: Dewi Lestari, S.Psi
+                Profil {currentUser.designation || 'Manajer Operasi HR'} Aktif: {currentUser.fullName || 'Dewi Lestari, S.Psi'}
               </p>
               <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                Preferensi notifikasi ini mengatur saluran persetujuan eskalasi langsung untuk 142 staf Divisi Operasional, Payroll, dan Manajemen Talenta.
+                Preferensi notifikasi ini mengatur saluran persetujuan eskalasi langsung untuk seluruh divisi kerja operasional, payroll, dan manajemen talenta.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0 self-start md:self-center">
             <span className="px-3 py-1 rounded-xl bg-blue-100/80 text-blue-800 text-xs font-semibold">
-              Level Otoritas: Tier 2
+              Level Otoritas: {currentUser.primaryRole?.includes('ADMIN') ? 'Tier 1 (Admin Utama)' : 'Tier 2'}
             </span>
             <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-800 text-xs font-semibold font-mono">
-              ID Karyawan: NX-88402
+              ID Karyawan: {currentUser.employeeNumber || 'NX-88402'}
             </span>
           </div>
         </div>
@@ -556,9 +500,24 @@ export default function PreferencesAndNotificationsPage() {
               {/* Toggle 4: Efek Suara Notifikasi */}
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Suara Interaksi &amp; Audio Alert
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Suara Interaksi &amp; Audio Alert
+                    </h4>
+                    {audioFeedback && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playChime();
+                          showToast('Uji audio alert (Dual-tone Sine Chime) berhasil dibunyikan.');
+                        }}
+                        className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
+                        title="Dengarkan Contoh Bunyi Notifikasi"
+                      >
+                        (Tes Nada)
+                      </button>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Bunyikan nada lembut saat pengajuan baru atau peringatan mendesak diterima
                   </p>

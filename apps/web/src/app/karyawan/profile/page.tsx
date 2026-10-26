@@ -50,11 +50,31 @@ import {
   Send,
   Search,
   RefreshCw,
+  Sliders,
+  Volume2,
+  Moon,
+  Sun,
 } from 'lucide-react';
+import { usePreferences } from '@/components/providers/PreferencesProvider';
 
 export default function EmployeeProfilePage() {
   const router = useRouter();
   const { user: currentUser, updateLocalUser } = useCurrentUser();
+  const {
+    preferences,
+    updatePreferences,
+    setThemeMode,
+    setTableDensity,
+    setFontSize,
+    setMicroAnimations,
+    setHighContrast,
+    setAudioFeedback,
+    setLanguage,
+    setTimezone,
+    toggleNotificationChannel,
+    playChime,
+    saveToServer: savePreferencesToServer,
+  } = usePreferences();
   const {
     isCollapsed: isSidebarCollapsed,
     toggle: toggleSidebar,
@@ -63,9 +83,9 @@ export default function EmployeeProfilePage() {
     closeMobile,
   } = useSidebarCollapse();
 
-  // Active Tab: 'biodata' | 'kepegawaian' | 'pajak_bank' | 'keamanan'
+  // Active Tab: 'biodata' | 'kepegawaian' | 'pajak_bank' | 'keamanan' | 'preferensi'
   const [activeTab, setActiveTab] = useState<
-    'biodata' | 'kepegawaian' | 'pajak_bank' | 'keamanan'
+    'biodata' | 'kepegawaian' | 'pajak_bank' | 'keamanan' | 'preferensi'
   >('biodata');
 
   // Search state
@@ -922,6 +942,22 @@ export default function EmployeeProfilePage() {
                 <ShieldCheck className="w-4 h-4" />
                 <span>Keamanan Akun &amp; Sesi</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('preferensi')}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'preferensi'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Sliders className="w-4 h-4" />
+                <span>Preferensi &amp; Tampilan</span>
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-blue-100 text-blue-700 font-bold">
+                  Sinkron
+                </span>
+              </button>
             </div>
 
             {/* Simpan Perubahan Button - Placed at Top Beside Tabs */}
@@ -1490,6 +1526,337 @@ export default function EmployeeProfilePage() {
                   >
                     Ganti Sandi
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: PREFERENSI & NOTIFIKASI SINKRONISASI GLOBAL */}
+          {activeTab === 'preferensi' && (
+            <div className="space-y-6">
+              {/* Sync Status Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-sky-500/10 border border-blue-200/80 flex items-start gap-4">
+                <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-sm flex-shrink-0">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-xs font-bold text-slate-900">
+                      Sinkronisasi Preferensi Portal Karyawan Terhubung
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Global HR &amp; Employee Synchronized
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Pengaturan tampilan antarmuka (Mode Tema, Skala Font, Densitas Tabel, Nada Dering Notifikasi) terhubung langsung dengan sistem global Nexora. Anda dapat mengkustomisasi kenyamanan visual Anda di sini, dan sistem akan menyimpannya ke seluruh sesi perangkat Anda.
+                  </p>
+                </div>
+              </div>
+
+              {/* Grid 2 Kolom: Tampilan & Matriks Notifikasi */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Kolom Kiri: Tampilan & Aksesibilitas */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Tampilan &amp; Aksesibilitas</h4>
+                        <p className="text-[11px] text-slate-500">Kustomisasi kenyamanan layar kerja harian Anda</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mode Tema Sistem */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-700">Mode Tema Sistem</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('light')}
+                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-bold cursor-pointer ${
+                          preferences.themeMode === 'light'
+                            ? 'border-blue-600 bg-blue-50/60 text-blue-700 ring-2 ring-blue-500/20'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <Sun className="w-4 h-4 text-amber-500" />
+                        <span>Terang</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('dark')}
+                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-bold cursor-pointer ${
+                          preferences.themeMode === 'dark'
+                            ? 'border-blue-600 bg-blue-50/60 text-blue-700 ring-2 ring-blue-500/20'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <Moon className="w-4 h-4 text-indigo-500" />
+                        <span>Gelap</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('system')}
+                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-bold cursor-pointer ${
+                          preferences.themeMode === 'system'
+                            ? 'border-blue-600 bg-blue-50/60 text-blue-700 ring-2 ring-blue-500/20'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <Laptop className="w-4 h-4 text-slate-600" />
+                        <span>Ikuti Sistem</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Densitas Tabel & Ukuran Font */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700">Densitas Tabel Data</label>
+                      <div className="flex rounded-xl border border-slate-200 p-0.5 bg-slate-50">
+                        {(['compact', 'normal', 'spacious'] as const).map((density) => (
+                          <button
+                            key={density}
+                            type="button"
+                            onClick={() => setTableDensity(density)}
+                            className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-colors capitalize ${
+                              preferences.tableDensity === density
+                                ? 'bg-white text-blue-600 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            {density === 'compact' ? 'Kompak' : density === 'normal' ? 'Normal' : 'Lega'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700">Ukuran Font Antarmuka</label>
+                      <div className="flex rounded-xl border border-slate-200 p-0.5 bg-slate-50">
+                        <button
+                          type="button"
+                          onClick={() => setFontSize('standard')}
+                          className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-colors ${
+                            preferences.fontSize === 'standard'
+                              ? 'bg-white text-blue-600 shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Standar (14px)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFontSize('large')}
+                          className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-colors ${
+                            preferences.fontSize === 'large'
+                              ? 'bg-white text-blue-600 shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Besar (16px)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Toggles */}
+                  <div className="space-y-3 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Animasi &amp; Transisi Mikro</p>
+                        <p className="text-[10px] text-slate-400">Efek kehalusan render saat membuka modal &amp; filter tabel</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMicroAnimations(!preferences.microAnimations)}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                          preferences.microAnimations ? 'bg-blue-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                            preferences.microAnimations ? 'left-6' : 'left-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Mode Kontras Tinggi</p>
+                        <p className="text-[10px] text-slate-400">Pertajam rasio kontras kartu dan teks data</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHighContrast(!preferences.highContrast)}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                          preferences.highContrast ? 'bg-blue-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                            preferences.highContrast ? 'left-6' : 'left-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">Suara Interaksi &amp; Audio Alert</p>
+                          <p className="text-[10px] text-slate-400">Bunyikan nada lembut saat notifikasi baru diterima</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={playChime}
+                          className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Putar nada uji"
+                        >
+                          <Volume2 className="w-3 h-3" />
+                          <span>Tes Nada</span>
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAudioFeedback(!preferences.audioFeedback)}
+                        className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                          preferences.audioFeedback ? 'bg-blue-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                            preferences.audioFeedback ? 'left-6' : 'left-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bahasa & Zona Waktu */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700">Bahasa Antarmuka</label>
+                      <select
+                        value={preferences.language}
+                        onChange={(e) => setLanguage(e.target.value as 'id' | 'en')}
+                        className="w-full text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="id">Bahasa Indonesia (ID)</option>
+                        <option value="en">English (US)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700">Zona Waktu</label>
+                      <select
+                        value={preferences.timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
+                        className="w-full text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="Asia/Jakarta">WIB (UTC+07:00) Jakarta</option>
+                        <option value="Asia/Makassar">WITA (UTC+08:00) Makassar</option>
+                        <option value="Asia/Jayapura">WIT (UTC+09:00) Jayapura</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kolom Kanan: Matriks Saluran Notifikasi */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Saluran Notifikasi Karyawan</h4>
+                        <p className="text-[11px] text-slate-500">Pilih media penerima alert untuk aktivitas pekerjaan Anda</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="divide-y divide-slate-100">
+                    {preferences.notifications.map((item) => (
+                      <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-bold text-slate-800">{item.category}</p>
+                            {item.badge && (
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                                  item.badge.color === 'red'
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : item.badge.color === 'amber'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}
+                              >
+                                {item.badge.text}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400">{item.description}</p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <label className="flex items-center gap-1 cursor-pointer text-[10px] font-semibold text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={item.email}
+                              onChange={() => toggleNotificationChannel(item.id, 'email')}
+                              className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>Email</span>
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer text-[10px] font-semibold text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={item.whatsapp}
+                              onChange={() => toggleNotificationChannel(item.id, 'whatsapp')}
+                              className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>WA</span>
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer text-[10px] font-semibold text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={item.push}
+                              onChange={() => toggleNotificationChannel(item.id, 'push')}
+                              className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>Push</span>
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tombol Simpan Preferensi */}
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const success = await savePreferencesToServer();
+                        if (success) {
+                          playChime();
+                          showToast('✓ Preferensi antarmuka & notifikasi berhasil disimpan dan disinkronkan ke seluruh sistem!');
+                        } else {
+                          showToast('✓ Preferensi berhasil disimpan secara lokal dan disinkronkan.');
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Simpan Preferensi Karyawan</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

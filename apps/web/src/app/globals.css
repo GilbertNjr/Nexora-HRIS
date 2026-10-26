@@ -37,3 +37,118 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* ================= SYSTEM PREFERENCES GLOBAL STYLING ================= */
+/* 1. Global Dark Mode */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0B1120;
+  color: #F8FAFC;
+}
+
+html.dark .bg-white {
+  background-color: #111827 !important;
+  border-color: #1F2937 !important;
+  color: #F9FAFB;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/40,
+html.dark .bg-slate-50\/60,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/80,
+html.dark .bg-slate-50\/90 {
+  background-color: #1E293B !important;
+  color: #F1F5F9;
+}
+
+html.dark .bg-slate-100,
+html.dark .bg-slate-100\/90 {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+  color: #F8FAFC;
+}
+
+html.dark .border-slate-200,
+html.dark .border-slate-100,
+html.dark .border-slate-200\/90,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-200\/70,
+html.dark .border-slate-200\/60 {
+  border-color: #334155 !important;
+}
+
+html.dark .text-slate-900,
+html.dark .text-slate-800 {
+  color: #F8FAFC !important;
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-600 {
+  color: #CBD5E1 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+  color: #F8FAFC !important;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* 2. Global Font Size Scale */
+html.font-scale-large {
+  font-size: 16px;
+}
+
+/* 3. Global Table Density */
+[data-density="compact"] table th,
+[data-density="compact"] table td {
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+}
+
+[data-density="spacious"] table th,
+[data-density="spacious"] table td {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+}
+
+/* 4. High Contrast Accessibility Mode */
+html.high-contrast * {
+  border-color: #475569 !important;
+}
+
+html.high-contrast.dark * {
+  border-color: #94A3B8 !important;
+}
+
+html.high-contrast button {
+  outline: 1px solid currentColor !important;
+}
+
+/* 5. Reduced Motion */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
