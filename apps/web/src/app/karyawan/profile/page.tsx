@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { NotificationBellDropdown } from '@/components/notifications/NotificationBellDropdown';
@@ -42,6 +42,9 @@ import {
   Edit3,
   Smartphone,
   Laptop,
+  Tablet,
+  Trash2,
+  Plus,
   Home,
   CheckCheck,
   Send,
@@ -83,11 +86,142 @@ export default function EmployeeProfilePage() {
   const [isChangingPwd, setIsChangingPwd] = useState(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
 
+  // Active Sessions Real-Time State (Live database connected devices)
+  interface ConnectedSession {
+    id: string;
+    userId: string;
+    deviceType: 'desktop' | 'mobile' | 'tablet';
+    deviceName: string;
+    os: string;
+    browser: string;
+    ipAddress: string;
+    location: string;
+    isCurrent: boolean;
+    isOnline: boolean;
+    statusText: string;
+    lastActiveText: string;
+    createdAt: string;
+  }
+
+  const [connectedSessions, setConnectedSessions] = useState<ConnectedSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+  const [isSimulatingMobile, setIsSimulatingMobile] = useState(false);
+
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4500);
+  };
+
+  // Fetch active connected sessions from PostgreSQL
+  const fetchActiveSessions = useCallback(async (quiet = false) => {
+    if (!quiet) setIsLoadingSessions(true);
+    try {
+      const storedSessionId = typeof window !== 'undefined' ? localStorage.getItem('nexora_session_id') || '' : '';
+      const params = new URLSearchParams();
+      if (currentUser.id) params.set('userId', currentUser.id);
+      if (currentUser.employeeNumber) params.set('employeeNumber', currentUser.employeeNumber);
+      if (currentUser.email) params.set('email', currentUser.email);
+      if (storedSessionId) params.set('sessionId', storedSessionId);
+
+      const res = await fetch(`/api/v1/auth/sessions?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setConnectedSessions(json.data);
+        }
+      }
+    } catch (err) {
+      console.error('Gagal memuat sesi aktif perangkat:', err);
+    } finally {
+      if (!quiet) setIsLoadingSessions(false);
+    }
+  }, [currentUser.id, currentUser.employeeNumber, currentUser.email]);
+
+  // Real-time synchronization for connected devices across browser tabs & devices
+  useEffect(() => {
+    fetchActiveSessions();
+    const interval = setInterval(() => {
+      fetchActiveSessions(true);
+    }, 4000);
+
+    let sessionChannel: BroadcastChannel | null = null;
+    try {
+      sessionChannel = new BroadcastChannel('nexora_session_sync');
+      sessionChannel.onmessage = (event) => {
+        if (event.data?.type === 'SESSION_CHANGED') {
+          fetchActiveSessions(true);
+        }
+      };
+    } catch {}
+
+    return () => {
+      clearInterval(interval);
+      if (sessionChannel) sessionChannel.close();
+    };
+  }, [fetchActiveSessions]);
+
+  // Handle remote revocation of a session
+  const handleRevokeSession = async (sessionId: string, devName: string) => {
+    setRevokingSessionId(sessionId);
+    try {
+      const res = await fetch(`/api/v1/auth/sessions?sessionId=${sessionId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConnectedSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        showToast(`Sesi perangkat "${devName}" berhasil diputuskan.`);
+        try {
+          const ch = new BroadcastChannel('nexora_session_sync');
+          ch.postMessage({ type: 'SESSION_CHANGED' });
+          ch.close();
+        } catch {}
+      } else {
+        showToast(data.error?.message || 'Gagal memutuskan sesi perangkat.');
+      }
+    } catch {
+      showToast('Terjadi kendala jaringan saat memutuskan sesi.');
+    } finally {
+      setRevokingSessionId(null);
+    }
+  };
+
+  // Simulate mobile login for testing multi-device real-time sync (Laptop + Mobile)
+  const handleSimulateMobileLogin = async () => {
+    setIsSimulatingMobile(true);
+    try {
+      const res = await fetch('/api/v1/auth/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          employeeNumber: currentUser.employeeNumber,
+          email: currentUser.email,
+          deviceType: 'mobile',
+          deviceName: 'Mobile Android (Samsung S24)',
+          isMobileSimulation: true,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Sesi perangkat Mobile Android (Samsung S24) berhasil terhubung secara real-time!');
+        fetchActiveSessions(true);
+        try {
+          const ch = new BroadcastChannel('nexora_session_sync');
+          ch.postMessage({ type: 'SESSION_CHANGED' });
+          ch.close();
+        } catch {}
+      } else {
+        showToast(data.error?.message || 'Gagal menghubungkan sesi mobile.');
+      }
+    } catch {
+      showToast('Gagal menghubungi server untuk simulasi mobile.');
+    } finally {
+      setIsSimulatingMobile(false);
+    }
   };
 
   // Profile data states (Initialized matching user's official master identity dynamically)
@@ -1070,40 +1204,128 @@ export default function EmployeeProfilePage() {
                   </button>
                 </div>
 
-                {/* Card 2: Perangkat Terkoneksi */}
+                {/* Card 2: Perangkat Terkoneksi (Real-time Multi-Device Tracking) */}
                 <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Laptop className="w-4 h-4 text-slate-600" />
                       <h4 className="text-xs font-bold text-slate-800">Perangkat Terkoneksi</h4>
                     </div>
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
-                      2 Sesi Aktif
+                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold">
+                      {connectedSessions.length} Sesi Aktif
                     </span>
                   </div>
 
                   <div className="space-y-2 text-xs">
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Laptop className="w-4 h-4 text-blue-600" />
-                        <div>
-                          <p className="font-bold text-slate-800 text-[11px]">Desktop Chrome</p>
-                          <p className="text-[9px] text-slate-400">SCBD HQ • Sesi Saat Ini</p>
-                        </div>
+                    {isLoadingSessions && connectedSessions.length === 0 ? (
+                      <div className="py-4 flex flex-col items-center justify-center gap-2 text-slate-400">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                        <span className="text-[10px]">Memeriksa perangkat aktif...</span>
                       </div>
-                      <span className="text-[9px] font-bold text-emerald-600">Online</span>
-                    </div>
+                    ) : connectedSessions.length === 0 ? (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center text-slate-400 text-[11px]">
+                        Tidak ada sesi perangkat lain yang terdeteksi.
+                      </div>
+                    ) : (
+                      connectedSessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
+                            session.isCurrent
+                              ? 'bg-blue-50/40 border-blue-200/80 shadow-2xs'
+                              : 'bg-slate-50 border-slate-100 hover:border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div
+                              className={`p-1.5 rounded-lg shrink-0 ${
+                                session.deviceType === 'mobile'
+                                  ? 'bg-amber-50 text-amber-600 border border-amber-200/60'
+                                  : session.deviceType === 'tablet'
+                                  ? 'bg-purple-50 text-purple-600 border border-purple-200/60'
+                                  : 'bg-blue-50 text-blue-600 border border-blue-200/60'
+                              }`}
+                            >
+                              {session.deviceType === 'mobile' ? (
+                                <Smartphone className="w-3.5 h-3.5" />
+                              ) : session.deviceType === 'tablet' ? (
+                                <Tablet className="w-3.5 h-3.5" />
+                              ) : (
+                                <Laptop className="w-3.5 h-3.5" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-bold text-slate-800 text-[11px] truncate">
+                                  {session.deviceName}
+                                </p>
+                                {session.isCurrent && (
+                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[8px] font-bold bg-blue-100 text-blue-700">
+                                    Ini
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[9px] text-slate-400 truncate">
+                                {session.location} • {session.lastActiveText}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                                session.isOnline
+                                  ? 'text-emerald-700 bg-emerald-50 border border-emerald-200/60'
+                                  : 'text-slate-500 bg-slate-100'
+                              }`}
+                            >
+                              {session.statusText}
+                            </span>
+                            {!session.isCurrent && (
+                              <button
+                                type="button"
+                                title="Putus Sesi Perangkat Ini"
+                                disabled={revokingSessionId === session.id}
+                                onClick={() => handleRevokeSession(session.id, session.deviceName)}
+                                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                {revokingSessionId === session.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin text-rose-500" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Smartphone className="w-4 h-4 text-slate-600" />
-                        <div>
-                          <p className="font-bold text-slate-800 text-[11px]">Mobile Android</p>
-                          <p className="text-[9px] text-slate-400">Samsung S24 • 1 jam lalu</p>
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-bold text-slate-400">Aktif</span>
-                    </div>
+                  {/* Action buttons: Segarkan & Tambah Sesi Mobile */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchActiveSessions()}
+                      disabled={isLoadingSessions}
+                      className="text-[10px] text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isLoadingSessions ? 'animate-spin text-blue-500' : ''}`} />
+                      <span>Segarkan</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSimulateMobileLogin}
+                      disabled={isSimulatingMobile}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50/70 hover:bg-blue-100/70 px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold transition-colors cursor-pointer border border-blue-200/50"
+                    >
+                      {isSimulatingMobile ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Plus className="w-3 h-3" />
+                      )}
+                      <span>+ Simulasi Mobile</span>
+                    </button>
                   </div>
                 </div>
               </div>

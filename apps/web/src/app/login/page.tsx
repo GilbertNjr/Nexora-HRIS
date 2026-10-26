@@ -88,6 +88,11 @@ export default function UnifiedLoginPage() {
           localStorage.setItem('nexora_user', JSON.stringify(safeUser));
           localStorage.setItem('nexora_employee_profile', JSON.stringify(safeUser));
 
+          const incomingSessionId = resData.data.sessionId || resData.data.tokens?.sessionId;
+          if (incomingSessionId) {
+            localStorage.setItem('nexora_session_id', incomingSessionId);
+          }
+
           try {
             localStorage.removeItem('nexora_latest_selfie_attendance');
           } catch {}
