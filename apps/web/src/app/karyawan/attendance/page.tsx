@@ -635,10 +635,16 @@ export default function EmployeeAttendancePage() {
     setIsVerifyingSelfie(true);
 
     const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const isLate = hours > 8 || (hours === 8 && minutes > 45); // Tolerance: 08:45 WIB
-    const timeNow = `${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
+    const parts = new Intl.DateTimeFormat('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Jakarta',
+    }).formatToParts(now);
+    const hours = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+    const minutes = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
+    const isLate = hours > 8 || (hours === 8 && minutes > 15); // Tolerance: 08:15 WIB
+    const timeNow = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} WIB`;
 
     try {
       // 1. Post to attendance API
@@ -667,8 +673,9 @@ export default function EmployeeAttendancePage() {
         }),
       });
 
+      let json: any = null;
       if (res.ok) {
-        const json = await res.json();
+        json = await res.json();
         if (json.data?.employeeStats) {
           setAttendanceStats(json.data.employeeStats);
           if (Array.isArray(json.data.employeeStats.history)) {
@@ -680,7 +687,9 @@ export default function EmployeeAttendancePage() {
       // 2. Broadcast on BroadcastChannel for all open tabs & admin dashboard
       const ch = new BroadcastChannel('nexora_live_sync');
       ch.postMessage({
-        type: 'EMPLOYEE_CLOCKED_IN',
+        type: 'ATTENDANCE_RECORDED',
+        record: json?.data?.record,
+        summary: json?.data?.summary,
         employeeId: currentUser.employeeNumber || 'NX-2021008',
         employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
         department: currentUser.department || 'Teknologi Informasi & Rekayasa Cloud',
@@ -723,7 +732,7 @@ export default function EmployeeAttendancePage() {
 
   // Handle Perform Check-Out
   const handlePerformCheckOut = async () => {
-    const timeStr = `${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
+    const timeStr = `${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB`;
     setHasClockedOut(true);
     setClockOutTimeStr(timeStr);
     setIsCheckOutModalOpen(false);
@@ -744,8 +753,9 @@ export default function EmployeeAttendancePage() {
         }),
       });
 
+      let json: any = null;
       if (res.ok) {
-        const json = await res.json();
+        json = await res.json();
         if (json.data?.employeeStats) {
           setAttendanceStats(json.data.employeeStats);
           if (Array.isArray(json.data.employeeStats.history)) {
@@ -758,6 +768,8 @@ export default function EmployeeAttendancePage() {
       ch.postMessage({
         type: 'ATTENDANCE_RECORDED',
         type_action: 'CLOCK_OUT',
+        record: json?.data?.record,
+        summary: json?.data?.summary,
         employeeId: currentUser.employeeNumber || 'NX-2021008',
         employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
         time: timeStr,

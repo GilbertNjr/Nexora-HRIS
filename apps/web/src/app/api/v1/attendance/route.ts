@@ -5,6 +5,7 @@ import { broadcastAuditEvent } from '@/lib/auditSSE';
 import { broadcastEmployeeEvent } from '@/lib/employeesSSE';
 import { getStoredAuditLogs, saveStoredAuditLogs, AuditLogEntry, recordAuditLog } from '@/lib/auditDb';
 import { getEmployeesFromDb } from '@/lib/db';
+import { getLeaveRequestsFromDb } from '@/lib/leaveDb';
 import {
   getAttendancesFromDb,
   saveAttendanceToDb,
@@ -108,11 +109,150 @@ function getStoredApprovalsList(): any[] {
 }
 
 function getTodayDateStr(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+}
+
+function getWibTimeParts(): { hours: number; minutes: number; seconds: number; timeStr: string } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Jakarta',
+  }).formatToParts(now);
+
+  const hours = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+  const minutes = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
+  const seconds = parseInt(parts.find((p) => p.type === 'second')?.value || '0', 10);
+  const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} WIB`;
+
+  return { hours, minutes, seconds, timeStr };
+}
+
+async function computeAttendanceSummary(
+  data: AttendanceData,
+  todayStr: string
+): Promise<{
+  totalEmployees: number;
+  presentCount: number;
+  onTimeCount: number;
+  lateCount: number;
+  leaveCount: number;
+  absentCount: number;
+  attendanceRate: number;
+}> {
+  let emps: any[] = [];
+  try {
+    emps = await getEmployeesFromDb();
+  } catch {}
+
+  const activeEmps = (emps || []).filter(
+    (e) => e.employmentStatus !== 'TERMINATED' && e.employmentStatus !== 'RESIGNED'
+  );
+  const totalEmployees = activeEmps.length > 0
+    ? activeEmps.length
+    : Array.isArray(emps) && emps.length > 0
+    ? emps.length
+    : data.totalEmployees || 1;
+  data.totalEmployees = totalEmployees;
+
+  // Deduplicate today's attendance per unique registered employee
+  const todayEmpMap = new Map<string, AttendanceItem>();
+  for (const r of data.records || []) {
+    if (r.date === todayStr && r.employeeId) {
+      const key = (r.employeeId || '').toLowerCase().trim();
+      if (!todayEmpMap.has(key)) {
+        todayEmpMap.set(key, r);
+      }
+    }
+  }
+
+  let todayOnTime = 0;
+  let todayLate = 0;
+  let todayDinas = 0;
+
+  todayEmpMap.forEach((rec) => {
+    if (rec.status === 'TERLAMBAT') {
+      todayLate++;
+    } else if (rec.status === 'DINAS_LUAR') {
+      todayDinas++;
+    } else {
+      todayOnTime++;
+    }
+  });
+
+  const todayPresent = todayEmpMap.size;
+
+  // Calculate approved leave active today from Neon DB & JSON
+  const leaveEmpKeys = new Set<string>();
+
+  try {
+    const dbLeaves = await getLeaveRequestsFromDb();
+    if (Array.isArray(dbLeaves)) {
+      dbLeaves.forEach((a) => {
+        if (
+          a.status === 'APPROVED' &&
+          a.startDate &&
+          a.endDate &&
+          todayStr >= a.startDate &&
+          todayStr <= a.endDate
+        ) {
+          const key = (a.nik || a.name || '').toLowerCase().trim();
+          if (key && !todayEmpMap.has(key)) {
+            leaveEmpKeys.add(key);
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('[attendance] Could not load leaves from DB:', err);
+  }
+
+  try {
+    const APPROVALS_FILE = path.join(STORAGE_DIR, 'nexora_approvals.json');
+    if (fs.existsSync(APPROVALS_FILE)) {
+      const approvals = JSON.parse(fs.readFileSync(APPROVALS_FILE, 'utf-8'));
+      if (Array.isArray(approvals)) {
+        approvals.forEach((a: any) => {
+          if (
+            a.status === 'APPROVED' &&
+            a.startDate &&
+            a.endDate &&
+            todayStr >= a.startDate &&
+            todayStr <= a.endDate
+          ) {
+            const key = (a.nik || a.name || '').toLowerCase().trim();
+            if (key && !todayEmpMap.has(key)) {
+              leaveEmpKeys.add(key);
+            }
+          }
+        });
+      }
+    }
+  } catch {}
+
+  const todayLeave = leaveEmpKeys.size;
+
+  data.onTimeCount = todayOnTime;
+  data.lateCount = todayLate;
+  data.leaveCount = todayLeave;
+  data.presentCount = todayPresent;
+
+  const absentCount = Math.max(0, data.totalEmployees - data.presentCount - data.leaveCount);
+  const attendanceRate = data.totalEmployees > 0
+    ? Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1))
+    : 0;
+
+  return {
+    totalEmployees,
+    presentCount: todayPresent,
+    onTimeCount: todayOnTime,
+    lateCount: todayLate,
+    leaveCount: todayLeave,
+    absentCount,
+    attendanceRate,
+  };
 }
 
 function calculateAccurateDuration(
@@ -449,44 +589,8 @@ export async function GET(request: NextRequest) {
     console.warn('[attendance/GET] Could not load from PostgreSQL:', err);
   }
 
-  const totalEmployees = Array.isArray(emps) && emps.length > 0 ? emps.length : (data.totalEmployees || 1);
-  data.totalEmployees = totalEmployees;
-
   const todayStr = getTodayDateStr();
-  const todayRecords = (data.records || []).filter((r) => r.date === todayStr);
-
-  const todayOnTime = todayRecords.filter((r) => r.status === 'TEPAT_WAKTU' || r.status === 'WFH').length;
-  const todayLate = todayRecords.filter((r) => r.status === 'TERLAMBAT').length;
-  const todayDinas = todayRecords.filter((r) => r.status === 'DINAS_LUAR').length;
-  const todayPresent = todayOnTime + todayLate + todayDinas;
-
-  let todayLeave = 0;
-  try {
-    const APPROVALS_FILE = path.join(STORAGE_DIR, 'nexora_approvals.json');
-    if (fs.existsSync(APPROVALS_FILE)) {
-      const approvals = JSON.parse(fs.readFileSync(APPROVALS_FILE, 'utf-8'));
-      if (Array.isArray(approvals)) {
-        todayLeave = approvals.filter(
-          (a: any) =>
-            a.status === 'APPROVED' &&
-            a.startDate &&
-            a.endDate &&
-            todayStr >= a.startDate &&
-            todayStr <= a.endDate
-        ).length;
-      }
-    }
-  } catch {}
-
-  data.onTimeCount = todayOnTime;
-  data.lateCount = todayLate;
-  data.leaveCount = todayLeave;
-  data.presentCount = todayPresent;
-
-  const absentCount = Math.max(0, data.totalEmployees - data.presentCount - data.leaveCount);
-  const attendanceRate = data.totalEmployees > 0
-    ? Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1))
-    : 0;
+  const summary = await computeAttendanceSummary(data, todayStr);
 
   let employeeStats = null;
   if (employeeId || employeeName) {
@@ -502,8 +606,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         ...data,
-        absentCount,
-        attendanceRate,
+        ...summary,
         employeeStats,
       },
     },
@@ -536,19 +639,14 @@ export async function POST(request: NextRequest) {
       }
     } catch {}
 
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const seconds = now.getSeconds();
-    const timeStr =
-      body.time ||
-      `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} WIB`;
+    const wib = getWibTimeParts();
+    const timeStr = body.time || wib.timeStr;
     const dateStr = body.date || getTodayDateStr();
 
     const isClockOut = body.type === 'CLOCK_OUT';
 
     // Standard clock-in limit is 08:15 WIB (15-min tolerance from 08:00)
-    const isLate = hours > 8 || (hours === 8 && minutes > 15);
+    const isLate = wib.hours > 8 || (wib.hours === 8 && wib.minutes > 15);
     const calculatedStatus: 'TEPAT_WAKTU' | 'TERLAMBAT' = isLate ? 'TERLAMBAT' : 'TEPAT_WAKTU';
     const finalStatus: 'TEPAT_WAKTU' | 'TERLAMBAT' | 'WFH' | 'DINAS_LUAR' =
       body.status || (body.workLocation === 'WFH' ? 'WFH' : body.workLocation === 'Dinas' ? 'DINAS_LUAR' : calculatedStatus);
@@ -661,21 +759,7 @@ export async function POST(request: NextRequest) {
     }
 
     const todayStr = dateStr;
-    const todayRecords = (data.records || []).filter((r) => r.date === todayStr);
-    const todayOnTime = todayRecords.filter((r) => r.status === 'TEPAT_WAKTU' || r.status === 'WFH').length;
-    const todayLate = todayRecords.filter((r) => r.status === 'TERLAMBAT').length;
-    const todayDinas = todayRecords.filter((r) => r.status === 'DINAS_LUAR').length;
-
-    data.onTimeCount = todayOnTime;
-    data.lateCount = todayLate;
-    data.presentCount = todayOnTime + todayLate + todayDinas;
-
     data.records = data.records.slice(0, 150);
-
-    const absentCount = Math.max(0, data.totalEmployees - data.presentCount - (data.leaveCount || 0));
-    const attendanceRate = data.totalEmployees > 0
-      ? Number(((data.presentCount / data.totalEmployees) * 100).toFixed(1))
-      : 0;
 
     // Persist permanently to Neon PostgreSQL (ensures biometric selfie photo & status survive redeploy)
     try {
@@ -684,17 +768,22 @@ export async function POST(request: NextRequest) {
       console.error('[attendance/POST] Error persisting to Neon DB:', dbErr);
     }
 
-    saveStoredAttendance(data);
+    // Synchronize latest records from PostgreSQL
+    try {
+      const dbRecords = await getAttendancesFromDb();
+      if (Array.isArray(dbRecords) && dbRecords.length > 0) {
+        const dbKeys = new Set(
+          dbRecords.map((r) => `${(r.employeeId || '').toLowerCase()}-${r.date}`)
+        );
+        const remainingFileRecords = (data.records || []).filter(
+          (r) => !dbKeys.has(`${(r.employeeId || '').toLowerCase()}-${r.date}`)
+        );
+        data.records = [...dbRecords, ...remainingFileRecords];
+      }
+    } catch {}
 
-    const summaryPayload = {
-      totalEmployees: data.totalEmployees,
-      presentCount: data.presentCount,
-      onTimeCount: data.onTimeCount,
-      lateCount: data.lateCount,
-      leaveCount: data.leaveCount,
-      absentCount,
-      attendanceRate,
-    };
+    const summaryPayload = await computeAttendanceSummary(data, todayStr);
+    saveStoredAttendance(data);
 
     const updatedEmployeeStats = computeEmployeeMonthlyStats(
       employeeId,
@@ -846,14 +935,31 @@ export async function DELETE(request: NextRequest) {
         (r.employeeName && r.employeeName.toLowerCase() === employeeName.toLowerCase());
       return !(isMatch && r.date === todayStr);
     });
+
+    const summaryPayload = await computeAttendanceSummary(data, todayStr);
     saveStoredAttendance(data);
 
     const resetStats = computeEmployeeMonthlyStats(employeeId, employeeName, data.records);
+
+    try {
+      broadcastEmployeeEvent('ATTENDANCE_RECORDED', {
+        record: {
+          employeeId,
+          employeeName,
+          type: 'RESET',
+          date: todayStr,
+        },
+        summary: summaryPayload,
+        employeeStats: resetStats,
+      });
+    } catch {}
+
     return NextResponse.json({
       success: true,
       message: 'Status presensi hari ini berhasil direset.',
       data: {
         employeeStats: resetStats,
+        summary: summaryPayload,
       },
     });
   } catch (err: any) {

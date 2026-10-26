@@ -107,7 +107,7 @@ export default function AdminAttendancePage() {
   const [selectedDept, setSelectedDept] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedShift, setSelectedShift] = useState<'all' | 'shift1' | 'shift2' | 'flexible'>('all');
-  const [selectedDate, setSelectedDate] = useState('24 Mar 2025 (Hari Ini)');
+  const [selectedDate, setSelectedDate] = useState('Hari Ini');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Modals State
@@ -284,8 +284,8 @@ export default function AdminAttendancePage() {
           const newPresent = prev.presentCount + 1;
           const newOnTime = isLate ? prev.onTimeCount : prev.onTimeCount + 1;
           const newLate = isLate ? prev.lateCount + 1 : prev.lateCount;
-          const newAbsent = Math.max(0, prev.absentCount - 1);
-          const newRate = Number(((newOnTime / prev.totalEmployees) * 100).toFixed(1));
+          const newAbsent = Math.max(0, prev.totalEmployees - newPresent - prev.leaveCount);
+          const newRate = Number(((newPresent / prev.totalEmployees) * 100).toFixed(1));
           return {
             ...prev,
             presentCount: newPresent,
@@ -296,6 +296,9 @@ export default function AdminAttendancePage() {
           };
         });
       }
+
+      // Re-fetch to guarantee 100% database synchronization
+      fetchAttendanceApi();
 
       const isClockOut = rec.type === 'CLOCK_OUT' || rec.type_action === 'CLOCK_OUT';
 
@@ -711,7 +714,16 @@ export default function AdminAttendancePage() {
       (selectedShift === 'shift2' && r.shiftName.includes('Shift Siang')) ||
       (selectedShift === 'flexible' && r.shiftName.includes('Fleksibel'));
 
-    return matchesSearch && matchesShift;
+    const matchesStatus =
+      selectedStatus === 'ALL' ||
+      r.status === selectedStatus ||
+      (selectedStatus === 'WFH' && (r.status === 'WFH' || r.workLocation === 'WFH'));
+
+    const matchesDept =
+      selectedDept === 'ALL' ||
+      r.division.toLowerCase().includes(selectedDept.toLowerCase());
+
+    return matchesSearch && matchesShift && matchesStatus && matchesDept;
   });
 
   // Dynamic breakdown for Metode Check-In
@@ -904,7 +916,7 @@ export default function AdminAttendancePage() {
               </div>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl font-bold text-slate-900">
-                  {kpiSummary.onTimeCount.toLocaleString('id-ID')}
+                  {kpiSummary.presentCount.toLocaleString('id-ID')}
                 </span>
                 <span className="text-xs text-slate-500 font-medium">staf</span>
               </div>
@@ -919,7 +931,13 @@ export default function AdminAttendancePage() {
               {kpiSummary.presentCount === 0 ? (
                 <span>Belum ada presensi masuk hari ini</span>
               ) : (
-                <span className="text-emerald-600 font-semibold">{kpiSummary.presentCount} hadir terverifikasi</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-emerald-600 font-semibold">{kpiSummary.onTimeCount} tepat waktu</span>
+                  {kpiSummary.lateCount > 0 && (
+                    <span className="text-amber-600 font-semibold">• {kpiSummary.lateCount} telat</span>
+                  )}
+                  <span className="text-slate-400 text-[10px]">({kpiSummary.presentCount} hadir)</span>
+                </div>
               )}
             </div>
           </div>
@@ -975,16 +993,9 @@ export default function AdminAttendancePage() {
             </div>
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] mt-3">
               <span className="text-slate-500 font-medium truncate">
-                {kpiSummary.leaveCount === 0 ? (
-                  'Belum ada izin/cuti aktif hari ini'
-                ) : (
-                  `${Math.round(kpiSummary.leaveCount * 0.54)} Cuti • ${Math.round(kpiSummary.leaveCount * 0.31)} Sakit • ${Math.max(
-                    0,
-                    kpiSummary.leaveCount -
-                      Math.round(kpiSummary.leaveCount * 0.54) -
-                      Math.round(kpiSummary.leaveCount * 0.31)
-                  )} Dinas`
-                )}
+                {kpiSummary.leaveCount === 0
+                  ? 'Belum ada izin/cuti aktif hari ini'
+                  : `${kpiSummary.leaveCount} staf izin/cuti aktif`}
               </span>
               <Link
                 href="/admin/leave"
@@ -1050,10 +1061,9 @@ export default function AdminAttendancePage() {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="w-full pl-10 pr-8 py-2.5 text-xs rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold text-slate-700 appearance-none cursor-pointer"
               >
-                <option value="24 Mar 2025 (Hari Ini)">24 Mar 2025 (Hari Ini)</option>
-                <option value="23 Mar 2025">23 Mar 2025 (Kemarin)</option>
-                <option value="22 Mar 2025">22 Mar 2025 (Sabtu)</option>
-                <option value="21 Mar 2025">21 Mar 2025 (Jumat)</option>
+                <option value="Hari Ini">Hari Ini ({new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })})</option>
+                <option value="Kemarin">Kemarin ({new Date(Date.now() - 86400000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })})</option>
+                <option value="Semua Tanggal">Semua Tanggal</option>
               </select>
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>

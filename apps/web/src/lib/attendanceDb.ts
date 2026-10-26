@@ -113,8 +113,7 @@ export async function saveAttendanceToDb(
 ): Promise<string | null> {
   try {
     const sql = getDb();
-    const d = new Date();
-    const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const localDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
     const dateStr = item.date || localDateStr;
     const employeeIdOrNik = item.employeeId || 'NX-2021008';
 
