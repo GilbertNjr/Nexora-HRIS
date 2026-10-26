@@ -726,40 +726,16 @@ export default function AdminAttendancePage() {
     return matchesSearch && matchesShift && matchesStatus && matchesDept;
   });
 
-  // Dynamic breakdown for Metode Check-In
+  // Dynamic breakdown for Metode Check-In (100% Face ID Biometrik)
   const presentRecords = records.filter(
     (r) => r.status && r.status !== 'BELUM_PRESENSI'
   );
   const totalPresentCount = presentRecords.length;
-
-  const bioCount = presentRecords.filter(
-    (r) =>
-      r.checkInSourceIcon === 'building' ||
-      r.checkInSourceIcon === 'cog' ||
-      (r.workLocation === 'WFO' && !r.checkInSourceIcon)
-  ).length;
-
-  const mobileGpsCount = presentRecords.filter(
-    (r) =>
-      r.checkInSourceIcon === 'pin' ||
-      r.workLocation === 'Dinas' ||
-      (r.location && r.location.toLowerCase().includes('gps'))
-  ).length;
-
-  const webPortalCount = presentRecords.filter(
-    (r) =>
-      r.checkInSourceIcon === 'globe' ||
-      r.workLocation === 'WFH' ||
-      (!r.checkInSourceIcon && r.workLocation !== 'WFO')
-  ).length;
-
-  const bioPercent = totalPresentCount > 0 ? Math.round((bioCount / totalPresentCount) * 100) : 0;
-  const mobilePercent = totalPresentCount > 0 ? Math.round((mobileGpsCount / totalPresentCount) * 100) : 0;
-  const webPercent = totalPresentCount > 0 ? Math.max(0, 100 - bioPercent - mobilePercent) : 0;
+  const faceIdCount = totalPresentCount;
+  const faceIdPercent = totalPresentCount > 0 ? 100 : 0;
 
   const circumference = 251.2;
-  const bioDash = (circumference * bioPercent) / 100;
-  const mobileDash = (circumference * mobilePercent) / 100;
+  const faceIdDash = (circumference * faceIdPercent) / 100;
 
   return (
     <AdminLayoutSkeleton
@@ -1373,26 +1349,9 @@ export default function AdminAttendancePage() {
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
                               <span>{item.checkInTime}</span>
-                              {item.checkInSourceIcon === 'globe' && (
-                                <span title="Web Portal">
-                                  <Laptop className="w-3.5 h-3.5 text-blue-500" />
-                                </span>
-                              )}
-                              {item.checkInSourceIcon === 'building' && (
-                                <span title="Kantor Pusat">
-                                  <Building className="w-3.5 h-3.5 text-amber-500" />
-                                </span>
-                              )}
-                              {item.checkInSourceIcon === 'cog' && (
-                                <span title="Pabrik Cikarang">
-                                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                                </span>
-                              )}
-                              {item.checkInSourceIcon === 'pin' && (
-                                <span title="Lokasi Client">
-                                  <MapPin className="w-3.5 h-3.5 text-purple-500" />
-                                </span>
-                              )}
+                              <span title="Face ID Biometrik Terverifikasi" className="inline-flex items-center text-blue-600">
+                                <Camera className="w-3.5 h-3.5" />
+                              </span>
                             </div>
                             <p
                               className={`text-[10px] font-semibold mt-0.5 ${
@@ -1656,20 +1615,23 @@ export default function AdminAttendancePage() {
               </div>
             </div>
 
-            {/* Card 2: Metode Check-In (Donut Chart & Distribution) */}
+            {/* Card 2: Metode Check-In (Face ID Biometrik Donut Visual) */}
             <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                    <PieChart className="w-4 h-4" />
+                    <Camera className="w-4 h-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Metode Check-In
-                  </h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Metode Check-In
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Verifikasi Face ID Biometrik</p>
+                  </div>
                 </div>
                 <button
                   onClick={handleRefresh}
-                  className="p-1 text-slate-400 hover:text-slate-700 rounded"
+                  className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
                   title="Refresh Breakdown"
                 >
                   <RotateCw className="w-3.5 h-3.5" />
@@ -1689,47 +1651,17 @@ export default function AdminAttendancePage() {
                       stroke="#F1F5F9"
                       strokeWidth="12"
                     />
-                    {totalPresentCount > 0 && bioPercent > 0 && (
+                    {totalPresentCount > 0 && (
                       <circle
                         cx="50"
                         cy="50"
                         r="40"
                         fill="transparent"
-                        stroke="#1D4ED8"
+                        stroke="#2563EB"
                         strokeWidth="12"
                         strokeDasharray="251.2"
-                        strokeDashoffset={251.2 - bioDash}
-                        className="transition-all duration-1000 ease-out"
-                      />
-                    )}
-                    {totalPresentCount > 0 && mobilePercent > 0 && (
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="transparent"
-                        stroke="#0EA5E9"
-                        strokeWidth="12"
-                        strokeDasharray="251.2"
-                        strokeDashoffset={251.2 - mobileDash}
-                        style={{ transform: `rotate(${(bioPercent / 100) * 360}deg)`, transformOrigin: '50% 50%' }}
-                        className="transition-all duration-1000 ease-out"
-                      />
-                    )}
-                    {totalPresentCount > 0 && webPercent > 0 && (
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="transparent"
-                        stroke="#94A3B8"
-                        strokeWidth="12"
-                        strokeDasharray="251.2"
-                        strokeDashoffset={251.2 - ((circumference * webPercent) / 100)}
-                        style={{
-                          transform: `rotate(${((bioPercent + mobilePercent) / 100) * 360}deg)`,
-                          transformOrigin: '50% 50%',
-                        }}
+                        strokeDashoffset={251.2 - faceIdDash}
+                        strokeLinecap="round"
                         className="transition-all duration-1000 ease-out"
                       />
                     )}
@@ -1745,42 +1677,39 @@ export default function AdminAttendancePage() {
                 </div>
               </div>
 
-              {/* Legend Breakdown */}
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-700 flex-shrink-0" />
-                    <span className="font-semibold text-slate-700 truncate">
-                      Biometrik Kantor (Finger & Face)
+              {/* Legend Breakdown - Face ID Only */}
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-blue-50/70 border border-blue-100/80">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                      <Camera className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-800 text-xs block">
+                        Face ID (Biometrik Wajah)
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Liveness Scan & AI Recognition
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-blue-700 text-xs block">
+                      {faceIdCount} ({faceIdPercent}%)
+                    </span>
+                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center justify-end gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500 inline" />
+                      {totalPresentCount > 0 ? 'Terverifikasi' : 'Siap'}
                     </span>
                   </div>
-                  <span className="font-mono font-bold text-slate-900">
-                    {bioCount} ({bioPercent}%)
-                  </span>
                 </div>
 
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500 flex-shrink-0" />
-                    <span className="font-semibold text-slate-700 truncate">
-                      Mobile App (GPS & Geofencing)
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold text-slate-900">
-                    {mobileGpsCount} ({mobilePercent}%)
+                <div className="p-3 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    Metode Tunggal Presensi
                   </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 border border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400 flex-shrink-0" />
-                    <span className="font-semibold text-slate-700 truncate">
-                      Web Portal SSO / Remote WFH
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold text-slate-900">
-                    {webPortalCount} ({webPercent}%)
-                  </span>
+                  <span className="font-bold text-slate-700">100% Wajib Face ID</span>
                 </div>
               </div>
             </div>
