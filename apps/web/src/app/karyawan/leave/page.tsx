@@ -21,7 +21,6 @@ import {
   CalendarPlus,
   Umbrella,
   Award,
-  Users,
   FileText,
   Download,
   Paperclip,
@@ -48,6 +47,11 @@ import {
   PanelLeft,
   PanelLeftClose,
   Menu,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Table2,
+  LayoutGrid,
 } from 'lucide-react';
 import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
@@ -75,62 +79,6 @@ interface LeaveRequestItem {
     status: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING' | 'REJECTED';
   }[];
 }
-
-interface SquadMember {
-  id: string;
-  name: string;
-  role: string;
-  initials: string;
-  status: 'WFO' | 'WFH' | 'SAKIT' | 'CUTI' | 'OFF';
-  statusLabel: string;
-  badgeClass: string;
-  location?: string;
-  checkInTime?: string;
-  notes?: string;
-}
-
-const initialSquadMembers: SquadMember[] = [
-  {
-    id: 'squad-1',
-    name: 'Nadia Wijaya',
-    role: 'Senior Backend Go',
-    initials: 'NW',
-    status: 'WFO',
-    statusLabel: 'WFO (Pusat)',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    location: 'SCBD Treasury Tower Lt. 32',
-  },
-  {
-    id: 'squad-2',
-    name: 'Dimas Surya',
-    role: 'DevOps Specialist',
-    initials: 'DS',
-    status: 'WFO',
-    statusLabel: 'WFO (Pusat)',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    location: 'SCBD Treasury Tower Lt. 32',
-  },
-  {
-    id: 'squad-3',
-    name: 'Farhan Harahap',
-    role: 'Database Admin',
-    initials: 'FH',
-    status: 'WFO',
-    statusLabel: 'WFO (Pusat)',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    location: 'SCBD Treasury Tower Lt. 32',
-  },
-  {
-    id: 'squad-4',
-    name: 'Raden Bagus Prakoso, S.Kom',
-    role: 'Cloud Architect Lead',
-    initials: 'RB',
-    status: 'WFO',
-    statusLabel: 'WFO (Pusat)',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    location: 'SCBD Treasury Tower Lt. 32',
-  },
-];
 
 // Historical default leave records (Starts empty for real-time ESS behavior)
 const defaultHistoricalLeaves: LeaveRequestItem[] = [];
@@ -197,13 +145,20 @@ export default function EssLeaveOverhaulPage() {
   // Filter tabs: all, pending, approved
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [expandedRows, setExpandedRows] = useState<string[]>([]);
+
+  const toggleRowExpand = (id: string) => {
+    setExpandedRows((prev) =>
+      prev.includes(id) ? prev.filter((rId) => rId !== id) : [...prev, id]
+    );
+  };
 
   // Modals state
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [previewDocName, setPreviewDocName] = useState<string | null>(null);
   const [isPkbModalOpen, setIsPkbModalOpen] = useState(false);
-  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Real-time synchronization states
@@ -211,7 +166,6 @@ export default function EssLeaveOverhaulPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
-  const [squadRoster, setSquadRoster] = useState<SquadMember[]>(initialSquadMembers);
   const [todayDateString, setTodayDateString] = useState<string>('');
 
   // Form State
@@ -304,65 +258,11 @@ export default function EssLeaveOverhaulPage() {
         }
       }
 
-      if (attendanceRes.ok) {
-        const attJson = await attendanceRes.json();
-        const records: any[] = attJson.data?.records || [];
-
-        // Synchronize Squad Core Architecture live attendance dynamically
-        setSquadRoster((prev) =>
-          prev.map((member) => {
-            const mName = member.name.toLowerCase();
-            const att = records.find(
-              (r: any) =>
-                (r.employeeName && r.employeeName.toLowerCase().includes(mName)) ||
-                (r.employeeId && r.employeeId.toLowerCase() === member.id.toLowerCase())
-            );
-            const leave = backendAllLeaves.find(
-              (l: any) =>
-                l.status === 'APPROVED' &&
-                (l.name && l.name.toLowerCase().includes(mName))
-            );
-
-            if (leave) {
-              const isSick = leave.typeCategory === 'sakit' || leave.leaveType?.toLowerCase().includes('sakit');
-              return {
-                ...member,
-                status: isSick ? 'SAKIT' : 'CUTI',
-                statusLabel: isSick ? `Sakit (${leave.durationDays || 1} Hari)` : `Cuti (${leave.durationDays || 1} Hari)`,
-                badgeClass: isSick
-                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                  : 'bg-purple-50 text-purple-700 border-purple-200',
-                notes: leave.title,
-              };
-            }
-
-            if (att) {
-              const isWfh = att.workLocation === 'WFH' || att.status === 'WFH';
-              const isDinas = att.status === 'DINAS_LUAR';
-              return {
-                ...member,
-                status: isWfh ? 'WFH' : isDinas ? 'OFF' : 'WFO',
-                statusLabel: isWfh ? 'WFH (Remote)' : isDinas ? 'Dinas Luar' : 'WFO (Pusat)',
-                badgeClass: isWfh
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : isDinas
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                checkInTime: att.checkInTime || att.time,
-                location: att.location,
-              };
-            }
-
-            return member;
-          })
-        );
-      }
-
       const now = new Date();
       const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
       setLastSyncedAt(timeStr);
       if (isManual) {
-        showToast('✓ Data permohonan & roster tim berhasil disinkronkan secara real-time.');
+        showToast('✓ Data permohonan cuti berhasil disinkronkan secara real-time.');
       }
     } catch {
       // ignore
@@ -689,9 +589,6 @@ export default function EssLeaveOverhaulPage() {
     }
   };
 
-  // Dynamic Sprint Backlog Coverage
-  const squadActiveCount = squadRoster.filter((m) => m.status === 'WFO' || m.status === 'WFH').length;
-  const squadCoverage = Math.round((squadActiveCount / (squadRoster.length || 1)) * 100);
 
   // Filter items
   const filteredRequests = requests.filter((r) => {
@@ -1064,44 +961,440 @@ export default function EssLeaveOverhaulPage() {
             </div>
           </div>
 
-          {/* SECTION 3: 2-COLUMN CONTENT (LEFT 8 COLS, RIGHT 4 COLS) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* LEFT COLUMN (8 COLS): LEAVE CARDS WITH STEPPER */}
-            <div className="lg:col-span-8 space-y-5">
-              {/* REAL-TIME LIVE STATUS BAR */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
-                <div className="flex items-center gap-2.5">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                  </span>
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span>Sinkronisasi Real-Time ESS Terhubung</span>
-                  </span>
-                  <span className="hidden sm:inline-block text-slate-300">•</span>
-                  <span className="hidden sm:inline-block text-[11px] text-slate-400 font-medium">
-                    Pembaruan persetujuan dari HR & Atasan diterima seketika
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 self-end sm:self-auto text-xs">
-                  <span className="text-[11px] text-slate-400">
-                    Sinkron: <strong className="text-slate-600 font-mono">{lastSyncedAt}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => fetchLiveLeaveData(true)}
-                    disabled={isRefreshing}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-all disabled:opacity-50 active:scale-95"
-                    title="Perbarui sinkronisasi sekarang"
-                  >
-                    <RotateCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
-                    <span>{isRefreshing ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
-                  </button>
-                </div>
+          {/* SECTION 3: TABEL PENGAJUAN & RIWAYAT CUTI / IZIN (FULL WIDTH) */}
+          <div className="space-y-4 w-full">
+            {/* REAL-TIME LIVE STATUS & VIEW CONTROLS */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                </span>
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>Sinkronisasi Real-Time ESS Terhubung</span>
+                </span>
+                <span className="hidden sm:inline-block text-slate-300">•</span>
+                <span className="hidden sm:inline-block text-[11px] text-slate-400 font-medium">
+                  Pembaruan persetujuan dari HR &amp; Atasan diterima seketika
+                </span>
               </div>
 
-              {filteredRequests.length === 0 ? (
+              <div className="flex items-center gap-3 self-end sm:self-auto text-xs">
+                {/* View Mode Switcher: Tabel (Default) vs Kartu */}
+                <div className="flex items-center p-0.5 rounded-xl bg-slate-100 border border-slate-200/80">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewMode === 'table'
+                        ? 'bg-white text-blue-700 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Tampilan Tabel (Lebih ringkas & enak dilihat)"
+                  >
+                    <Table2 className="w-3.5 h-3.5" />
+                    <span>Tabel</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('cards')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewMode === 'cards'
+                        ? 'bg-white text-blue-700 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Tampilan Kartu Stepper"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Kartu</span>
+                  </button>
+                </div>
+
+                <span className="text-[11px] text-slate-400">
+                  Sinkron: <strong className="text-slate-600 font-mono">{lastSyncedAt}</strong>
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => fetchLiveLeaveData(true)}
+                  disabled={isRefreshing}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
+                  title="Perbarui sinkronisasi sekarang"
+                >
+                  <RotateCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+                  <span>{isRefreshing ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
+                </button>
+              </div>
+            </div>
+
+              {/* MAIN CONTENT: TABLE VIEW (DEFAULT) OR CARD VIEW */}
+            {viewMode === 'table' ? (
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200/80 bg-slate-50/70 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="py-3.5 px-4 w-44">NO. REF &amp; TANGGAL</th>
+                        <th className="py-3.5 px-4 min-w-[200px]">JENIS &amp; KETERANGAN</th>
+                        <th className="py-3.5 px-4 w-44">PERIODE</th>
+                        <th className="py-3.5 px-3 w-28 text-center">DURASI</th>
+                        <th className="py-3.5 px-4 w-44">PENGGANTI (HANDOVER)</th>
+                        <th className="py-3.5 px-4 w-48">STATUS &amp; ALUR</th>
+                        <th className="py-3.5 px-4 w-36 text-right">AKSI</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                      {filteredRequests.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-16 text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                              <CalendarDays className="w-6 h-6" />
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-800">Tidak ada pengajuan ditemukan</h4>
+                            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                              Tidak ada riwayat cuti atau izin yang sesuai dengan filter yang dipilih saat ini.
+                            </p>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredRequests.map((item) => {
+                          const isExpanded = expandedRows.includes(item.id);
+                          const isApproved = item.status === 'APPROVED';
+                          const isPending = item.status === 'PENDING';
+                          const isRejected = item.status === 'REJECTED';
+
+                          return (
+                            <React.Fragment key={item.id}>
+                              <tr
+                                className={`hover:bg-slate-50/90 transition-colors group cursor-pointer ${
+                                  isExpanded ? 'bg-blue-50/20' : ''
+                                } ${recentlyUpdatedId === item.id ? 'bg-emerald-50/30' : ''}`}
+                                onClick={() => toggleRowExpand(item.id)}
+                              >
+                                {/* Column 1: Ref No & Submitted Date */}
+                                <td className="py-3.5 px-4 align-top">
+                                  <div className="space-y-1">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCopyRef(item.refNo);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[11px] font-bold transition-colors group/ref"
+                                      title="Klik untuk salin No. Referensi"
+                                    >
+                                      <span>{item.refNo}</span>
+                                      {copiedRef === item.refNo ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3 text-slate-400 group-hover/ref:text-slate-700" />
+                                      )}
+                                    </button>
+                                    <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                      <Clock3 className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                      <span>{item.submittedAt}</span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Column 2: Leave Type & Title/Notes */}
+                                <td className="py-3.5 px-4 align-top">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                          item.type.includes('Sakit') || item.title.includes('Sakit')
+                                            ? 'bg-rose-50 text-rose-700 border-rose-200/80'
+                                            : item.type.includes('Bersama')
+                                            ? 'bg-purple-50 text-purple-700 border-purple-200/80'
+                                            : 'bg-blue-50 text-blue-700 border-blue-200/80'
+                                        }`}
+                                      >
+                                        {item.type.includes('Sakit') || item.title.includes('Sakit') ? (
+                                          <HeartPulse className="w-2.5 h-2.5 text-rose-500" />
+                                        ) : item.type.includes('Bersama') ? (
+                                          <Building2 className="w-2.5 h-2.5 text-purple-500" />
+                                        ) : (
+                                          <CalendarDays className="w-2.5 h-2.5 text-blue-500" />
+                                        )}
+                                        <span>{item.type}</span>
+                                      </span>
+                                    </div>
+                                    <p className="font-bold text-slate-800 text-xs leading-tight">
+                                      {item.title}
+                                    </p>
+                                    {item.notes && (
+                                      <p className="text-[11px] text-slate-500 italic line-clamp-1">
+                                        &ldquo;{item.notes}&rdquo;
+                                      </p>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Column 3: Periode */}
+                                <td className="py-3.5 px-4 align-top">
+                                  <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-xs whitespace-nowrap">
+                                    <Calendar className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                                    <span>{item.startDate}</span>
+                                    <span className="text-slate-400">s/d</span>
+                                    <span>{item.endDate}</span>
+                                  </div>
+                                </td>
+
+                                {/* Column 4: Durasi */}
+                                <td className="py-3.5 px-3 text-center align-top">
+                                  <span className="inline-flex px-2.5 py-0.5 rounded-md bg-blue-50 border border-blue-200/70 text-blue-800 text-[11px] font-bold whitespace-nowrap">
+                                    {item.durationDays} Hari Kerja
+                                  </span>
+                                </td>
+
+                                {/* Column 5: Pengganti (Handover) */}
+                                <td className="py-3.5 px-4 align-top">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                                      <UserCheck className="w-3.5 h-3.5" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-slate-800 leading-tight">
+                                      {item.handover}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* Column 6: Status & Stepper Summary */}
+                                <td className="py-3.5 px-4 align-top">
+                                  <div className="space-y-1">
+                                    <span
+                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                        isPending
+                                          ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
+                                          : isRejected
+                                          ? 'bg-rose-50 text-rose-800 border border-rose-200/80'
+                                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200/80'
+                                      }`}
+                                    >
+                                      {isPending ? (
+                                        <span className="relative flex h-2 w-2">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                                        </span>
+                                      ) : isRejected ? (
+                                        <X className="w-3 h-3 text-rose-600" />
+                                      ) : (
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                      )}
+                                      <span>{item.statusBadge}</span>
+                                    </span>
+
+                                    <div className="text-[10px] text-slate-400 font-medium">
+                                      {isApproved ? (
+                                        <span className="text-emerald-700 font-bold">✓ 3 dari 3 Tahap Disetujui</span>
+                                      ) : isPending ? (
+                                        <span className="text-amber-700 font-bold">⏳ Tahap 3: Review HRD</span>
+                                      ) : (
+                                        <span className="text-rose-700 font-bold">✕ Ditolak HRD</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Column 7: Actions */}
+                                <td className="py-3.5 px-4 text-right align-top">
+                                  <div
+                                    className="flex items-center justify-end gap-1.5"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {/* Document Attachment Button if present */}
+                                    {item.documentName && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewDocName(item.documentName || null)}
+                                        className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
+                                        title={`Lampiran: ${item.documentName}`}
+                                      >
+                                        <Paperclip className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+
+                                    {/* Cancel pending button if PENDING */}
+                                    {isPending && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCancelPending(item.id)}
+                                        className="px-2.5 py-1.5 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/80 text-[11px] font-bold transition-all cursor-pointer"
+                                        title="Batalkan pengajuan ini"
+                                      >
+                                        Batalkan
+                                      </button>
+                                    )}
+
+                                    {/* Toggle Expand Row */}
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleRowExpand(item.id)}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                        isExpanded
+                                          ? 'bg-blue-600 text-white shadow-xs'
+                                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                      }`}
+                                      title="Tampilkan / Sembunyikan Alur Verifikasi Bertingkat"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Alur</span>
+                                      <ChevronDown
+                                        className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                          isExpanded ? 'rotate-180' : ''
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+
+                              {/* EXPANDABLE ACCORDION ROW: Alur Verifikasi Bertingkat 3-Tier & Catatan */}
+                              {isExpanded && (
+                                <tr className="bg-gradient-to-r from-blue-50/40 via-slate-50/50 to-blue-50/20 border-b border-slate-200">
+                                  <td colSpan={7} className="p-4 sm:p-5">
+                                    <div className="space-y-4">
+                                      {/* Note Box */}
+                                      <div className="rounded-2xl bg-white border border-slate-200/80 p-3.5 space-y-1">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                                          <MessageSquareQuote className="w-3.5 h-3.5 text-slate-400" />
+                                          <span>Catatan Lengkap Pemohon</span>
+                                        </div>
+                                        <p className="text-xs text-slate-700 italic pl-1 border-l-2 border-blue-400">
+                                          &ldquo;{item.notes}&rdquo;
+                                        </p>
+                                      </div>
+
+                                      {/* 3-Tier Pipeline Stepper */}
+                                      <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5">
+                                            <Zap className="w-3.5 h-3.5 text-blue-600" />
+                                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700">
+                                              Alur Verifikasi Bertingkat (3-Tier Approval Pipeline)
+                                            </span>
+                                          </div>
+                                          <span className="text-[10px] text-slate-400 font-medium">
+                                            {item.completedAt ? `Status akhir: ${item.completedAt}` : 'Menunggu tinjauan manajemen'}
+                                          </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                          {item.steps.map((st, sIdx) => {
+                                            const stepDone = st.status === 'COMPLETED';
+                                            const stepProgress = st.status === 'IN_PROGRESS';
+                                            const stepRejected = st.status === 'REJECTED';
+
+                                            return (
+                                              <div
+                                                key={sIdx}
+                                                className={`p-3 rounded-2xl border transition-all flex flex-col justify-between space-y-2.5 ${
+                                                  stepDone
+                                                    ? 'bg-white border-emerald-200 shadow-2xs'
+                                                    : stepProgress
+                                                    ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/20 shadow-xs'
+                                                    : stepRejected
+                                                    ? 'bg-rose-50/60 border-rose-200 shadow-2xs'
+                                                    : 'bg-white/80 border-slate-200 text-slate-500'
+                                                }`}
+                                              >
+                                                <div className="flex items-start gap-2.5">
+                                                  <div
+                                                    className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                                                      stepDone
+                                                        ? 'bg-emerald-600 text-white'
+                                                        : stepProgress
+                                                        ? 'bg-amber-500 text-white animate-pulse'
+                                                        : stepRejected
+                                                        ? 'bg-rose-600 text-white'
+                                                        : 'bg-slate-200 text-slate-500'
+                                                    }`}
+                                                  >
+                                                    {stepDone ? (
+                                                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                                    ) : stepProgress ? (
+                                                      <Clock3 className="w-3.5 h-3.5" />
+                                                    ) : stepRejected ? (
+                                                      <X className="w-3.5 h-3.5 stroke-[3]" />
+                                                    ) : (
+                                                      <UserCheck className="w-3.5 h-3.5" />
+                                                    )}
+                                                  </div>
+                                                  <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center justify-between gap-1">
+                                                      <p className="text-xs font-bold text-slate-900 truncate">
+                                                        {st.title}
+                                                      </p>
+                                                      <span
+                                                        className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                                          stepDone
+                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                            : stepProgress
+                                                            ? 'bg-amber-100 text-amber-800'
+                                                            : stepRejected
+                                                            ? 'bg-rose-100 text-rose-800'
+                                                            : 'bg-slate-100 text-slate-600'
+                                                        }`}
+                                                      >
+                                                        {stepDone ? 'Selesai' : stepProgress ? 'Proses' : stepRejected ? 'Ditolak' : 'Antrean'}
+                                                      </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-600 font-semibold truncate mt-0.5">
+                                                      {st.person}
+                                                    </p>
+                                                  </div>
+                                                </div>
+
+                                                {st.time && (
+                                                  <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                                                    <span className="text-slate-400">Waktu:</span>
+                                                    <span
+                                                      className={`font-semibold ${
+                                                        stepDone
+                                                          ? 'text-emerald-700'
+                                                          : stepProgress
+                                                          ? 'text-amber-700 font-bold'
+                                                          : stepRejected
+                                                          ? 'text-rose-700'
+                                                          : 'text-slate-400'
+                                                      }`}
+                                                    >
+                                                      {st.time}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Table Footer Summary */}
+                <div className="p-3.5 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500">
+                  <span>
+                    Menampilkan <strong className="text-slate-800">{filteredRequests.length}</strong> pengajuan cuti &amp; izin
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Klik baris atau tombol <strong>Alur</strong> untuk melihat rincian verifikasi 3-tier
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* ALTERNATIVE VIEW: CARD VIEW */
+              <div className="space-y-4">
+                {filteredRequests.length === 0 ? (
                 <div className="p-12 bg-white rounded-3xl border border-slate-200/90 text-center space-y-3">
                   <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
                     <CalendarDays className="w-6 h-6" />
@@ -1421,143 +1714,9 @@ export default function EssLeaveOverhaulPage() {
                   </div>
                 ))
               )}
-            </div>
 
-            {/* RIGHT COLUMN (4 COLS): ROSTER TIM & PANDUAN PKB (Full unclipped content!) */}
-            <div className="lg:col-span-4 space-y-6 flex flex-col">
-              {/* CARD 1: ROSTER TIM ENGINEERING matching screenshot */}
-              <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-blue-600" />
-                      <h3 className="text-sm font-extrabold text-slate-900">
-                        Roster Tim Engineering
-                      </h3>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Hari Ini</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 leading-snug">
-                      Status kehadiran rekan squad Core Architecture untuk sinkronisasi beban kerja.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Dynamic Squad Members List synced with live attendance */}
-                <div className="space-y-3">
-                  {squadRoster.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between gap-2.5 py-1">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-slate-800 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-2xs">
-                          {member.initials}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">{member.name}</p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {member.role}
-                            {member.checkInTime ? ` • ${member.checkInTime}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border flex-shrink-0 ${member.badgeClass}`}>
-                        {member.statusLabel}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Footer Coverage & Link */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    Sprint Backlog Coverage: <strong className="text-slate-800">{squadCoverage}%</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsRosterModalOpen(true)}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-                  >
-                    <span>Lihat Kalender Tim</span>
-                    <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                  </button>
-                </div>
               </div>
-
-              {/* CARD 2: PANDUAN HAK CUTI (PKB NEXORA) (Fully unclipped with generous bottom space!) */}
-              <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
-                <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-sm">
-                    @
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900">
-                      Panduan Hak Cuti (PKB Nexora)
-                    </h3>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Ketentuan hak istimewa cuti berbayar sesuai Perjanjian Kerja Bersama periode 2024-2026:
-                </p>
-
-                {/* Complete Unclipped Checklist Items */}
-                <div className="space-y-2.5 text-xs text-slate-700">
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="text-blue-600 font-bold flex-shrink-0">✓</span>
-                    <span>
-                      <strong>Cuti Tahunan:</strong> 12 hari/tahun kalender, hak timbul setelah 1 tahun masa bakti.
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="text-blue-600 font-bold flex-shrink-0">✓</span>
-                    <span>
-                      <strong>Cuti Khusus Menikah:</strong> 3 hari kerja penuh (melampirkan undangan/akta).
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="text-blue-600 font-bold flex-shrink-0">✓</span>
-                    <span>
-                      <strong>Cuti Duka Cita:</strong> 2 hari kerja untuk anggota keluarga inti sedarah.
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="text-blue-600 font-bold flex-shrink-0">✓</span>
-                    <span>
-                      <strong>Izin Sakit:</strong> Wajib melampirkan surat dokter klinik resmi maksimal 1x24 jam.
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="text-blue-600 font-bold flex-shrink-0">✓</span>
-                    <span>
-                      <strong>Cuti Melahirkan / Istri Melahirkan:</strong> 3 bulan untuk karyawan wanita, 2 hari untuk karyawan pria.
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-2 leading-relaxed">
-                    <span className="text-blue-600 font-bold flex-shrink-0">✓</span>
-                    <span>
-                      <strong>Delegasi Handover:</strong> Wajib menunjuk rekan selevel sebelum tanggal cuti dimulai.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Footer Download Link */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setIsPkbModalOpen(true)}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-                  >
-                    <span>Unduh Dokumen PKB Lengkap (PDF)</span>
-                    <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                  </button>
-                  <span className="text-[10px] text-slate-400 font-semibold">Versi 2.4</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            )}          </div>
         </main>
       </div>
 
@@ -1859,60 +2018,6 @@ export default function EssLeaveOverhaulPage() {
               >
                 <Download className="w-4 h-4" />
                 <span>Unduh Salinan PDF</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 5: ROSTER LENGKAP TIM */}
-      {isRosterModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 p-6 space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
-                    Kalender Roster Tim Engineering
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Squad Core Architecture &amp; Platform</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2 text-xs divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
-              {squadRoster.map((member) => (
-                <div key={member.id} className="pt-2 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-bold text-slate-900 truncate">{member.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate">
-                      {member.role} {member.location ? `• ${member.location}` : ''}
-                    </p>
-                  </div>
-                  <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border flex-shrink-0 ${member.badgeClass}`}>
-                    {member.statusLabel}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-3 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
-              >
-                Tutup
               </button>
             </div>
           </div>

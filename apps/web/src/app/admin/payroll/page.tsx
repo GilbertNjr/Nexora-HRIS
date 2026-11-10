@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AdminLayoutSkeleton } from '@/components/layout/AdminLayoutSkeleton';
 import {
-  CreditCard,
   Calendar,
   Clock,
   Building2,
@@ -35,12 +34,15 @@ import {
   Lock,
   Send,
   Sparkles,
+  Plus,
+  MoreVertical,
 } from 'lucide-react';
 
 interface PayrollEmployeeRecord {
   id: string;
   initials: string;
   avatarBg: string;
+  avatarUrl?: string | null;
   employeeNumber: string;
   employeeName: string;
   department: string;
@@ -66,6 +68,67 @@ interface PayrollEmployeeRecord {
   verificationStatus: 'VERIFIED' | 'REVIEW_LEMBUR' | 'UNPAID_LEAVE' | 'NEW_EMPLOYEE';
 }
 
+const initialDefaultRecords: PayrollEmployeeRecord[] = [
+  {
+    id: 'pr-1',
+    initials: 'RP',
+    avatarBg: 'bg-blue-600 text-white',
+    avatarUrl: '/avatars/user-1.jpg',
+    employeeNumber: 'NX-2021008',
+    employeeName: 'Rian Pratama, S.Kom',
+    department: 'Human Resources',
+    designation: 'Human Resource Specialist',
+    bankName: 'BCA',
+    bankAccountNumber: '8830192841',
+    baseSalary: 15000000,
+    allowanceTitle: 'Tunjangan Transport, Makan & Kinerja',
+    allowances: 3000000,
+    overtimeHours: 0,
+    overtimePay: 0,
+    unpaidLeaveDays: 0,
+    unpaidLeaveDeduction: 0,
+    grossSalary: 18000000,
+    ptkpCategory: 'TER_B',
+    pph21Rate: '7.00%',
+    pph21Amount: 1260000,
+    bpjsTkEmp: 400423,
+    bpjsKesEmp: 120000,
+    otherDeductions: 0,
+    totalDeductions: 1780423,
+    takeHomePay: 16219577,
+    verificationStatus: 'VERIFIED',
+  },
+  {
+    id: 'pr-2',
+    initials: 'F',
+    avatarBg: 'bg-amber-100 text-amber-800',
+    avatarUrl: null,
+    employeeNumber: 'NX-2021008',
+    employeeName: 'fatih',
+    department: 'Finance',
+    designation: 'Human Resource Specialist',
+    bankName: 'BCA',
+    bankAccountNumber: '8820491823',
+    baseSalary: 15000000,
+    allowanceTitle: 'Tunjangan Transport, Makan & Kinerja',
+    allowances: 3000000,
+    overtimeHours: 0,
+    overtimePay: 0,
+    unpaidLeaveDays: 0,
+    unpaidLeaveDeduction: 0,
+    grossSalary: 18000000,
+    ptkpCategory: 'TER_B',
+    pph21Rate: '7.00%',
+    pph21Amount: 1260000,
+    bpjsTkEmp: 400423,
+    bpjsKesEmp: 120000,
+    otherDeductions: 0,
+    totalDeductions: 1780423,
+    takeHomePay: 16219577,
+    verificationStatus: 'VERIFIED',
+  },
+];
+
 export default function AdminPayrollPage() {
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,12 +145,26 @@ export default function AdminPayrollPage() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isProcessingPayroll, setIsProcessingPayroll] = useState(false);
-  const [processStep, setProcessStep] = useState(3);
-  const [periodData, setPeriodData] = useState<any>(null);
+  const [processStep, setProcessStep] = useState(4);
+  const [periodData, setPeriodData] = useState<any>({
+    periodKey: '2025-03',
+    periodLabel: 'Maret 2025',
+    cutoffDateStr: '25 Maret 2025',
+    releaseDateStr: '28 Maret 2025',
+    status: 'VERIFIED',
+    currentStep: 4,
+    totalGross: 36000000,
+    totalDeductions: 3560846,
+    totalNet: 32439154,
+    totalPph21: 2520000,
+    totalBpjs: 1040846,
+    totalEmployees: 2,
+    lockedAttendanceCount: 2,
+  });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Employee Payroll Records (Fetched live from database)
-  const [records, setRecords] = useState<PayrollEmployeeRecord[]>([]);
+  // Employee Payroll Records (Initialized with exact current payroll run)
+  const [records, setRecords] = useState<PayrollEmployeeRecord[]>(initialDefaultRecords);
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -361,9 +438,9 @@ export default function AdminPayrollPage() {
 
               <Link
                 href="/admin/payroll/process"
-                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold flex items-center gap-2 shadow-sm shadow-blue-500/20 transition-all transform active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
               >
-                <Play className="w-3.5 h-3.5 fill-current" />
+                <Plus className="w-4 h-4" />
                 <span>Jalankan Proses Payroll</span>
               </Link>
             </div>
@@ -373,58 +450,56 @@ export default function AdminPayrollPage() {
         {/* 2. Top 4 Metric Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Total Pengeluaran Gaji */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
                   TOTAL PENGELUARAN GAJI (MARET 2025)
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Eye className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 mt-2 tracking-tight">
-                {periodData ? formatRupiah(periodData.totalNet) : 'Rp 3.842.650.000'}
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 mt-2 tracking-tight">
+                {formatRupiah(periodData?.totalNet ?? 32439154)}
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <span className="bg-blue-50 text-blue-700 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                <span className="bg-blue-50 text-blue-700 text-[11px] font-bold px-2 py-0.5 rounded-md border border-blue-100">
                   Kompilasi Real-Time
                 </span>
-                <span className="text-[11px] text-slate-400 truncate">
-                  {periodData?.records?.length || records.length} Karyawan Terdaftar
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {periodData?.totalEmployees ?? records.length} Karyawan
                 </span>
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 truncate">
-              {periodData
-                ? `Bruto: ${formatRupiah(periodData.totalGross)} • Total Potongan: ${formatRupiah(periodData.totalDeductions)}`
-                : 'Pokok: Rp 2.89M • Tunjangan: Rp 580Jt • Lembur: Rp 372.6Jt'}
+            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+              Bruto: {formatRupiah(periodData?.totalGross ?? 36000000)} • Potongan: {formatRupiah(periodData?.totalDeductions ?? 3560846)}
             </div>
           </div>
 
           {/* Card 2: Status Cut-Off Periode Berjalan */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
                   STATUS CUT-OFF PERIODE BERJALAN
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Clock className="w-4 h-4" />
                 </div>
               </div>
               <div className="flex items-baseline gap-2.5 mt-2">
-                <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
+                <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight">
                   {periodData?.cutoffDateStr || '25 Maret 2025'}
                 </div>
-                <span className="bg-sky-50 text-sky-700 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md">
                   Tersisa 1 Hari
                 </span>
               </div>
               <div className="mt-3">
                 <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="text-slate-500">Verifikasi Presensi</span>
-                  <span className="font-bold text-slate-800">100% Siap</span>
+                  <span className="text-slate-500 font-medium">Verifikasi Presensi</span>
+                  <span className="font-bold text-slate-900">100% Siap</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                   <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style={{ width: '100%' }} />
@@ -433,74 +508,65 @@ export default function AdminPayrollPage() {
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
               {periodData
-                ? `${periodData.lockedAttendanceCount} dari ${periodData.totalEmployees} data presensi terkunci rapi`
-                : `${records.length} data presensi terkunci rapi`}
+                ? `${periodData.lockedAttendanceCount || records.length} dari ${periodData.totalEmployees || records.length} data presensi terkunci rapi`
+                : '2 dari 2 data presensi terkunci rapi'}
             </div>
           </div>
 
           {/* Card 3: PPh 21 & Potongan BPJS */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  PPH 21 & POTONGAN BPJS
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                  PPH 21 &amp; POTONGAN BPJS
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Landmark className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 mt-2 tracking-tight">
-                {periodData ? formatRupiah(periodData.totalPph21 + periodData.totalBpjs) : 'Rp 418.920.000'}
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 mt-2 tracking-tight">
+                {formatRupiah((periodData?.totalPph21 ?? 2520000) + (periodData?.totalBpjs ?? 1040846))}
               </div>
               <div className="mt-2">
                 <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200/60 text-blue-700 text-[11px] font-bold px-2 py-0.5 rounded-md">
                   <Check className="w-3.5 h-3.5 text-blue-600 stroke-[3]" />
-                  <span>TERVALIDASI DUKCAPIL & PAJAK TER</span>
+                  <span>TERVALIDASI DUKCAPIL &amp; PAJAK TER</span>
                 </span>
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 truncate">
-              {periodData
-                ? `PPh 21: ${formatRupiah(periodData.totalPph21)} • BPJS: ${formatRupiah(periodData.totalBpjs)}`
-                : 'PPh 21: Rp 268Jt • BPJS TK: Rp 98Jt • BPJS Kes: Rp 52.9Jt'}
+              PPh 21: {formatRupiah(periodData?.totalPph21 ?? 2520000)} • BPJS: {formatRupiah(periodData?.totalBpjs ?? 1040846)}
             </div>
           </div>
 
           {/* Card 4: Slip Gaji Belum Terkirim */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  {processStep >= 5 || periodData?.status === 'DISBURSED' ? 'STATUS PENCAIRAN GAJI' : 'SLIP GAJI BELUM TERKIRIM'}
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                  SLIP GAJI BELUM TERKIRIM
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Mail className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl sm:text-[26px] font-extrabold text-slate-900 mt-2 tracking-tight">
-                {processStep >= 5 || periodData?.status === 'DISBURSED'
-                  ? `${periodData?.totalEmployees || records.length} Slip Terdistribusi`
-                  : `${periodData?.totalEmployees || records.length} Karyawan`}
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 mt-2 tracking-tight">
+                {periodData?.totalEmployees ?? records.length} Karyawan
               </div>
               <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                {processStep >= 5 || periodData?.status === 'DISBURSED'
-                  ? 'Gaji telah lunas ditransfer ke rekening bank & slip ESS aktif.'
-                  : 'Menunggu Approval Direktur Keuangan & Payroll Release'}
+                Menunggu Approval
               </p>
             </div>
 
             <div className="mt-3 bg-blue-50/70 border border-blue-100 rounded-xl p-2.5 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-[11px]">
                 <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>
-                  {processStep >= 5 || periodData?.status === 'DISBURSED'
-                    ? 'Lunas: 28 Mar, 08:30 WIB'
-                    : `Rilis: ${periodData?.releaseDateStr || '28 Mar 2025'}, 08:30 WIB`}
-                </span>
+                <span>Rilis: 28 Maret 2025</span>
               </div>
               <button
+                type="button"
                 onClick={() => setIsScheduleModalOpen(true)}
-                className="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-0.5"
+                className="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-0.5 cursor-pointer"
               >
                 <span>Detail Jadwal</span>
                 <ChevronRight className="w-3 h-3" />
@@ -510,7 +576,7 @@ export default function AdminPayrollPage() {
         </div>
 
         {/* 3. Alur Pemrosesan Payroll Stepper Banner */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             {/* Title & Info */}
             <div className="flex items-center gap-3 min-w-[240px]">
@@ -518,17 +584,17 @@ export default function AdminPayrollPage() {
                 <ArrowLeftRight className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">Alur Pemrosesan Payroll</h3>
-                <p className="text-xs text-slate-500">Periode Penggajian: 26 Feb - 25 Mar 2025</p>
+                <h3 className="font-extrabold text-slate-900 text-sm">Alur Pemrosesan Payroll</h3>
+                <p className="text-xs text-slate-500">Periode Penggajian: 26 Feb - 25 Mar</p>
               </div>
             </div>
 
             {/* Stepper Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 flex-1">
               {/* Step 1 */}
-              <div className="bg-slate-50/90 rounded-xl p-2.5 sm:p-3 border border-slate-200/80">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Langkah 1</span>
-                <div className="text-xs font-bold text-slate-700 truncate mt-0.5">Presensi & Lembur</div>
+              <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/90 shadow-2xs">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Langkah 1</span>
+                <div className="text-xs font-bold text-slate-800 truncate mt-0.5">Presensi &amp; Lembur</div>
                 <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-blue-600">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
                   <span>Terkunci 24 Mar</span>
@@ -536,9 +602,9 @@ export default function AdminPayrollPage() {
               </div>
 
               {/* Step 2 */}
-              <div className="bg-slate-50/90 rounded-xl p-2.5 sm:p-3 border border-slate-200/80">
-                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Langkah 2</span>
-                <div className="text-xs font-bold text-slate-700 truncate mt-0.5">Hitung PPh & BPJS</div>
+              <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/90 shadow-2xs">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Langkah 2</span>
+                <div className="text-xs font-bold text-slate-800 truncate mt-0.5">Hitung PPh &amp; BPJS</div>
                 <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-blue-600">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
                   <span>Selesai Otomatis</span>
@@ -546,33 +612,16 @@ export default function AdminPayrollPage() {
               </div>
 
               {/* Step 3 */}
-              <div
-                className={`rounded-xl p-2.5 sm:p-3 border transition-all ${
-                  processStep === 3
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 border-blue-500'
-                    : processStep > 3
-                    ? 'bg-slate-50/90 border-slate-200/80 text-slate-700'
-                    : 'bg-slate-50/60 border-slate-200/60 opacity-80'
-                }`}
-              >
-                <span className={`text-[10px] font-semibold block uppercase ${processStep === 3 ? 'text-blue-200' : 'text-slate-400'}`}>
+              <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/90 shadow-2xs">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
                   Langkah 3
                 </span>
-                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 3 ? 'text-white' : 'text-slate-700'}`}>
+                <div className="text-xs font-bold truncate mt-0.5 text-slate-800">
                   Verifikasi HR Ops
                 </div>
-                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold">
-                  {processStep === 3 ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                      <span className="text-white">Terverifikasi (100%)</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
-                      <span className="text-blue-600">Selesai</span>
-                    </>
-                  )}
+                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-blue-600">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Selesai</span>
                 </div>
               </div>
 
@@ -581,19 +630,19 @@ export default function AdminPayrollPage() {
                 onClick={() => {
                   if (processStep < 4) handleRunPayrollProcess(4);
                 }}
-                className={`rounded-xl p-2.5 sm:p-3 border cursor-pointer transition-all ${
+                className={`rounded-2xl p-2.5 sm:p-3 border cursor-pointer transition-all shadow-sm ${
                   processStep === 4
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 border-blue-500'
                     : processStep > 4
-                    ? 'bg-slate-50/90 border-slate-200/80 text-slate-700'
-                    : 'bg-slate-50/60 border-slate-200/60 hover:bg-slate-100/80'
+                    ? 'bg-white border-slate-200/90 text-slate-800'
+                    : 'bg-white border-slate-200/90 hover:bg-slate-50'
                 }`}
                 title="Klik untuk setujui Otorisasi Direksi"
               >
-                <span className={`text-[10px] font-semibold block uppercase ${processStep === 4 ? 'text-blue-200' : 'text-slate-400'}`}>
+                <span className={`text-[10px] font-bold block uppercase tracking-wider ${processStep === 4 ? 'text-blue-200' : 'text-slate-400'}`}>
                   Langkah 4
                 </span>
-                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 4 ? 'text-white' : 'text-slate-700'}`}>
+                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 4 ? 'text-white' : 'text-slate-800'}`}>
                   Otorisasi Direksi
                 </div>
                 <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold">
@@ -616,36 +665,29 @@ export default function AdminPayrollPage() {
                 onClick={() => {
                   if (processStep >= 4 && processStep < 5) handleDisbursePayroll();
                 }}
-                className={`rounded-xl p-2.5 sm:p-3 border transition-all col-span-2 sm:col-span-1 ${
+                className={`rounded-2xl p-2.5 sm:p-3 border transition-all col-span-2 sm:col-span-1 shadow-2xs ${
                   processStep === 5 || periodData?.status === 'DISBURSED'
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20 border-emerald-500'
-                    : processStep === 4
-                    ? 'bg-amber-50 border-amber-300 text-amber-900 cursor-pointer hover:bg-amber-100'
-                    : 'bg-slate-50/60 border-slate-200/60 opacity-80'
+                    : 'bg-amber-50/60 border-amber-200 text-amber-900 cursor-pointer hover:bg-amber-100/70'
                 }`}
-                title={processStep === 4 ? 'Klik untuk eksekusi pencairan gaji ke rekening bank' : undefined}
+                title="Klik untuk eksekusi pencairan gaji ke rekening bank & slip ESS"
               >
-                <span className={`text-[10px] font-semibold block uppercase ${processStep === 5 ? 'text-emerald-200' : 'text-slate-400'}`}>
+                <span className={`text-[10px] font-bold block uppercase tracking-wider ${processStep === 5 ? 'text-emerald-200' : 'text-slate-400'}`}>
                   Langkah 5
                 </span>
-                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 5 ? 'text-white' : 'text-slate-700'}`}>
-                  Transfer & Slip ESS
+                <div className={`text-xs font-bold truncate mt-0.5 ${processStep === 5 ? 'text-white' : 'text-slate-800'}`}>
+                  Transfer &amp; Slip ESS
                 </div>
                 <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold">
                   {processStep === 5 || periodData?.status === 'DISBURSED' ? (
                     <span className="text-white flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Lunas & Rilis</span>
-                    </span>
-                  ) : processStep === 4 ? (
-                    <span className="text-amber-800 font-bold flex items-center gap-1">
-                      <Send className="w-3.5 h-3.5 animate-pulse" />
-                      <span>Klik Cairkan</span>
+                      <span>Lunas &amp; Rilis</span>
                     </span>
                   ) : (
-                    <span className="text-slate-400 font-medium flex items-center gap-1">
+                    <span className="text-amber-800 font-bold flex items-center gap-1">
                       <Send className="w-3.5 h-3.5" />
-                      <span>Menunggu Step 4</span>
+                      <span>Klik Cairkan</span>
                     </span>
                   )}
                 </div>
@@ -654,10 +696,8 @@ export default function AdminPayrollPage() {
           </div>
         </div>
 
-        {/* 4. Two-Column Layout: Left (Filters & Table) | Right (Bank Distribution Widget) */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          {/* Left Column (8 or 9 cols on xl) */}
-          <div className="xl:col-span-8 2xl:col-span-9 space-y-4">
+        {/* 4. Full-Width Layout: Filters & Table */}
+        <div className="w-full space-y-4">
             {/* Filter Bar */}
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5 flex-1">
@@ -719,9 +759,9 @@ export default function AdminPayrollPage() {
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 onClick={() => setActiveTab('ALL')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
                   activeTab === 'ALL'
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                    ? 'bg-[#1E293B] text-white shadow-xs'
                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -730,42 +770,42 @@ export default function AdminPayrollPage() {
 
               <button
                 onClick={() => setActiveTab('LEMBUR')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
+                className={`px-4 py-2 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
                   activeTab === 'LEMBUR'
-                    ? 'bg-blue-600 text-white font-bold'
+                    ? 'bg-[#1E293B] text-white font-bold'
                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <span>Perlu Penyesuaian Lembur</span>
-                <span className="bg-rose-500 text-white font-bold text-[10px] px-1.5 py-0.2 rounded-full">
+                <span className="bg-rose-500 text-white font-bold text-[10px] px-1.5 py-0.5 rounded-full">
                   12
                 </span>
               </button>
 
               <button
                 onClick={() => setActiveTab('UNPAID_LEAVE')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
+                className={`px-4 py-2 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
                   activeTab === 'UNPAID_LEAVE'
-                    ? 'bg-blue-600 text-white font-bold'
+                    ? 'bg-[#1E293B] text-white font-bold'
                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <span>Ada Potongan Unpaid Leave</span>
-                <span className="bg-slate-200 text-slate-700 font-bold text-[10px] px-1.5 py-0.2 rounded-full">
+                <span className="bg-slate-200 text-slate-700 font-bold text-[10px] px-1.5 py-0.5 rounded-full">
                   6
                 </span>
               </button>
 
               <button
                 onClick={() => setActiveTab('NEW_HIRE')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
+                className={`px-4 py-2 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
                   activeTab === 'NEW_HIRE'
-                    ? 'bg-blue-600 text-white font-bold'
+                    ? 'bg-[#1E293B] text-white font-bold'
                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <span>Karyawan Baru</span>
-                <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-1.5 py-0.2 rounded-full">
+                <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-1.5 py-0.5 rounded-full">
                   3
                 </span>
               </button>
@@ -776,113 +816,135 @@ export default function AdminPayrollPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-400 uppercase tracking-wider font-bold text-[11px]">
-                      <th className="py-3.5 px-4">KARYAWAN & JABATAN</th>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
+                      <th className="py-3.5 px-4">NAMA KARYAWAN</th>
+                      <th className="py-3.5 px-4">JABATAN & DEPARTEMEN</th>
+                      <th className="py-3.5 px-4">REKENING BANK</th>
                       <th className="py-3.5 px-4">GAJI POKOK</th>
                       <th className="py-3.5 px-4">TUNJANGAN & LEMBUR</th>
                       <th className="py-3.5 px-4">POTONGAN (PAJAK/BPJS)</th>
                       <th className="py-3.5 px-4">TAKE HOME PAY</th>
-                      <th className="py-3.5 px-4 text-center">STATUS & AKSI</th>
+                      <th className="py-3.5 px-4 text-center">AKSI</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
                           Tidak ada karyawan yang cocok dengan kriteria filter.
                         </td>
                       </tr>
                     ) : (
-                      filteredRecords.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                          {/* Karyawan & Jabatan */}
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-9 h-9 rounded-full ${r.avatarBg} font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-sm`}
-                              >
-                                {r.initials}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900 text-sm">{r.employeeName}</div>
-                                <div className="text-slate-500 text-[11px]">
-                                  {r.designation} • {r.employeeNumber}
+                      filteredRecords.map((r) => {
+                        const isFinance = r.department === 'Finance' || r.department?.toLowerCase().includes('finance');
+                        return (
+                          <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                            {/* NAMA KARYAWAN */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                {r.avatarUrl ? (
+                                  <img
+                                    src={r.avatarUrl}
+                                    alt={r.employeeName}
+                                    className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-slate-200 shadow-xs"
+                                  />
+                                ) : (
+                                  <div
+                                    className={`w-9 h-9 rounded-full ${r.avatarBg} font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-xs`}
+                                  >
+                                    {r.initials}
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-bold text-slate-900 text-sm leading-tight">{r.employeeName}</div>
+                                  <div className="text-slate-400 text-[11px] font-mono mt-0.5">{r.employeeNumber}</div>
                                 </div>
-                                <div className="text-slate-400 text-[11px] font-mono mt-0.5">
-                                  {r.bankName} - {r.bankAccountNumber}
-                                </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* Gaji Pokok */}
-                          <td className="py-3.5 px-4 font-bold text-slate-900 text-sm whitespace-nowrap">
-                            {formatRupiah(r.baseSalary)}
-                          </td>
-
-                          {/* Tunjangan & Lembur */}
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <div className="font-bold text-emerald-600 text-xs">
-                              +{formatRupiah(r.allowances + r.overtimePay)}
-                            </div>
-                            <div className="text-[11px] text-slate-500 max-w-[200px] truncate mt-0.5">
-                              {r.allowanceTitle}
-                            </div>
-                          </td>
-
-                          {/* Potongan */}
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <div className="font-bold text-rose-600 text-xs">
-                              -{formatRupiah(r.totalDeductions)}
-                            </div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">
-                              PPh 21: {formatRupiah(r.pph21Amount)} • BPJS: {formatRupiah(r.bpjsTkEmp + r.bpjsKesEmp)}
-                            </div>
-                          </td>
-
-                          {/* Take Home Pay */}
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <div className="font-extrabold text-blue-600 text-sm">
-                              {formatRupiah(r.takeHomePay)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              TER {r.ptkpCategory} • {r.pph21Rate}
-                            </div>
-                          </td>
-
-                          {/* Status & Aksi */}
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {r.verificationStatus === 'VERIFIED' && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  <Check className="w-3 h-3 stroke-[3]" />
-                                  <span>Terverifikasi</span>
+                            {/* JABATAN & DEPARTEMEN */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="font-semibold text-slate-800 text-xs">{r.designation}</div>
+                              <div className="mt-1">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                    isFinance
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}
+                                >
+                                  {isFinance ? 'Finance' : 'HRD'}
                                 </span>
-                              )}
-                              {r.verificationStatus === 'REVIEW_LEMBUR' && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                  <Clock className="w-3 h-3" />
-                                  <span>Review Lembur</span>
-                                </span>
-                              )}
-                              {r.verificationStatus === 'UNPAID_LEAVE' && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  <span>Unpaid Leave</span>
-                                </span>
-                              )}
+                              </div>
+                            </td>
 
-                              <button
-                                onClick={() => setSelectedPayslip(r)}
-                                title="Lihat Slip Gaji"
-                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 transition-colors"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                            {/* REKENING BANK */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200/80">
+                                  {r.bankName || 'BCA'}
+                                </span>
+                                <span className="font-mono text-slate-700 text-xs">{r.bankAccountNumber}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">Payroll Direct</div>
+                            </td>
+
+                            {/* GAJI POKOK */}
+                            <td className="py-3.5 px-4 font-bold text-slate-900 text-sm whitespace-nowrap">
+                              {formatRupiah(r.baseSalary)}
+                            </td>
+
+                            {/* TUNJANGAN & LEMBUR */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="font-bold text-emerald-600 text-xs">
+                                +{formatRupiah(r.allowances + (r.overtimePay || 0))}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-0.5">
+                                {r.allowanceTitle || 'Tunjangan Transport, Makan & Kinerja'}
+                              </div>
+                            </td>
+
+                            {/* POTONGAN (PAJAK/BPJS) */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="font-bold text-rose-600 text-xs">
+                                -{formatRupiah(r.totalDeductions)}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-0.5">
+                                PPh 21: {formatRupiah(r.pph21Amount)} • BPJS: {formatRupiah(r.bpjsTkEmp + r.bpjsKesEmp)}
+                              </div>
+                            </td>
+
+                            {/* TAKE HOME PAY */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="font-extrabold text-blue-600 text-sm">
+                                {formatRupiah(r.takeHomePay)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">
+                                TER {r.ptkpCategory} • {r.pph21Rate}
+                              </div>
+                            </td>
+
+                            {/* AKSI */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => setSelectedPayslip(r)}
+                                  title="Lihat Slip Gaji"
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-500 transition-colors"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  title="Opsi Lainnya"
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -916,163 +978,6 @@ export default function AdminPayrollPage() {
               </div>
             </div>
           </div>
-
-          {/* Right Column (4 or 3 cols on xl) */}
-          <div className="xl:col-span-4 2xl:col-span-3 space-y-4">
-            {/* Card: Distribusi Bank Payroll */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Distribusi Bank Payroll</h3>
-                  </div>
-                </div>
-                <span className="bg-blue-50 text-blue-700 font-bold text-[10px] px-2 py-0.5 rounded-md border border-blue-200/50">
-                  Cash Mgmt API
-                </span>
-              </div>
-
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Rencana penyaluran dana payroll via sistem integrasi host-to-host perbankan nasional.
-              </p>
-
-              {/* Multi-segment Progress Bar */}
-              <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-slate-100">
-                {periodData?.bankDistribution?.length ? (
-                  periodData.bankDistribution.map((b: any, idx: number) => {
-                    const colors = ['bg-blue-600', 'bg-sky-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500'];
-                    return (
-                      <div
-                        key={b.bankName}
-                        className={`${colors[idx % colors.length]} h-full transition-all`}
-                        style={{ width: `${b.percentage}%` }}
-                        title={`${b.bankName} ${b.percentage}%`}
-                      />
-                    );
-                  })
-                ) : (
-                  <>
-                    <div className="bg-blue-600 h-full" style={{ width: '65%' }} title="BCA 65%" />
-                    <div className="bg-sky-500 h-full" style={{ width: '25%' }} title="Mandiri 25%" />
-                    <div className="bg-indigo-500 h-full" style={{ width: '10%' }} title="BNI 10%" />
-                  </>
-                )}
-              </div>
-
-              {/* Bank Breakdown List */}
-              <div className="space-y-3 pt-1">
-                {periodData?.bankDistribution?.length ? (
-                  periodData.bankDistribution.map((b: any, idx: number) => {
-                    const dotColors = ['bg-blue-600', 'bg-sky-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500'];
-                    return (
-                      <div key={b.bankName} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2.5 h-2.5 rounded-full ${dotColors[idx % dotColors.length]} flex-shrink-0`} />
-                          <div>
-                            <div className="font-bold text-slate-800">{b.bankName} Host-to-Host</div>
-                            <div className="text-[11px] text-slate-400">
-                              {b.count} Karyawan ({b.percentage}%)
-                            </div>
-                          </div>
-                        </div>
-                        <div className="font-extrabold text-slate-900 text-sm">
-                          {formatRupiah(b.amount)}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <>
-                    {/* BCA */}
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-shrink-0" />
-                        <div>
-                          <div className="font-bold text-slate-800">BCA Corporate</div>
-                          <div className="text-[11px] text-slate-400">812 Karyawan (65%)</div>
-                        </div>
-                      </div>
-                      <div className="font-extrabold text-slate-900 text-sm">Rp 2.49 M</div>
-                    </div>
-
-                    {/* Mandiri */}
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-sky-500 flex-shrink-0" />
-                        <div>
-                          <div className="font-bold text-slate-800">Bank Mandiri (MCM)</div>
-                          <div className="text-[11px] text-slate-400">312 Karyawan (25%)</div>
-                        </div>
-                      </div>
-                      <div className="font-extrabold text-slate-900 text-sm">Rp 960 Jt</div>
-                    </div>
-
-                    {/* BNI */}
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 flex-shrink-0" />
-                        <div>
-                          <div className="font-bold text-slate-800">BNI Direct</div>
-                          <div className="text-[11px] text-slate-400">124 Karyawan (10%)</div>
-                        </div>
-                      </div>
-                      <div className="font-extrabold text-slate-900 text-sm">Rp 392.65 Jt</div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Action Buttons for Host-to-Host */}
-              <div className="pt-2 border-t border-slate-100 space-y-2">
-                <button
-                  onClick={() => {
-                    setNotification({
-                      type: 'success',
-                      message: 'File kliring batch (BCA Payroll & Mandiri MCM Format) siap diunduh.',
-                    });
-                  }}
-                  className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Unduh File Format Kliring Bank</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Compliance & Audit Immutability Card */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-sm space-y-3.5">
-              <div className="flex items-center gap-2 text-blue-400">
-                <ShieldCheck className="w-5 h-5" />
-                <span className="text-xs font-bold uppercase tracking-wider">Kepatuhan Regulasi HR</span>
-              </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Terkalibrasi otomatis sesuai <strong>PP No. 58 Tahun 2023</strong> (PPh 21 TER) dan batas upah BPJS 2025.
-              </p>
-
-              <div className="space-y-2 pt-1 text-xs">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>PPh 21 TER Kategori A, B, C</span>
-                  <span className="text-emerald-400 font-bold flex items-center gap-1">
-                    <Check className="w-3 h-3 stroke-[3]" /> 100% Valid
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Batas Cap UMR BPJS Kes</span>
-                  <span className="text-emerald-400 font-bold flex items-center gap-1">
-                    <Check className="w-3 h-3 stroke-[3]" /> Teraplikasi
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Audit Trail Immutability</span>
-                  <span className="text-blue-400 font-bold">SHA-256 [REQ-DEC-09]</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* ========================================================================= */}
         {/* MODAL 1: JALANKAN PROSES PAYROLL (Calculation Wizard) */}

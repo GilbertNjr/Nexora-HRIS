@@ -215,7 +215,7 @@ export default function EmployeeDashboardOverhaulPage() {
       summary:
         'Peningkatan fasilitas rawat jalan dan integrasi klaim digital cashless melalui portal ESS Karyawan dengan jaringan rumah sakit rekanan tier-1.',
       content:
-        'Manajemen HR dengan bangga mengumumkan pembaruan fasilitas asuransi kesehatan karyawan:\n\n1. Plafon rawat jalan ditingkatkan sebesar 15% untuk seluruh staf tetap.\n2. Klaim rawat inap dan obat resep dapat diproses secara cashless via kartu digital ESS.\n3. Buku panduan klaim reimbursement dapat diakses di Pusat Dokumen & Surat.',
+        'Manajemen HR dengan bangga mengumumkan pembaruan fasilitas asuransi kesehatan karyawan:\n\n1. Plafon rawat jalan ditingkatkan sebesar 15% untuk seluruh staf tetap.\n2. Klaim rawat inap dan obat resep dapat diproses secara cashless via kartu digital ESS.\n3. Buku panduan klaim reimbursement dapat dikonfirmasi langsung ke HR Operations.',
       buttonText: 'Rincian Polis Asuransi',
       priority: 'INFO',
       publishedAt: '12 Oktober 2026, 10:00 WIB',

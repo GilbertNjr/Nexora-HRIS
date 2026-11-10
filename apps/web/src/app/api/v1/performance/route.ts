@@ -4,6 +4,7 @@ import path from 'path';
 import {
   getPerformanceFromDb,
   upsertPerformanceToDb,
+  deletePerformanceFromDb,
   getCurrentRealCycle,
   getGradeFromScore,
 } from '@/lib/performanceDb';
@@ -543,6 +544,38 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Data evaluasi kinerja berhasil dikalibrasi & tersimpan di database.',
+    });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Parameter ID wajib disediakan.' }, { status: 400 });
+    }
+
+    await deletePerformanceFromDb(id);
+
+    try {
+      await recordAuditLog({
+        module: 'PERFORMANCE',
+        action: 'PERFORMANCE_DELETED',
+        recordId: id,
+        userName: 'HR Administrator',
+        userEmail: 'admin@nexora.local',
+        userNik: 'NX-ADMIN-001',
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'Konsol HR Admin (Web)',
+      });
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      message: 'Data evaluasi kinerja berhasil dihapus.',
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });

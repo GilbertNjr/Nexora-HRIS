@@ -10,7 +10,6 @@ import {
   CreditCard,
   TrendingUp,
   GraduationCap,
-  FolderArchive,
   Headphones,
   HelpCircle,
   PanelLeftClose,
@@ -18,6 +17,7 @@ import {
   X,
   Menu,
   Megaphone,
+  LogOut,
 } from 'lucide-react';
 import { EmployeeAnnouncementBroadcastListener } from '@/components/notifications/EmployeeAnnouncementBroadcastListener';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -30,8 +30,7 @@ export type EmployeeActiveMenu =
   | 'leave'
   | 'payroll'
   | 'performance'
-  | 'training'
-  | 'documents';
+  | 'training';
 
 interface EmployeeSidebarProps {
   activeMenu: EmployeeActiveMenu;
@@ -57,6 +56,38 @@ export function EmployeeSidebar({
   const { user: currentUser } = useCurrentUser();
   const [companyLogo, setCompanyLogo] = useState<string>('/company-logo-saved.jpg');
   const [companyName, setCompanyName] = useState<string>('Nexora Group & HR Solutions');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const sessionId = typeof window !== 'undefined' ? localStorage.getItem('nexora_session_id') : null;
+      if (sessionId) {
+        await fetch('/api/v1/auth/sessions', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        }).catch(() => {});
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('nexora_token');
+      localStorage.removeItem('nexora_user');
+      localStorage.removeItem('nexora_session_id');
+      localStorage.removeItem('nexora_active_portal');
+      localStorage.removeItem('nexora_employee_profile');
+
+      try {
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({ type: 'USER_LOGGED_OUT', timestamp: Date.now() });
+        bc.close();
+      } catch {}
+
+      window.location.href = '/login';
+    }
+  };
 
   useEffect(() => {
     try {
@@ -432,128 +463,197 @@ export function EmployeeSidebar({
           </Link>
         </div>
 
-        {/* SECTION 3: DOKUMEN & BANTUAN */}
+        {/* SECTION 3: BANTUAN & DUKUNGAN */}
         <div className="space-y-1 pt-1">
           <p className={`text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-2 mb-1.5 ${
             isCollapsed ? 'block md:hidden' : 'block'
           }`}>
-            DOKUMEN & BANTUAN
+            BANTUAN &amp; DUKUNGAN
           </p>
-
-          <Link
-            href="/karyawan/documents"
-            onClick={onCloseMobile}
-            title={isCollapsed ? 'Arsip & Formulir' : undefined}
-            className={`w-full flex items-center rounded-xl text-xs font-semibold transition-all ${
-              activeMenu === 'documents'
-                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            } ${isCollapsed ? 'justify-start md:justify-center px-3.5 py-2.5 md:p-2.5 gap-3 md:gap-0' : 'px-3.5 py-2.5 gap-3'}`}
-          >
-            <FolderArchive className={`w-4 h-4 flex-shrink-0 ${activeMenu === 'documents' ? 'text-white' : 'text-slate-400'}`} />
-            <span className={isCollapsed ? 'inline md:hidden' : 'inline'}>Arsip & Formulir</span>
-          </Link>
 
           <button
             type="button"
             onClick={handleHelpdeskClick}
             title={isCollapsed ? 'Bantuan & Kontak HR' : undefined}
-            className={`w-full flex items-center rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left ${
+            className={`w-full flex items-center rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left cursor-pointer ${
               isCollapsed ? 'justify-start md:justify-center px-3.5 py-2.5 md:p-2.5 gap-3 md:gap-0' : 'px-3.5 py-2.5 gap-3'
             }`}
           >
             <Headphones className="w-4 h-4 text-slate-400 flex-shrink-0" />
-            <span className={isCollapsed ? 'inline md:hidden' : 'inline'}>Bantuan & Kontak HR</span>
+            <span className={isCollapsed ? 'inline md:hidden' : 'inline'}>Bantuan &amp; Kontak HR</span>
           </button>
         </div>
       </div>
 
-      {/* BOTTOM CARD: PUSAT DUKUNGAN */}
+      {/* BOTTOM CARD: PUSAT DUKUNGAN, LOGOUT & VERSI APPS */}
       {isCollapsed && (
-        <div className="hidden md:flex pt-4 border-t border-slate-100 justify-center">
+        <div className="hidden md:flex pt-4 border-t border-slate-100 flex-col items-center gap-2">
           <button
             type="button"
             onClick={() => {
               if (onOpenPkbModal) onOpenPkbModal();
               else handleHelpdeskClick();
             }}
-            className="w-10 h-10 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 items-center justify-center transition-colors shadow-2xs"
+            className="w-10 h-10 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
             title="Pusat Dukungan (SOP & Tiket HR)"
           >
             <HelpCircle className="w-5 h-5" />
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowLogoutModal(true)}
+            className="w-10 h-10 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/70 flex items-center justify-center transition-colors cursor-pointer"
+            title="Keluar Akun Karyawan (Logout)"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+
+          <span
+            className="font-mono text-[9px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60"
+            title="Nexora HRIS ESS v2.4.0"
+          >
+            v2.4
+          </span>
         </div>
       )}
 
-      <div className={`mt-6 p-4 rounded-2xl bg-blue-50/60 border border-blue-200/70 text-xs space-y-2 ${
-        isCollapsed ? 'block md:hidden' : 'block'
-      }`}>
-        <div className="flex items-center gap-2 text-blue-900 font-bold">
-          <HelpCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
-          <span>Pusat Dukungan ESS</span>
-        </div>
-        <p className="text-[11px] text-slate-500 leading-relaxed">
-          {activeMenu === 'attendance'
-            ? 'Kendala liveness camera, radius geofence, atau koreksi?'
-            : 'Ada kendala data kehadiran atau klaim?'}
-        </p>
+      <div className={`mt-6 space-y-3 ${isCollapsed ? 'block md:hidden' : 'block'}`}>
+        {/* Support Box */}
+        <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/70 text-xs space-y-2">
+          <div className="flex items-center gap-2 text-blue-900 font-bold">
+            <HelpCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
+            <span>Pusat Dukungan ESS</span>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            {activeMenu === 'attendance'
+              ? 'Kendala liveness camera, radius geofence, atau koreksi?'
+              : 'Ada kendala data kehadiran atau klaim?'}
+          </p>
 
-        <div className="pt-1 space-y-1 font-semibold text-[11px]">
-          {activeMenu === 'attendance' ? (
-            <>
-              <a
-                href="#sop"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (onOpenPkbModal) onOpenPkbModal();
-                  else if (onShowToast) onShowToast('SOP Presensi Biometrik: Pastikan pencahayaan cukup dan izinkan akses kamera.');
-                }}
-                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-              >
-                <span>SOP Presensi Biometrik</span>
-                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-              </a>
-              <a
-                href="#chat-pic"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (onShowToast) onShowToast('Menghubungkan ke PIC Absensi HR: Diana S. (Ext. 405 / WA Business HR)');
-                }}
-                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-              >
-                <span>Chat PIC Absensi (Diana S.)</span>
-                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-              </a>
-            </>
-          ) : (
-            <>
-              <a
-                href="#sop"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (onOpenPkbModal) onOpenPkbModal();
-                }}
-                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-              >
-                <span>SOP Kepegawaian</span>
-                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-              </a>
-              <a
-                href="#tiket"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleHelpdeskClick();
-                }}
-                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-              >
-                <span>Tiket Helpdesk HR</span>
-                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-              </a>
-            </>
-          )}
+          <div className="pt-1 space-y-1 font-semibold text-[11px]">
+            {activeMenu === 'attendance' ? (
+              <>
+                <a
+                  href="#sop"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onOpenPkbModal) onOpenPkbModal();
+                    else if (onShowToast) onShowToast('SOP Presensi Biometrik: Pastikan pencahayaan cukup dan izinkan akses kamera.');
+                  }}
+                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                >
+                  <span>SOP Presensi Biometrik</span>
+                  <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                </a>
+                <a
+                  href="#chat-pic"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onShowToast) onShowToast('Menghubungkan ke PIC Absensi HR: Diana S. (Ext. 405 / WA Business HR)');
+                  }}
+                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                >
+                  <span>Chat PIC Absensi (Diana S.)</span>
+                  <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                </a>
+              </>
+            ) : (
+              <>
+                <a
+                  href="#sop"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onOpenPkbModal) onOpenPkbModal();
+                  }}
+                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                >
+                  <span>SOP Kepegawaian</span>
+                  <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                </a>
+                <a
+                  href="#tiket"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleHelpdeskClick();
+                  }}
+                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                >
+                  <span>Tiket Helpdesk HR</span>
+                  <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                </a>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Logout Button */}
+        <button
+          type="button"
+          onClick={() => setShowLogoutModal(true)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/60 hover:bg-rose-100/80 border border-rose-200/60 transition-all cursor-pointer group shadow-2xs active:scale-[0.99]"
+          title="Keluar dari Akun Karyawan (Logout)"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+              <LogOut className="w-3.5 h-3.5" />
+            </div>
+            <span className="truncate">Keluar Akun</span>
+          </div>
+          <span className="text-[10px] font-bold text-rose-500/80 group-hover:text-rose-700">Logout</span>
+        </button>
+
+        {/* App Version Information */}
+        <div className="flex items-center justify-between px-1.5 pt-0.5 text-[11px] text-slate-400">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 animate-pulse" />
+            <span className="font-semibold text-slate-500 text-[10px] truncate">Nexora ESS Portal</span>
+          </div>
+          <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/80 flex-shrink-0">
+            v2.4.0
+          </span>
         </div>
       </div>
     </aside>
+
+    {/* Modal Konfirmasi Logout Karyawan */}
+    {showLogoutModal && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center flex-shrink-0">
+              <LogOut className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Konfirmasi Keluar Akun</h3>
+              <p className="text-xs text-slate-500">Nexora Portal Karyawan (ESS)</p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Apakah Anda yakin ingin keluar dari akun karyawan? Sesi aktif pada perangkat ini akan diakhiri.
+          </p>
+          <div className="flex items-center justify-end gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowLogoutModal(false)}
+              disabled={isLoggingOut}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>{isLoggingOut ? 'Memproses...' : 'Ya, Keluar'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Global Real-Time HR Announcement Broadcast Listener across all employee sub-pages */}
     <EmployeeAnnouncementBroadcastListener />

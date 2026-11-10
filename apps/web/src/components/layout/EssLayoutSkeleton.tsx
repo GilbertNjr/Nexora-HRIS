@@ -180,7 +180,11 @@ export function EssLayoutSkeleton({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto w-full p-4 sm:p-6 flex-1">{children}</main>
+      <main className="max-w-4xl mx-auto w-full p-4 sm:p-6 flex-1 scroll-smooth">
+        <div className="page-smooth-enter">
+          {children}
+        </div>
+      </main>
 
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 z-50 flex items-center justify-around px-2 shadow-lg">

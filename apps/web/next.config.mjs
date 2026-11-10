@@ -14,6 +14,11 @@ const nextConfig = {
         destination: '/karyawan',
         permanent: true,
       },
+      {
+        source: '/admin/documents',
+        destination: '/admin',
+        permanent: false,
+      },
     ];
   },
 };

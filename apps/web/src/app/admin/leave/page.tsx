@@ -29,11 +29,8 @@ import {
   RefreshCw,
   Grid,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Paperclip,
   MoreVertical,
-  Info,
   ShieldCheck,
   FileSpreadsheet,
   HeartPulse,
@@ -123,24 +120,6 @@ function isDateInRange(target: Date, startStr: string | undefined, endStr: strin
   return targetTime >= startTime && targetTime <= endTime;
 }
 
-function formatReturnDate(endStr: string | undefined): string {
-  const end = parseFlexibleDate(endStr);
-  if (!end) return 'Besok';
-
-  const returnDate = new Date(end);
-  returnDate.setDate(returnDate.getDate() + 1);
-
-  const today = new Date();
-  const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  const returnZero = new Date(returnDate.getFullYear(), returnDate.getMonth(), returnDate.getDate()).getTime();
-  const diffDays = Math.round((returnZero - todayZero) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return 'Hari ini';
-  if (diffDays === 1) return 'Besok';
-
-  return returnDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-}
-
 const mapApprovalToLeave = (item: any): LeaveRequest => {
   const isCuti = item.type === 'cuti' || !item.type;
   return {
@@ -178,13 +157,6 @@ export default function AdminLeavePage() {
   const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [selectedDept, setSelectedDept] = useState('Semua Departemen');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  // Dynamic Calendar & Roster State
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(() => new Date());
-  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
-  const [rosterSearch, setRosterSearch] = useState('');
-  const [rosterDeptFilter, setRosterDeptFilter] = useState('ALL');
 
   // Modals State
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -289,35 +261,12 @@ export default function AdminLeavePage() {
   // Real-time Current Clock Date
   const [today, setToday] = useState<Date>(() => new Date());
 
-  // Real-time Calendar Clock: Auto rollover at midnight & month transition without manual intervention
+  // Real-time Clock: Auto rollover at midnight
   useEffect(() => {
     const syncCalendarWithRealTime = () => {
       const now = new Date();
       setToday((prevToday) => {
-        const hasDayChanged = prevToday.toDateString() !== now.toDateString();
-        const hasMonthChanged =
-          prevToday.getMonth() !== now.getMonth() ||
-          prevToday.getFullYear() !== now.getFullYear();
-
-        if (hasDayChanged || hasMonthChanged) {
-          // If viewing current month, advance calendar view automatically
-          setCalendarMonth((prevCalMonth) => {
-            const wasViewingCurrentMonth =
-              prevCalMonth.getFullYear() === prevToday.getFullYear() &&
-              prevCalMonth.getMonth() === prevToday.getMonth();
-
-            if (wasViewingCurrentMonth) {
-              return new Date(now.getFullYear(), now.getMonth(), 1);
-            }
-            return prevCalMonth;
-          });
-
-          // If the selected day was today, keep selected day tracking today
-          setSelectedCalendarDate((prevSel) => {
-            const wasSelectedToday = prevSel.toDateString() === prevToday.toDateString();
-            return wasSelectedToday ? now : prevSel;
-          });
-
+        if (prevToday.toDateString() !== now.toDateString()) {
           return now;
         }
         return prevToday;
@@ -341,13 +290,6 @@ export default function AdminLeavePage() {
       window.removeEventListener('focus', handleVisibilityOrFocus);
     };
   }, []);
-
-  const isCurrentMonthActive = useMemo(() => {
-    return (
-      calendarMonth.getFullYear() === today.getFullYear() &&
-      calendarMonth.getMonth() === today.getMonth()
-    );
-  }, [calendarMonth, today]);
 
   // Filter requests by status
   const pendingRequests = useMemo(
@@ -435,160 +377,6 @@ export default function AdminLeavePage() {
   const unverifiedSickCount = allSickLeaves.length - verifiedSickLeaves.length;
   const verifiedPercent = allSickLeaves.length > 0 ? Math.round((verifiedSickLeaves.length / allSickLeaves.length) * 100) : 100;
   const totalCount = requests.length;
-
-  // Calendar Calculation for the active calendar month
-  const calendarYear = calendarMonth.getFullYear();
-  const calendarMonthIdx = calendarMonth.getMonth();
-
-  const currentMonthName = useMemo(
-    () =>
-      new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(calendarMonth),
-    [calendarMonth]
-  );
-
-  const calendarCells = useMemo(() => {
-    const daysInCurrentMonth = new Date(calendarYear, calendarMonthIdx + 1, 0).getDate();
-    const daysInPrevMonth = new Date(calendarYear, calendarMonthIdx, 0).getDate();
-    // Monday is 0, Sunday is 6
-    const startDayOfWeek = (new Date(calendarYear, calendarMonthIdx, 1).getDay() + 6) % 7;
-
-    const cells: {
-      dayNumber: number;
-      date: Date;
-      isCurrentMonth: boolean;
-      isToday: boolean;
-      isSelected: boolean;
-      dayOfWeek: number;
-      approvedLeaves: LeaveRequest[];
-      pendingLeaves: LeaveRequest[];
-    }[] = [];
-
-    // Leading days from previous month
-    for (let i = startDayOfWeek - 1; i >= 0; i--) {
-      const d = daysInPrevMonth - i;
-      const prevDate = new Date(calendarYear, calendarMonthIdx - 1, d);
-      cells.push({
-        dayNumber: d,
-        date: prevDate,
-        isCurrentMonth: false,
-        isToday: false,
-        isSelected: false,
-        dayOfWeek: (prevDate.getDay() + 6) % 7,
-        approvedLeaves: [],
-        pendingLeaves: [],
-      });
-    }
-
-    // Days in current month
-    for (let d = 1; d <= daysInCurrentMonth; d++) {
-      const cellDate = new Date(calendarYear, calendarMonthIdx, d);
-      const isToday = cellDate.toDateString() === today.toDateString();
-      const isSelected = cellDate.toDateString() === selectedCalendarDate.toDateString();
-      const dayOfWeek = (cellDate.getDay() + 6) % 7;
-
-      const cellApproved = requests.filter(
-        (r) => r.status === 'APPROVED' && isDateInRange(cellDate, r.startDate, r.endDate)
-      );
-      const cellPending = requests.filter(
-        (r) =>
-          ((r.status as string) === 'PENDING' || r.status === 'PENDING_HRD' || r.status === 'PENDING_SPV') &&
-          isDateInRange(cellDate, r.startDate, r.endDate)
-      );
-
-      cells.push({
-        dayNumber: d,
-        date: cellDate,
-        isCurrentMonth: true,
-        isToday,
-        isSelected,
-        dayOfWeek,
-        approvedLeaves: cellApproved,
-        pendingLeaves: cellPending,
-      });
-    }
-
-    // Trailing days from next month to complete weeks (multiples of 7)
-    const remaining = 7 - (cells.length % 7);
-    if (remaining < 7) {
-      for (let d = 1; d <= remaining; d++) {
-        const nextDate = new Date(calendarYear, calendarMonthIdx + 1, d);
-        cells.push({
-          dayNumber: d,
-          date: nextDate,
-          isCurrentMonth: false,
-          isToday: false,
-          isSelected: false,
-          dayOfWeek: (nextDate.getDay() + 6) % 7,
-          approvedLeaves: [],
-          pendingLeaves: [],
-        });
-      }
-    }
-
-    return cells;
-  }, [calendarYear, calendarMonthIdx, requests, today, selectedCalendarDate]);
-
-  // Leaves on selected calendar date
-  const leavesOnSelectedDate = useMemo(() => {
-    return requests.filter(
-      (r) => r.status === 'APPROVED' && isDateInRange(selectedCalendarDate, r.startDate, r.endDate)
-    );
-  }, [requests, selectedCalendarDate]);
-
-  const isSelectedDateToday = useMemo(
-    () => selectedCalendarDate.toDateString() === today.toDateString(),
-    [selectedCalendarDate, today]
-  );
-
-  const formattedSelectedDateStr = useMemo(
-    () =>
-      selectedCalendarDate.toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }),
-    [selectedCalendarDate]
-  );
-
-  const handlePrevMonth = () => {
-    setCalendarMonth(new Date(calendarYear, calendarMonthIdx - 1, 1));
-  };
-
-  const handleNextMonth = () => {
-    setCalendarMonth(new Date(calendarYear, calendarMonthIdx + 1, 1));
-  };
-
-  const handleResetToToday = () => {
-    const now = new Date();
-    setToday(now);
-    setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedCalendarDate(now);
-  };
-
-  const uniqueDepartments = useMemo(() => {
-    const s = new Set<string>();
-    requests.forEach((r) => {
-      if (r.department) s.add(r.department);
-    });
-    return Array.from(s);
-  }, [requests]);
-
-  const filteredRoster = useMemo(() => {
-    return requests
-      .filter((r) => r.status === 'APPROVED')
-      .filter((r) => {
-        if (rosterDeptFilter !== 'ALL' && r.department !== rosterDeptFilter) return false;
-        if (rosterSearch) {
-          const q = rosterSearch.toLowerCase();
-          const matchName = r.name.toLowerCase().includes(q);
-          const matchNik = r.nik.toLowerCase().includes(q);
-          const matchType = r.leaveType.toLowerCase().includes(q);
-          const matchDept = r.department.toLowerCase().includes(q);
-          if (!matchName && !matchNik && !matchType && !matchDept) return false;
-        }
-        return true;
-      });
-  }, [requests, rosterDeptFilter, rosterSearch]);
 
   const getTodayIso = () => {
     const d = new Date();
@@ -1204,12 +992,8 @@ export default function AdminLeavePage() {
           </div>
         </div>
 
-        {/* Main Two-Column Layout: Table Left, Calendar Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* ========================================================= */}
-          {/* LEFT COLUMN: Table of Leave Requests (8 cols on lg) */}
-          {/* ========================================================= */}
-          <div className="lg:col-span-8 space-y-4">
+        {/* Data Table Pengajuan Cuti (Full Width) */}
+        <div className="space-y-4">
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
@@ -1392,261 +1176,7 @@ export default function AdminLeavePage() {
               </div>
             </div>
           </div>
-
-          {/* ========================================================= */}
-          {/* RIGHT COLUMN: Kalender Cuti & Absen Hari Ini (4 cols on lg) */}
-          {/* ========================================================= */}
-          <div className="lg:col-span-4 space-y-4">
-            {/* Card 1: Kalender Cuti Departemen - Real-Time Dynamic Synchronization */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    {isCurrentMonthActive && (
-                      <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="text-xs font-bold text-slate-900 leading-tight">
-                        Kalender Cuti Departemen
-                      </h3>
-                      <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                        title="Kalender real-time aktif: otomatis berganti bulan & hari mengikuti kalender nyata tanpa perlu reload"
-                      >
-                        <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping" />
-                        Live Real-Time
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={handlePrevMonth}
-                    title="Bulan sebelumnya"
-                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleResetToToday}
-                    title={
-                      isCurrentMonthActive
-                        ? 'Bulan ini (Waktu Nyata) • Klik untuk reset ke Hari Ini'
-                        : 'Klik untuk kembali ke Bulan & Hari Ini (Real-Time)'
-                    }
-                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-lg capitalize transition-all flex items-center gap-1.5 ${
-                      isCurrentMonthActive
-                        ? 'text-blue-700 bg-blue-50 border border-blue-200/70 hover:bg-blue-100/70'
-                        : 'text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100'
-                    }`}
-                  >
-                    <span>{currentMonthName}</span>
-                    {!isCurrentMonthActive && (
-                      <span className="text-[9px] bg-amber-200/80 text-amber-900 px-1 rounded font-bold">
-                        Kembali
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    title="Bulan berikutnya"
-                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Dynamic Calendar Grid (Sen, Sel, Rab, Kam, Jum, Sab, Min) */}
-              <div className="space-y-2 text-center text-xs">
-                <div className="grid grid-cols-7 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <span>Sen</span>
-                  <span>Sel</span>
-                  <span>Rab</span>
-                  <span>Kam</span>
-                  <span>Jum</span>
-                  <span className="text-rose-500">Sab</span>
-                  <span className="text-rose-500">Min</span>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 text-[11px] font-semibold">
-                  {calendarCells.map((cell, idx) => {
-                    const isWeekend = cell.dayOfWeek === 5 || cell.dayOfWeek === 6;
-                    const hasApproved = cell.approvedLeaves.length > 0;
-                    const hasPending = cell.pendingLeaves.length > 0;
-
-                    let cellStyle = 'text-slate-700 hover:bg-slate-100';
-                    if (!cell.isCurrentMonth) {
-                      cellStyle = isWeekend ? 'text-rose-300 hover:bg-slate-50' : 'text-slate-300 hover:bg-slate-50';
-                    } else if (cell.isSelected) {
-                      cellStyle = cell.isToday
-                        ? 'bg-[#1D4ED8] text-white font-extrabold ring-2 ring-blue-300 shadow-xs'
-                        : 'bg-[#1D4ED8] text-white font-bold shadow-xs';
-                    } else if (hasApproved) {
-                      cellStyle = 'bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 border border-blue-200/50';
-                    } else if (cell.isToday) {
-                      cellStyle = 'text-blue-700 font-extrabold ring-1.5 ring-blue-500 bg-blue-50/50 hover:bg-blue-100/50';
-                    } else if (isWeekend) {
-                      cellStyle = 'text-rose-500 hover:bg-rose-50/60';
-                    }
-
-                    const tooltipText = [
-                      cell.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-                      cell.isToday ? '(Hari Ini - Real-Time)' : '',
-                      hasApproved ? `• ${cell.approvedLeaves.length} cuti disetujui: ${cell.approvedLeaves.map((l) => l.name).join(', ')}` : '',
-                      hasPending ? `• ${cell.pendingLeaves.length} menunggu approval` : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ');
-
-                    return (
-                      <button
-                        key={`${cell.dayNumber}-${idx}`}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCalendarDate(cell.date);
-                          if (!cell.isCurrentMonth) {
-                            setCalendarMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
-                          }
-                        }}
-                        title={tooltipText}
-                        className={`relative p-1.5 rounded-lg transition-all flex flex-col items-center justify-center h-8 text-[11px] ${cellStyle}`}
-                      >
-                        <span>{cell.dayNumber}</span>
-                        {/* Status Dots */}
-                        {cell.isCurrentMonth && (hasApproved || hasPending) && !cell.isSelected && (
-                          <div className="flex items-center gap-0.5 mt-0.5">
-                            {hasApproved && (
-                              <span className="w-1 h-1 rounded-full bg-blue-600 inline-block" />
-                            )}
-                            {hasPending && (
-                              <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" />
-                            )}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Sub-section: ABSEN HARI INI / TANGGAL DIPILIH */}
-              <div className="pt-3 border-t border-slate-100 space-y-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold uppercase tracking-wider text-slate-500 text-[10px]">
-                      {isSelectedDateToday ? 'ABSEN HARI INI' : `ABSEN: ${formattedSelectedDateStr}`} ({leavesOnSelectedDate.length} DARI {totalHeadcount})
-                    </span>
-                    {!isSelectedDateToday && (
-                      <button
-                        type="button"
-                        onClick={handleResetToToday}
-                        className="text-[9px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-0.5"
-                        title="Kembali ke Hari Ini"
-                      >
-                        • Kembali ke Hari Ini
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsRosterModalOpen(true)}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800"
-                  >
-                    Lihat Semua
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {leavesOnSelectedDate.length === 0 ? (
-                    <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-1.5 shadow-2xs">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-800">Seluruh Karyawan Hadir</p>
-                      <p className="text-[10px] text-slate-400 leading-tight">
-                        Tidak ada cuti atau izin aktif pada {formattedSelectedDateStr}. Data tersinkronisasi otomatis saat ada permohonan yang disetujui.
-                      </p>
-                    </div>
-                  ) : (
-                    leavesOnSelectedDate.map((leave) => {
-                      const badgeColor =
-                        leave.typeCategory === 'sakit'
-                          ? 'bg-amber-100 text-amber-800'
-                          : leave.typeCategory === 'khusus'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-blue-100 text-blue-800';
-
-                      const badgeLabel =
-                        leave.typeCategory === 'sakit'
-                          ? 'Sakit'
-                          : leave.typeCategory === 'khusus'
-                          ? 'Dispensasi'
-                          : 'Tahunan';
-
-                      return (
-                        <div
-                          key={leave.id}
-                          className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <img
-                              src={leave.avatarUrl}
-                              alt={leave.name}
-                              className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 leading-tight truncate">
-                                {leave.name}
-                              </p>
-                              <p className="text-[10px] text-slate-400 truncate">
-                                {leave.role || leave.department}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
-                              {badgeLabel}
-                            </span>
-                            <p className="text-[9px] text-slate-400 mt-0.5">
-                              Balik: {formatReturnDate(leave.endDate)}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Card 2: Aturan Kebijakan Cuti */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-sm space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <h4 className="text-xs font-bold text-slate-900">Aturan Kebijakan Cuti</h4>
-                </div>
-                <Info className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Sistem otomatis memvalidasi pengajuan sesuai UU Ketenagakerjaan &amp; PKB Perusahaan.
-                Cuti &gt; 2 hari kerja wajib persetujuan 2 tingkat (SPV + HRD).
-              </p>
-            </div>
-          </div>
         </div>
-      </div>
 
       {/* MODAL 1: Ajukan Cuti Manual (HR Direct Entry) */}
       {isManualModalOpen && (
@@ -1846,121 +1376,6 @@ export default function AdminLeavePage() {
             >
               Tutup Pratinjau
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: Roster Lengkap Karyawan Cuti & Izin */}
-      {isRosterModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Roster Karyawan Cuti &amp; Izin
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Daftar seluruh permohonan yang telah disetujui (Approved)
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Filter toolbar inside modal */}
-            <div className="p-4 border-b border-slate-100 bg-white flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Cari nama, NIK, atau jenis cuti..."
-                  value={rosterSearch}
-                  onChange={(e) => setRosterSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <select
-                value={rosterDeptFilter}
-                onChange={(e) => setRosterDeptFilter(e.target.value)}
-                className="text-xs rounded-xl border border-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
-              >
-                <option value="ALL">Semua Departemen</option>
-                {uniqueDepartments.map((dept) => (
-                  <option key={dept} value={dept}>
-                    {dept}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* List */}
-            <div className="overflow-y-auto p-4 space-y-2 flex-1">
-              {filteredRoster.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 text-xs">
-                  Tidak ada data karyawan cuti/izin yang sesuai dengan filter.
-                </div>
-              ) : (
-                filteredRoster.map((leave) => {
-                  const badgeColor =
-                    leave.typeCategory === 'sakit'
-                      ? 'bg-amber-100 text-amber-800'
-                      : leave.typeCategory === 'khusus'
-                      ? 'bg-purple-100 text-purple-800'
-                      : 'bg-blue-100 text-blue-800';
-
-                  return (
-                    <div
-                      key={leave.id}
-                      className="p-3 rounded-xl border border-slate-200/70 hover:border-slate-300 bg-white flex items-center justify-between gap-3 text-xs transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={leave.avatarUrl}
-                          alt={leave.name}
-                          className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 truncate">{leave.name}</p>
-                          <p className="text-[11px] text-slate-400 truncate">
-                            {leave.nik} • {leave.department}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="text-right flex-shrink-0">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
-                          {leave.leaveType}
-                        </span>
-                        <p className="text-[10px] text-slate-600 font-medium mt-1">
-                          {leave.startDate} s/d {leave.endDate} ({leave.durationDays} Hari)
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 text-xs text-slate-500">
-              <span>Menampilkan {filteredRoster.length} dari {approvedRequests.length} permohonan disetujui</span>
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition-colors"
-              >
-                Tutup
-              </button>
-            </div>
           </div>
         </div>
       )}

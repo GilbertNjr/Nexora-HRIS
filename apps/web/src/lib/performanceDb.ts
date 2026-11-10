@@ -447,3 +447,14 @@ export async function upsertPerformanceToDb(record: {
     return false;
   }
 }
+
+export async function deletePerformanceFromDb(id: string): Promise<boolean> {
+  try {
+    const sql = getDb();
+    await sql`DELETE FROM performance_reviews WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error('Failed to delete performance review from Neon DB:', error);
+    return false;
+  }
+}

@@ -52,9 +52,97 @@ export interface EmployeeItem {
   avatarUrl?: string | null;
 }
 
+const initialMasterEmployees: EmployeeItem[] = [
+  {
+    id: 'emp-1',
+    employeeNumber: 'NX-2021008',
+    fullName: 'Rian Pratama, S.Kom',
+    firstName: 'Rian',
+    lastName: 'Pratama',
+    email: 'rian.pratama@nexora.co.id',
+    phone: '+62 812-9845-1120',
+    department: 'Human Resource Department',
+    designation: 'Human Resource Specialist',
+    employmentType: 'PERMANENT',
+    employmentStatus: 'ACTIVE',
+    joinDate: '2021-08-16',
+    bankName: 'BCA',
+    accountNumber: '8830192841',
+    avatarUrl: '/avatars/user-1.jpg',
+  },
+  {
+    id: 'emp-2',
+    employeeNumber: 'NX-2025089',
+    fullName: 'Fatih',
+    firstName: 'Fatih',
+    lastName: '',
+    email: 'fatih@nexora.co.id',
+    phone: '+62 813-8820-4918',
+    department: 'Finance & Accounting',
+    designation: 'Human Resource Specialist',
+    employmentType: 'PERMANENT',
+    employmentStatus: 'ACTIVE',
+    joinDate: '2022-03-01',
+    bankName: 'BCA',
+    accountNumber: '8820491823',
+    avatarUrl: null,
+  },
+  {
+    id: 'emp-3',
+    employeeNumber: 'NX-2026105',
+    fullName: 'Amel',
+    firstName: 'Amel',
+    lastName: '',
+    email: 'amel@nexora.co.id',
+    phone: '+62 815-7721-0941',
+    department: 'Operasional & Logistik',
+    designation: 'Human Resource Specialist',
+    employmentType: 'PERMANENT',
+    employmentStatus: 'ACTIVE',
+    joinDate: '2023-01-15',
+    bankName: 'Mandiri',
+    accountNumber: '1370019283019',
+    avatarUrl: null,
+  },
+  {
+    id: 'emp-4',
+    employeeNumber: 'NX-2026855',
+    fullName: 'Bang geb',
+    firstName: 'Bang',
+    lastName: 'geb',
+    email: 'bang.geb@nexora.co.id',
+    phone: '+62 818-0923-4412',
+    department: 'Pemasaran & Penjualan',
+    designation: 'Human Resource Specialist',
+    employmentType: 'CONTRACT_PKWT',
+    employmentStatus: 'ACTIVE',
+    joinDate: '2023-07-10',
+    bankName: 'BCA',
+    accountNumber: '5271928401',
+    avatarUrl: null,
+  },
+  {
+    id: 'emp-5',
+    employeeNumber: 'NX-2026445',
+    fullName: 'Kak arum',
+    firstName: 'Kak',
+    lastName: 'arum',
+    email: 'kak.arum@nexora.co.id',
+    phone: '+62 819-4451-2290',
+    department: 'Human Capital Management',
+    designation: 'Human Resource Specialist',
+    employmentType: 'PERMANENT',
+    employmentStatus: 'ACTIVE',
+    joinDate: '2022-11-20',
+    bankName: 'BCA',
+    accountNumber: '6820194821',
+    avatarUrl: null,
+  },
+];
+
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [employees, setEmployees] = useState<EmployeeItem[]>(initialMasterEmployees);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('ALL');
@@ -601,7 +689,7 @@ export default function EmployeesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
+                {isLoading && employees.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-16 px-6 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center space-y-2">

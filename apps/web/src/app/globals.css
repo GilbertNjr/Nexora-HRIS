@@ -10,16 +10,96 @@
   --color-accent: #8B5CF6;
   --color-dark: #0F172A;
   --color-surface: #F8FAFC;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================================================= */
+/* ULTRA-SMOOTH 60FPS / 120FPS HARDWARE-ACCELERATED SCROLLING & TRANSITIONS  */
+/* ========================================================================= */
+html {
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #0F172A;
   background-color: #F8FAFC;
-  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Custom Scrollbar */
+/* Global Micro-Interaction & Smooth Easing */
+a,
+button,
+select,
+input,
+textarea {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tactile Micro-Press for Comfortable Feel */
+button:active:not(:disabled),
+a:active {
+  transform: scale(0.98);
+  transition-duration: 0.1s;
+}
+
+/* Silky Smooth Card Transitions */
+.card-smooth {
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-smooth:hover {
+  transform: translateY(-1.5px);
+}
+
+/* Smooth Table Row Animations */
+tr {
+  transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Ultra Smooth Page / Feature Entry Animation */
+@keyframes smoothPageEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-smooth-enter {
+  animation: smoothPageEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modal Smooth Spring Animation */
+@keyframes modalSmoothIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-smooth-spring {
+  animation: modalSmoothIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom Ultra-Slim Modern Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -32,6 +112,7 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #CBD5E1;
   border-radius: 9999px;
+  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 ::-webkit-scrollbar-thumb:hover {

@@ -327,7 +327,7 @@ export default function AdminAuditPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {isLoading ? (
+                {isLoading && filteredLogs.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
                       <div className="flex flex-col items-center justify-center gap-2">

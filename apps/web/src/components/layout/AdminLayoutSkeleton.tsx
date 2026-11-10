@@ -29,6 +29,7 @@ import {
   PanelLeft,
   User,
   FileText,
+  LogOut,
 } from 'lucide-react';
 import { subscribeSharedSSE } from '@/lib/sseClient';
 
@@ -52,6 +53,38 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
     designation: '',
     avatarUrl: '',
   });
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const sessionId = typeof window !== 'undefined' ? localStorage.getItem('nexora_session_id') : null;
+      if (sessionId) {
+        await fetch('/api/v1/auth/sessions', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        }).catch(() => {});
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('nexora_token');
+      localStorage.removeItem('nexora_user');
+      localStorage.removeItem('nexora_session_id');
+      localStorage.removeItem('nexora_active_portal');
+      localStorage.removeItem('nexora_employee_profile');
+
+      try {
+        const bc = new BroadcastChannel('nexora_live_sync');
+        bc.postMessage({ type: 'USER_LOGGED_OUT', timestamp: Date.now() });
+        bc.close();
+      } catch {}
+
+      window.location.href = '/login';
+    }
+  };
 
   useEffect(() => {
     try {
@@ -226,12 +259,6 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
           icon: TrendingUp,
           active: pathname.startsWith('/admin/performance'),
         },
-        {
-          name: 'Pusat Dokumen & Surat',
-          href: '/admin/documents',
-          icon: FileText,
-          active: pathname.startsWith('/admin/documents'),
-        },
       ],
     },
     {
@@ -387,12 +414,13 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
           </nav>
         </div>
 
-        {/* Sidebar Bottom: Help Card */}
-        {!isSidebarCollapsed && (
-          <div className="p-3 border-t border-slate-100 flex-shrink-0">
+        {/* Sidebar Bottom: Help, Logout & App Version Info */}
+        {!isSidebarCollapsed ? (
+          <div className="p-3 border-t border-slate-100 flex-shrink-0 space-y-2">
+            {/* Help Card */}
             <Link
               href="/admin/help"
-              className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100/90 border border-slate-200/70 flex items-center justify-between transition-colors group"
+              className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/90 border border-slate-200/70 flex items-center justify-between transition-colors group"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
@@ -409,6 +437,60 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
               </div>
               <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors flex-shrink-0 ml-1" />
             </Link>
+
+            {/* Logout Button */}
+            <button
+              type="button"
+              onClick={() => setShowLogoutModal(true)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/60 hover:bg-rose-100/80 border border-rose-200/60 transition-all cursor-pointer group shadow-2xs active:scale-[0.99]"
+              title="Keluar dari Akun Admin (Logout)"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                  <LogOut className="w-3.5 h-3.5" />
+                </div>
+                <span className="truncate">Keluar Sistem</span>
+              </div>
+              <span className="text-[10px] font-bold text-rose-500/80 group-hover:text-rose-700">Logout</span>
+            </button>
+
+            {/* App Version Information */}
+            <div className="flex items-center justify-between px-1.5 pt-0.5 text-[11px] text-slate-400">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 animate-pulse" />
+                <span className="font-semibold text-slate-500 text-[10px] truncate">Nexora Enterprise</span>
+              </div>
+              <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/80 flex-shrink-0">
+                v2.4.0
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* Minimized / Collapsed Bottom Controls */
+          <div className="p-2 border-t border-slate-100 flex-shrink-0 flex flex-col items-center gap-2">
+            <Link
+              href="/admin/help"
+              className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/70 flex items-center justify-center transition-colors"
+              title="Bantuan HRIS (Dokumentasi & Kontak)"
+            >
+              <HelpCircle className="w-4 h-4 text-blue-600" />
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setShowLogoutModal(true)}
+              className="w-10 h-10 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/70 flex items-center justify-center transition-colors cursor-pointer"
+              title="Keluar Sistem (Logout)"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+
+            <span
+              className="font-mono text-[9px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60"
+              title="Nexora Enterprise v2.4.0"
+            >
+              v2.4
+            </span>
           </div>
         )}
       </aside>
@@ -536,10 +618,51 @@ export function AdminLayoutSkeleton({ children, onQuickAction }: AdminLayoutProp
         </header>
 
         {/* Main Content Render */}
-        <main className="p-4 sm:p-6 lg:p-8 flex-1 overflow-y-auto">
-          {children}
+        <main className="p-4 sm:p-6 lg:p-8 flex-1">
+          <div className="page-smooth-enter">
+            {children}
+          </div>
         </main>
       </div>
+
+      {/* Modal Konfirmasi Logout */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center flex-shrink-0">
+                <LogOut className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Konfirmasi Keluar Akun</h3>
+                <p className="text-xs text-slate-500">Nexora Enterprise Portal</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Apakah Anda yakin ingin keluar dari sesi HR Administrator? Sesi aktif pada browser ini akan segera ditutup.
+            </p>
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                disabled={isLoggingOut}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>{isLoggingOut ? 'Memproses...' : 'Ya, Keluar'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -29,13 +29,11 @@ import {
   CheckSquare,
   Square,
   Sparkles,
-  PieChart,
   Eye,
   FileText,
   CalendarCheck,
   ShieldCheck,
   Camera,
-  Edit3,
   Trash2,
 } from 'lucide-react';
 import { subscribeSharedSSE } from '@/lib/sseClient';
@@ -63,33 +61,6 @@ interface AttendanceRecord {
   workLocation?: string;
 }
 
-interface OvertimeItem {
-  id: string;
-  name: string;
-  department: string;
-  hours: string;
-  timeRange: string;
-  reason: string;
-  dateBadge: string;
-}
-
-interface AttendanceCorrectionItem {
-  id: string;
-  name: string;
-  nik: string;
-  role: string;
-  department: string;
-  date: string;
-  targetTime: string;
-  type: string;
-  reason: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  submittedAt: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  adminNotes?: string;
-}
-
 export default function AdminAttendancePage() {
   // Dynamic Real-Time KPI Summary State (Synchronized with Attendance Database & ESS Clock-in)
   const [kpiSummary, setKpiSummary] = useState({
@@ -106,7 +77,6 @@ export default function AdminAttendancePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
-  const [selectedShift, setSelectedShift] = useState<'all' | 'shift1' | 'shift2' | 'flexible'>('all');
   const [selectedDate, setSelectedDate] = useState('Hari Ini');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -121,12 +91,6 @@ export default function AdminAttendancePage() {
   // Table selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Overtime Pending Requests State (Dynamic from unified approvals API)
-  const [overtimeList, setOvertimeList] = useState<OvertimeItem[]>([]);
-
-  // Attendance Correction Requests State (Dynamic from unified approvals API)
-  const [correctionList, setCorrectionList] = useState<AttendanceCorrectionItem[]>([]);
-
   // Attendance Records State (Dynamic from real-time database)
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
 
@@ -140,10 +104,7 @@ export default function AdminAttendancePage() {
     // 1. Fetch live attendance data from API and sync KPI stats
     const fetchAttendanceApi = async () => {
       try {
-        const [res, appRes] = await Promise.all([
-          fetch(`/api/v1/attendance?t=${Date.now()}`, { cache: 'no-store' }),
-          fetch(`/api/v1/approvals?t=${Date.now()}`, { cache: 'no-store' }),
-        ]);
+        const res = await fetch(`/api/v1/attendance?t=${Date.now()}`, { cache: 'no-store' });
 
         if (res.ok) {
           const json = await res.json();
@@ -211,48 +172,6 @@ export default function AdminAttendancePage() {
               }));
               setRecords(apiRecords);
             }
-          }
-        }
-
-        if (appRes.ok) {
-          const appJson = await appRes.json();
-          if (Array.isArray(appJson.data)) {
-            const pendingOT = appJson.data
-              .filter((a: any) => a.type === 'lembur')
-              .map((a: any) => ({
-                id: a.id,
-                name: a.name,
-                department: a.department || 'Operasional',
-                hours: a.detail?.split('(')[0]?.trim() || '2.0 Jam',
-                timeRange: a.detail?.includes('(') ? a.detail.split('(')[1].replace(')', '').trim() : '17:00 - 19:00',
-                reason: a.reason || a.title || 'Lembur Operasional',
-                dateBadge: a.submittedDate || 'Hari Ini',
-              }));
-            setOvertimeList(pendingOT);
-
-            const pendingCorrections: AttendanceCorrectionItem[] = appJson.data
-              .filter((a: any) => a.type === 'presensi' && a.status === 'PENDING')
-              .map((a: any) => ({
-                id: a.id,
-                name: a.name,
-                nik: a.nik || 'NX-2021008',
-                role: a.role || 'Karyawan',
-                department: a.department || 'Teknologi Informasi',
-                date: a.correctionDate || a.date || '',
-                targetTime: a.correctionTargetTime || a.targetTime || '08:30',
-                type: a.correctionType || a.title?.replace('Koreksi Presensi: ', '') || 'Koreksi Presensi',
-                reason:
-                  a.correctionReason ||
-                  (a.detail?.includes('• Alasan: ')
-                    ? a.detail.split('• Alasan: ')[1].replace(/^"/, '').replace(/"$/, '')
-                    : a.detail || ''),
-                status: a.status || 'PENDING',
-                submittedAt: a.submittedDate || a.timestamp || '',
-                reviewedBy: a.reviewedBy,
-                reviewedAt: a.reviewedAt,
-                adminNotes: a.adminNotes,
-              }));
-            setCorrectionList(pendingCorrections);
           }
         }
       } catch {
@@ -437,10 +356,7 @@ export default function AdminAttendancePage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const [res, appRes] = await Promise.all([
-        fetch(`/api/v1/attendance?t=${Date.now()}`, { cache: 'no-store' }),
-        fetch(`/api/v1/approvals?t=${Date.now()}`, { cache: 'no-store' }),
-      ]);
+      const res = await fetch(`/api/v1/attendance?t=${Date.now()}`, { cache: 'no-store' });
 
       if (res.ok) {
         const json = await res.json();
@@ -509,81 +425,9 @@ export default function AdminAttendancePage() {
           }
         }
       }
-
-      if (appRes.ok) {
-        const appJson = await appRes.json();
-        if (Array.isArray(appJson.data)) {
-          const pendingOT = appJson.data
-            .filter((a: any) => a.type === 'lembur')
-            .map((a: any) => ({
-              id: a.id,
-              name: a.name,
-              department: a.department || 'Operasional',
-              hours: a.detail?.split('(')[0]?.trim() || '2.0 Jam',
-              timeRange: a.detail?.includes('(') ? a.detail.split('(')[1].replace(')', '').trim() : '17:00 - 19:00',
-              reason: a.reason || a.title || 'Lembur Operasional',
-              dateBadge: a.submittedDate || 'Hari Ini',
-            }));
-          setOvertimeList(pendingOT);
-
-          const pendingCorrections: AttendanceCorrectionItem[] = appJson.data
-            .filter((a: any) => a.type === 'presensi' && a.status === 'PENDING')
-            .map((a: any) => ({
-              id: a.id,
-              name: a.name,
-              nik: a.nik || 'NX-2021008',
-              role: a.role || 'Karyawan',
-              department: a.department || 'Teknologi Informasi',
-              date: a.correctionDate || a.date || '',
-              targetTime: a.correctionTargetTime || a.targetTime || '08:30',
-              type: a.correctionType || a.title?.replace('Koreksi Presensi: ', '') || 'Koreksi Presensi',
-              reason:
-                a.correctionReason ||
-                (a.detail?.includes('• Alasan: ')
-                  ? a.detail.split('• Alasan: ')[1].replace(/^"/, '').replace(/"$/, '')
-                  : a.detail || ''),
-              status: a.status || 'PENDING',
-              submittedAt: a.submittedDate || a.timestamp || '',
-              reviewedBy: a.reviewedBy,
-              reviewedAt: a.reviewedAt,
-              adminNotes: a.adminNotes,
-            }));
-          setCorrectionList(pendingCorrections);
-        }
-      }
     } catch {}
     setIsRefreshing(false);
     showToast('Sinkronisasi Biometrik & Geofencing berhasil diperbarui!');
-  };
-
-  const handleApproveOvertime = async (id: string, name: string) => {
-    setOvertimeList((prev) => prev.filter((item) => item.id !== id));
-    showToast(`Lembur ${name} berhasil disetujui & dicatat ke perhitungan payroll!`);
-    try {
-      await fetch('/api/v1/approvals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: 'APPROVED' }),
-      });
-      const ch = new BroadcastChannel('nexora_live_sync');
-      ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'APPROVED' });
-      ch.close();
-    } catch {}
-  };
-
-  const handleRejectOvertime = async (id: string, name: string) => {
-    setOvertimeList((prev) => prev.filter((item) => item.id !== id));
-    showToast(`Pengajuan lembur ${name} ditolak.`);
-    try {
-      await fetch('/api/v1/approvals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: 'REJECTED' }),
-      });
-      const ch = new BroadcastChannel('nexora_live_sync');
-      ch.postMessage({ type: 'APPROVAL_STATUS_CHANGED', id, status: 'REJECTED' });
-      ch.close();
-    } catch {}
   };
 
   const handleClearAllAttendanceLogs = async () => {
@@ -618,75 +462,6 @@ export default function AdminAttendancePage() {
     }
   };
 
-  const handleApproveCorrection = async (item: AttendanceCorrectionItem) => {
-    setCorrectionList((prev) => prev.filter((c) => c.id !== item.id));
-    showToast(
-      `✓ Koreksi presensi ${item.name} (${item.date} • ${item.targetTime} WIB) disetujui & jam kehadiran otomatis diperbarui!`
-    );
-
-    try {
-      await fetch('/api/v1/approvals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: item.id,
-          status: 'APPROVED',
-          reviewedBy: 'HR Operations SCBD',
-          adminNotes: 'Disetujui melalui verifikasi presensi harian HRD',
-        }),
-      });
-
-      const ch = new BroadcastChannel('nexora_live_sync');
-      ch.postMessage({
-        type: 'ATTENDANCE_CORRECTION_UPDATED',
-        id: item.id,
-        status: 'APPROVED',
-        nik: item.nik,
-        name: item.name,
-      });
-      ch.postMessage({
-        type: 'ATTENDANCE_RECORDED',
-      });
-      ch.close();
-
-      handleRefresh();
-    } catch (err) {
-      console.error('Failed to approve correction:', err);
-    }
-  };
-
-  const handleRejectCorrection = async (item: AttendanceCorrectionItem) => {
-    setCorrectionList((prev) => prev.filter((c) => c.id !== item.id));
-    showToast(`✕ Pengajuan koreksi presensi ${item.name} ditolak.`);
-
-    try {
-      await fetch('/api/v1/approvals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: item.id,
-          status: 'REJECTED',
-          reviewedBy: 'HR Operations SCBD',
-          adminNotes: 'Ditolak: data presensi tidak sesuai dengan log CCTV/Server SCBD',
-        }),
-      });
-
-      const ch = new BroadcastChannel('nexora_live_sync');
-      ch.postMessage({
-        type: 'ATTENDANCE_CORRECTION_UPDATED',
-        id: item.id,
-        status: 'REJECTED',
-        nik: item.nik,
-        name: item.name,
-      });
-      ch.close();
-
-      handleRefresh();
-    } catch (err) {
-      console.error('Failed to reject correction:', err);
-    }
-  };
-
   const toggleSelectAll = () => {
     if (selectedIds.length === records.length) {
       setSelectedIds([]);
@@ -708,12 +483,6 @@ export default function AdminAttendancePage() {
       r.nik.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.division.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesShift =
-      selectedShift === 'all' ||
-      (selectedShift === 'shift1' && r.shiftName.includes('08:00')) ||
-      (selectedShift === 'shift2' && r.shiftName.includes('Shift Siang')) ||
-      (selectedShift === 'flexible' && r.shiftName.includes('Fleksibel'));
-
     const matchesStatus =
       selectedStatus === 'ALL' ||
       r.status === selectedStatus ||
@@ -723,19 +492,8 @@ export default function AdminAttendancePage() {
       selectedDept === 'ALL' ||
       r.division.toLowerCase().includes(selectedDept.toLowerCase());
 
-    return matchesSearch && matchesShift && matchesStatus && matchesDept;
+    return matchesSearch && matchesStatus && matchesDept;
   });
-
-  // Dynamic breakdown for Metode Check-In (100% Face ID Biometrik)
-  const presentRecords = records.filter(
-    (r) => r.status && r.status !== 'BELUM_PRESENSI'
-  );
-  const totalPresentCount = presentRecords.length;
-  const faceIdCount = totalPresentCount;
-  const faceIdPercent = totalPresentCount > 0 ? 100 : 0;
-
-  const circumference = 251.2;
-  const faceIdDash = (circumference * faceIdPercent) / 100;
 
   return (
     <AdminLayoutSkeleton
@@ -1077,81 +835,29 @@ export default function AdminAttendancePage() {
             </div>
           </div>
 
-          {/* Sub-bar: Shift Pills + Sync Status */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-              <span className="text-xs font-semibold text-slate-500 mr-1 flex-shrink-0">
-                Shift:
-              </span>
-              <button
-                onClick={() => setSelectedShift('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedShift === 'all'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Semua Shift
-              </button>
-              <button
-                onClick={() => setSelectedShift('shift1')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedShift === 'shift1'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Shift 1 (08:00 - 17:00)
-              </button>
-              <button
-                onClick={() => setSelectedShift('shift2')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedShift === 'shift2'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Shift Siang (13:00 - 21:00)
-              </button>
-              <button
-                onClick={() => setSelectedShift('flexible')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                  selectedShift === 'flexible'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Fleksibel HQ
-              </button>
+          {/* Sub-bar: Sync Status & Refresh Button */}
+          <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+              <span className="w-2 h-2 rounded-full bg-blue-600" />
+              <span>Sinkron Biometrik Otomatis</span>
             </div>
 
-            {/* Sync Status & Refresh Button */}
-            <div className="flex items-center gap-4 text-xs">
-              <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                <span>Sinkron Biometrik Otomatis</span>
-              </div>
-              <button
-                onClick={handleRefresh}
-                className="flex items-center gap-1.5 font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                <RotateCw
-                  className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
-                />
-                <span>Refresh Data</span>
-              </button>
-            </div>
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              <RotateCw
+                className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+              />
+              <span>Refresh Data</span>
+            </button>
           </div>
         </div>
 
         {/* =========================================================================
-            4. LOWER 2-COLUMN SECTION: (Table Log on Left, Widgets on Right)
+            4. LOG PRESENSI HARIAN REAL-TIME (Tabel Full-Width)
         ========================================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* -----------------------------------------------------------------------
-              LEFT COLUMN: Log Presensi Harian Real-Time (8 cols)
-          ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200/70 shadow-sm overflow-hidden flex flex-col justify-between">
+        <div className="bg-white rounded-3xl border border-slate-200/70 shadow-sm overflow-hidden flex flex-col justify-between">
             <div>
               {/* Table Header Row */}
               <div className="p-5 border-b border-slate-100 flex items-center justify-between">
@@ -1440,282 +1146,7 @@ export default function AdminAttendancePage() {
               </div>
             </div>
           </div>
-
-          {/* -----------------------------------------------------------------------
-              RIGHT COLUMN: Verifikasi Lembur & Metode Check-In (4 cols)
-          ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-4 space-y-5">
-            {/* Card 0: Verifikasi Koreksi Presensi Karyawan */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-                    <Edit3 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Verifikasi Koreksi Presensi
-                    </h3>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                  {correctionList.length} Pengajuan
-                </span>
-              </div>
-
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Pengajuan koreksi presensi mandiri (lupa tap-out, kendala jaringan/biometrik) yang menunggu verifikasi HR.
-              </p>
-
-              <div className="space-y-3.5">
-                {correctionList.map((cor) => (
-                  <div
-                    key={cor.id}
-                    className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80 space-y-2.5 hover:border-amber-300 transition-all"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
-                          <span>{cor.name}</span>
-                          <span className="text-[10px] font-mono text-slate-400 font-normal">({cor.nik})</span>
-                        </h4>
-                        <p className="text-[11px] text-slate-500 font-medium">
-                          {cor.department}
-                        </p>
-                      </div>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 flex-shrink-0">
-                        {cor.type}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 bg-white/90 px-3 py-1.5 rounded-xl border border-amber-200/60">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Tgl: {cor.date}</span>
-                      <span className="text-slate-300">•</span>
-                      <Clock className="w-3.5 h-3.5 text-blue-600" />
-                      <span className="text-blue-700 font-bold">Target: {cor.targetTime} WIB</span>
-                    </div>
-
-                    <p className="text-[11px] text-slate-700 italic bg-white p-2.5 rounded-xl border border-slate-200/60">
-                      &ldquo;{cor.reason}&rdquo;
-                    </p>
-
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        onClick={() => handleRejectCorrection(cor)}
-                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Tolak
-                      </button>
-                      <button
-                        onClick={() => handleApproveCorrection(cor)}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all transform active:scale-95 inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Setujui &amp; Perbarui Jam</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {correctionList.length === 0 && (
-                  <div className="text-center py-6 text-slate-400 text-xs space-y-1">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-                    <p className="font-semibold text-slate-700">
-                      Semua Koreksi Selesai Diverifikasi
-                    </p>
-                    <p className="text-[11px]">Tidak ada permohonan koreksi presensi tertunda.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Card 1: Verifikasi Lembur */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Verifikasi Lembur
-                    </h3>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  {overtimeList.length} Permohonan
-                </span>
-              </div>
-
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Surat Perintah Lembur (SPL) yang diajukan oleh supervisor divisi menunggu otorisasi HRD.
-              </p>
-
-              <div className="space-y-3.5">
-                {overtimeList.map((ot) => (
-                  <div
-                    key={ot.id}
-                    className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/60 space-y-2.5 hover:border-blue-200 transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-900 truncate">
-                          {ot.name}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 font-medium">
-                          {ot.department} • <strong className="text-blue-700">{ot.hours}</strong> ({ot.timeRange})
-                        </p>
-                      </div>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 flex-shrink-0">
-                        {ot.dateBadge}
-                      </span>
-                    </div>
-
-                    <p className="text-[11px] text-slate-600 italic bg-white p-2.5 rounded-xl border border-slate-200/50">
-                      "{ot.reason}"
-                    </p>
-
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        onClick={() => handleRejectOvertime(ot.id, ot.name)}
-                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-colors"
-                      >
-                        Tolak
-                      </button>
-                      <button
-                        onClick={() => handleApproveOvertime(ot.id, ot.name)}
-                        className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all transform active:scale-95"
-                      >
-                        Setujui Segera
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {overtimeList.length === 0 && (
-                  <div className="text-center py-6 text-slate-400 text-xs space-y-1">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-                    <p className="font-semibold text-slate-700">
-                      Semua Lembur Sudah Disetujui
-                    </p>
-                    <p className="text-[11px]">Tidak ada permohonan tertunda.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 text-center">
-                <Link
-                  href="/admin/payroll"
-                  className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
-                >
-                  <span>Buka Semua Riwayat Lembur</span>
-                  <span>&rarr;</span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Card 2: Metode Check-In (Face ID Biometrik Donut Visual) */}
-            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                    <Camera className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Metode Check-In
-                    </h3>
-                    <p className="text-[11px] text-slate-400">Verifikasi Face ID Biometrik</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleRefresh}
-                  className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
-                  title="Refresh Breakdown"
-                >
-                  <RotateCw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Circular Visual & Center Counter */}
-              <div className="flex flex-col items-center py-2">
-                <div className="relative w-36 h-36 flex items-center justify-center">
-                  {/* SVG Donut Visual */}
-                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="transparent"
-                      stroke="#F1F5F9"
-                      strokeWidth="12"
-                    />
-                    {totalPresentCount > 0 && (
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="transparent"
-                        stroke="#2563EB"
-                        strokeWidth="12"
-                        strokeDasharray="251.2"
-                        strokeDashoffset={251.2 - faceIdDash}
-                        strokeLinecap="round"
-                        className="transition-all duration-1000 ease-out"
-                      />
-                    )}
-                  </svg>
-                  <div className="absolute flex flex-col items-center text-center">
-                    <span className="text-2xl font-bold text-slate-900">
-                      {totalPresentCount.toLocaleString('id-ID')}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">
-                      Total Hadir
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Legend Breakdown - Face ID Only */}
-              <div className="space-y-2.5 text-xs">
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-blue-50/70 border border-blue-100/80">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                      <Camera className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-800 text-xs block">
-                        Face ID (Biometrik Wajah)
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-medium">
-                        Liveness Scan & AI Recognition
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-mono font-bold text-blue-700 text-xs block">
-                      {faceIdCount} ({faceIdPercent}%)
-                    </span>
-                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center justify-end gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500 inline" />
-                      {totalPresentCount > 0 ? 'Terverifikasi' : 'Siap'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                    Metode Tunggal Presensi
-                  </span>
-                  <span className="font-bold text-slate-700">100% Wajib Face ID</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
 
       {/* =========================================================================
           MODAL 1: SHIFT & JAM KERJA CONFIGURATION

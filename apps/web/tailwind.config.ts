@@ -34,6 +34,15 @@ const config: Config = {
         subtle: '0 2px 10px rgba(15, 23, 42, 0.04)',
         elevated: '0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04)',
       },
+      transitionTimingFunction: {
+        'spring': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        'smooth': 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+        'soft': 'cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      animation: {
+        'smooth-enter': 'smoothPageEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'modal-spring': 'modalSmoothIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+      },
     },
   },
   plugins: [],

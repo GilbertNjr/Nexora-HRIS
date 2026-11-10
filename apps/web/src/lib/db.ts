@@ -197,7 +197,7 @@ function ensureStorage(): void {
 
 let _cachedEmployees: EmployeeRecord[] | null = null;
 let _lastEmployeesFetchTime = 0;
-const EMPLOYEES_CACHE_TTL_MS = 3500; // 3.5s micro-cache prevents redundant DB hits during parallel page loads
+const EMPLOYEES_CACHE_TTL_MS = 60000; // 60s in-memory cache for fast 0ms loads, invalidated on write
 
 export function invalidateEmployeesCache(): void {
   _cachedEmployees = null;
