@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
+import { downloadPayslipPDF } from '@/utils/generatePayslipPDF';
 
 interface PayrollPeriodData {
   periodKey: string;
@@ -393,6 +394,25 @@ export default function EssPayrollPage() {
     if (typeof window !== 'undefined') {
       window.print();
     }
+  };
+
+  const handleDownloadPayslipPDF = () => {
+    downloadPayslipPDF({
+      employeeName: currentUser.fullName || 'Rian Pratama, S.Kom',
+      employeeNumber: currentUser.employeeNumber || 'NX-2021008',
+      designation: currentUser.designation || 'Lead Backend Architect',
+      department: currentUser.department || 'Technology',
+      periodLabel: currentData.periodLabel,
+      takeHomePay: currentData.takeHomePay,
+      grossSalary: currentData.grossSalary,
+      totalDeductions: currentData.totalDeductions,
+      transferBank: currentData.transferBank,
+      accountNumberMasked: currentData.accountNumberMasked,
+      transferDate: currentData.transferDate,
+      earnings: currentData.earnings || [],
+      deductions: currentData.deductions || [],
+    });
+    showToast('✓ Berkas PDF Slip Gaji resmi berhasil diunduh ke perangkat Anda.');
   };
 
   return (
@@ -1045,10 +1065,10 @@ export default function EssPayrollPage() {
               <button
                 type="button"
                 onClick={() => {
+                  handleDownloadPayslipPDF();
                   setIsPdfModalOpen(false);
-                  showToast('✓ Berkas PDF Slip Gaji resmi berhasil diunduh ke perangkat Anda.');
                 }}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Unduh Berkas</span>
