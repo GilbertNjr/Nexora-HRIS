@@ -1174,7 +1174,7 @@ export default function EmployeeDashboardOverhaulPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* LEFT COLUMN (8 COLS) */}
             <div className="lg:col-span-8 space-y-6">
-              {/* CARD 1: PENGUMUMAN HRD - Clean Premium & Dynamic Executive Bulletin */}
+              {/* CARD 1: PENGUMUMAN HRD - Clean Solid Enterprise UI without Gradients */}
               {(() => {
                 const currentAnnouncement =
                   announcements[activeAnnouncementIdx] || announcements[0];
@@ -1183,83 +1183,90 @@ export default function EmployeeDashboardOverhaulPage() {
                   <div
                     onMouseEnter={() => setIsCarouselPaused(true)}
                     onMouseLeave={() => setIsCarouselPaused(false)}
-                    className={`group relative rounded-3xl p-6 sm:p-7 text-white shadow-xl transition-all duration-500 overflow-hidden ${
+                    className={`group relative rounded-3xl p-6 sm:p-7 transition-all duration-300 overflow-hidden ${
                       isAnnouncementGlowing
-                        ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-900 shadow-[0_0_35px_rgba(251,191,36,0.5)] scale-[1.01]'
-                        : ''
+                        ? 'ring-2 ring-amber-400 ring-offset-2 shadow-lg'
+                        : 'shadow-2xs hover:shadow-sm'
                     } ${
                       isUrgent
-                        ? 'bg-gradient-to-br from-slate-950 via-rose-950/80 to-slate-900 border border-rose-800/50 shadow-rose-950/20'
-                        : 'bg-gradient-to-br from-[#0F172A] via-[#111C38] to-[#0A1128] border border-slate-700/60 shadow-slate-950/20'
+                        ? 'bg-rose-50/40 border border-rose-200 text-slate-900'
+                        : 'bg-white border border-slate-200/90 text-slate-900'
                     }`}
                   >
-                    {/* Top ambient progress bar */}
+                    {/* Top Hairline Progress Bar (Solid Color, Smooth Width Transition) */}
                     {announcements.length > 1 && (
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-white/5 z-20 overflow-hidden">
+                      <div className="absolute top-0 left-0 right-0 h-[3px] bg-slate-100 z-20 overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-blue-500 via-indigo-400 to-cyan-300 transition-all duration-75"
+                          className={`h-full transition-[width] duration-100 ease-linear ${
+                            isUrgent ? 'bg-rose-600' : 'bg-blue-600'
+                          }`}
                           style={{ width: `${carouselProgress}%` }}
                         />
                       </div>
                     )}
 
-                    {/* Subtle luxury ambient glows */}
-                    <div className="absolute -right-12 -top-12 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-                    <div className="absolute -left-12 -bottom-12 w-60 h-60 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-                    <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.04] pointer-events-none" />
-
-                    <div className="relative z-10 flex flex-col justify-between gap-5 min-h-[160px]">
-                      {/* Top Row: Category badge, Doc number, Live HR Sync, and Direct Slide Switcher */}
+                    <div className="relative z-10 flex flex-col justify-between gap-5">
+                      {/* Top Row: Category badge, Doc number, Live HR Sync, and Slide Indicator */}
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="p-1.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-300 inline-flex items-center justify-center shadow-xs">
-                            <Megaphone className="w-3.5 h-3.5" />
+                          <span
+                            className={`w-8 h-8 rounded-xl inline-flex items-center justify-center flex-shrink-0 border ${
+                              isUrgent
+                                ? 'bg-rose-50 border-rose-200 text-rose-600'
+                                : 'bg-blue-50 border-blue-100 text-blue-600'
+                            }`}
+                          >
+                            <Megaphone className="w-4 h-4" />
                           </span>
 
-                          <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${
-                            isUrgent
-                              ? 'bg-rose-500/20 text-rose-200 border-rose-400/30'
-                              : 'bg-blue-500/15 text-blue-200 border-blue-400/25'
-                          }`}>
+                          <span
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
+                              isUrgent
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : 'bg-blue-50 text-blue-700 border-blue-200/80'
+                            }`}
+                          >
                             {currentAnnouncement?.badge || 'PENGUMUMAN HRD'}
                           </span>
 
-                          <span className="text-[11px] font-mono text-slate-300 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
+                          <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/70">
                             {currentAnnouncement?.docNumber || 'No. 018/HR-NOTIF/X/2026'}
                           </span>
 
-                          {/* Live SSE / Broadcast Indicator */}
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          {/* Live HR Sync Indicator */}
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-semibold">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                            </span>
                             <span>Live HR Sync</span>
                           </span>
 
                           {isAnnouncementGlowing && (
-                            <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase tracking-wider animate-bounce shadow-md shadow-amber-400/30">
-                              ✨ Pengumuman Baru
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                              Pengumuman Baru
                             </span>
                           )}
                         </div>
 
                         {/* Interactive Slide Switcher Pills (Top-Right) */}
                         {announcements.length > 1 && (
-                          <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-2.5 py-1 backdrop-blur-md">
+                          <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200/80 rounded-full px-3 py-1.5 flex-shrink-0">
                             {announcements.map((item, idx) => (
                               <button
                                 key={item.id || idx}
                                 type="button"
                                 onClick={() => handleSelectAnnouncement(idx)}
                                 title={`Beralih ke: ${item.title}`}
-                                className={`transition-all duration-300 rounded-full ${
+                                className={`transition-all duration-300 rounded-full cursor-pointer ${
                                   idx === activeAnnouncementIdx
-                                    ? 'w-6 h-2 bg-gradient-to-r from-blue-400 to-indigo-300 shadow-xs'
-                                    : 'w-2 h-2 bg-white/20 hover:bg-white/50'
+                                    ? `w-5 h-1.5 ${isUrgent ? 'bg-rose-600' : 'bg-blue-600'}`
+                                    : 'w-1.5 h-1.5 bg-slate-300 hover:bg-slate-400'
                                 }`}
                               />
                             ))}
                             {isCarouselPaused && (
-                              <span className="text-[9px] font-semibold text-slate-400 pl-1 uppercase tracking-wider">
+                              <span className="text-[9px] font-semibold text-slate-500 pl-1.5 ml-0.5 border-l border-slate-200 uppercase tracking-wider">
                                 Jeda
                               </span>
                             )}
@@ -1267,49 +1274,52 @@ export default function EmployeeDashboardOverhaulPage() {
                         )}
                       </div>
 
-                      {/* Middle: Title & Summary */}
-                      <div className="space-y-1.5 max-w-3xl">
-                        <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white leading-snug">
+                      {/* Middle: Title & Summary with Smooth Fade Transition */}
+                      <div
+                        key={currentAnnouncement?.id || activeAnnouncementIdx}
+                        className="space-y-1.5 max-w-3xl animate-in fade-in duration-300"
+                      >
+                        <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 leading-snug">
                           {currentAnnouncement?.title || 'Ketentuan Core Hours & Fleksibilitas Hybrid Q4 2026'}
                         </h3>
 
-                        <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed font-normal">
+                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
                           {currentAnnouncement?.summary ||
                             'Penyesuaian core hours 08:30 - 16:30 WIB dengan integrasi otomatis Google Calendar dan kepatuhan kuota minimal WFO 60% pekanan.'}
                         </p>
                       </div>
 
-                      {/* Bottom Row: Metadata, Pagination Controls, and Luxury Action Button */}
-                      <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                      {/* Bottom Row: Metadata, Crisp Inline Pagination Controls, and Solid Action Button */}
+                      <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                           <span>
-                            Diterbitkan: <strong className="text-slate-300 font-medium">{currentAnnouncement?.publishedAt}</strong>
+                            Diterbitkan: <strong className="text-slate-700 font-semibold">{currentAnnouncement?.publishedAt}</strong>
                           </span>
-                          <span className="text-slate-600">•</span>
+                          <span className="hidden sm:inline text-slate-300">•</span>
                           <span>
-                            Otorisasi: <strong className="text-slate-300 font-medium">{currentAnnouncement?.author}</strong>
+                            Otorisasi: <strong className="text-slate-700 font-semibold">{currentAnnouncement?.author}</strong>
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between sm:justify-end gap-3">
-                          {/* Navigation Controls: Arrows and Indicator */}
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 flex-shrink-0">
+                          {/* Navigation Controls: Arrows and Non-Wrapping Counter */}
                           {announcements.length > 1 && (
-                            <div className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl p-1 backdrop-blur-md">
+                            <div className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1 flex-shrink-0">
                               <button
                                 type="button"
                                 onClick={handlePrevAnnouncement}
-                                className="p-1 hover:bg-white/15 rounded-lg text-slate-300 hover:text-white transition-colors"
+                                className="p-1.5 hover:bg-white hover:shadow-2xs rounded-lg text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
                                 title="Pengumuman sebelumnya"
                               >
                                 <ChevronLeft className="w-4 h-4" />
                               </button>
-                              <span className="text-[11px] font-mono text-slate-300 px-1 font-medium">
+                              <span className="text-xs font-mono font-semibold text-slate-600 px-2 whitespace-nowrap tabular-nums">
                                 {activeAnnouncementIdx + 1} / {announcements.length}
                               </span>
                               <button
                                 type="button"
                                 onClick={handleNextAnnouncement}
-                                className="p-1 hover:bg-white/15 rounded-lg text-slate-300 hover:text-white transition-colors"
+                                className="p-1.5 hover:bg-white hover:shadow-2xs rounded-lg text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
                                 title="Pengumuman berikutnya"
                               >
                                 <ChevronRight className="w-4 h-4" />
@@ -1317,11 +1327,15 @@ export default function EmployeeDashboardOverhaulPage() {
                             </div>
                           )}
 
-                          {/* Executive CTA Button */}
+                          {/* Clean Solid CTA Button */}
                           <button
                             type="button"
                             onClick={() => setIsAnnouncementModalOpen(true)}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-600/25 border border-blue-400/30 transition-all hover:scale-[1.02] active:scale-95 flex-shrink-0 group"
+                            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-xs shadow-xs transition-all active:scale-[0.98] flex-shrink-0 whitespace-nowrap cursor-pointer group ${
+                              isUrgent
+                                ? 'bg-rose-600 hover:bg-rose-700'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
                           >
                             <span>{currentAnnouncement?.buttonText || 'Lihat SE Direksi'}</span>
                             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -1751,7 +1765,7 @@ export default function EmployeeDashboardOverhaulPage() {
               {/* Official Document Header */}
               <div className="flex items-start justify-between pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs flex-shrink-0">
                     <Megaphone className="w-5 h-5" />
                   </div>
                   <div>
