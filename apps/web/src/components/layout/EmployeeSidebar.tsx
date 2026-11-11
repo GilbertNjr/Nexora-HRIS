@@ -18,10 +18,17 @@ import {
   Menu,
   Megaphone,
   LogOut,
+  BookOpen,
+  Download,
+  Send,
+  CheckCircle2,
+  Phone,
+  Mail,
 } from 'lucide-react';
 import { EmployeeAnnouncementBroadcastListener } from '@/components/notifications/EmployeeAnnouncementBroadcastListener';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { subscribeSharedSSE } from '@/lib/sseClient';
+import { downloadSopPDF } from '@/utils/generateSopPDF';
 
 export type EmployeeActiveMenu =
   | 'dashboard'
@@ -58,6 +65,12 @@ export function EmployeeSidebar({
   const [companyName, setCompanyName] = useState<string>('Nexora Group & HR Solutions');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showSopModal, setShowSopModal] = useState(false);
+  const [showHelpdeskModal, setShowHelpdeskModal] = useState(false);
+  const [helpdeskCategory, setHelpdeskCategory] = useState('Kendala Presensi / Kehadiran');
+  const [helpdeskMessage, setHelpdeskMessage] = useState('');
+  const [isSendingTicket, setIsSendingTicket] = useState(false);
+  const [sentTicketCode, setSentTicketCode] = useState<string | null>(null);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -176,9 +189,64 @@ export function EmployeeSidebar({
     };
   }, []);
 
+  const handleOpenSop = () => {
+    if (onOpenPkbModal) {
+      onOpenPkbModal();
+    } else {
+      setShowSopModal(true);
+    }
+  };
+
   const handleHelpdeskClick = () => {
+    setSentTicketCode(null);
+    setHelpdeskMessage('');
+    setHelpdeskCategory(
+      activeMenu === 'attendance'
+        ? 'Kendala Liveness Camera / Geofence'
+        : activeMenu === 'payroll'
+        ? 'Pertanyaan Slip Gaji & PPh 21'
+        : 'Kendala Data Kehadiran atau Klaim'
+    );
+    setShowHelpdeskModal(true);
+  };
+
+  const handleSubmitTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!helpdeskMessage.trim()) return;
+    setIsSendingTicket(true);
+
+    const ticketCode = `TKT-HR-${Date.now().toString().slice(-6)}`;
+    const senderName = currentUser.fullName || 'Karyawan Nexora';
+    const senderNik = currentUser.employeeNumber || 'NX-ESS';
+
+    try {
+      await fetch('/api/v1/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Tiket Helpdesk Baru (${ticketCode}): ${helpdeskCategory}`,
+          message: `${senderName} (${senderNik}) mengirim kendala: ${helpdeskMessage.trim()}`,
+          category: 'system',
+          type: 'info',
+          actionUrl: '/admin',
+          actionLabel: 'Tinjau Tiket',
+          actor: {
+            name: senderName,
+            initials: senderName.slice(0, 2).toUpperCase(),
+          },
+          metadata: {
+            ticketCode,
+            nik: senderNik,
+            category: helpdeskCategory,
+          },
+        }),
+      });
+    } catch {}
+
+    setIsSendingTicket(false);
+    setSentTicketCode(ticketCode);
     if (onShowToast) {
-      onShowToast('Kontak HR Helpdesk: Ext. 402 / helpdesk-hr@nexora.co.id');
+      onShowToast(`✓ Tiket ${ticketCode} berhasil dikirim ke tim HR Helpdesk!`);
     }
   };
 
@@ -531,57 +599,44 @@ export function EmployeeSidebar({
               : 'Ada kendala data kehadiran atau klaim?'}
           </p>
 
-          <div className="pt-1 space-y-1 font-semibold text-[11px]">
+          <div className="pt-1 space-y-1.5 font-semibold text-[11px]">
             {activeMenu === 'attendance' ? (
               <>
-                <a
-                  href="#sop"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (onOpenPkbModal) onOpenPkbModal();
-                    else if (onShowToast) onShowToast('SOP Presensi Biometrik: Pastikan pencahayaan cukup dan izinkan akses kamera.');
-                  }}
-                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                <button
+                  type="button"
+                  onClick={handleOpenSop}
+                  className="w-full text-left text-blue-600 hover:text-blue-800 flex items-center gap-1 group cursor-pointer transition-colors"
                 >
                   <span>SOP Presensi Biometrik</span>
                   <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                </a>
-                <a
-                  href="#chat-pic"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (onShowToast) onShowToast('Menghubungkan ke PIC Absensi HR: Diana S. (Ext. 405 / WA Business HR)');
-                  }}
-                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                </button>
+                <button
+                  type="button"
+                  onClick={handleHelpdeskClick}
+                  className="w-full text-left text-blue-600 hover:text-blue-800 flex items-center gap-1 group cursor-pointer transition-colors"
                 >
                   <span>Chat PIC Absensi (Diana S.)</span>
                   <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                </a>
+                </button>
               </>
             ) : (
               <>
-                <a
-                  href="#sop"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (onOpenPkbModal) onOpenPkbModal();
-                  }}
-                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                <button
+                  type="button"
+                  onClick={handleOpenSop}
+                  className="w-full text-left text-blue-600 hover:text-blue-800 flex items-center gap-1 group cursor-pointer transition-colors"
                 >
                   <span>SOP Kepegawaian</span>
                   <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                </a>
-                <a
-                  href="#tiket"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleHelpdeskClick();
-                  }}
-                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
+                </button>
+                <button
+                  type="button"
+                  onClick={handleHelpdeskClick}
+                  className="w-full text-left text-blue-600 hover:text-blue-800 flex items-center gap-1 group cursor-pointer transition-colors"
                 >
                   <span>Tiket Helpdesk HR</span>
                   <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                </a>
+                </button>
               </>
             )}
           </div>
@@ -651,6 +706,217 @@ export function EmployeeSidebar({
               <span>{isLoggingOut ? 'Memproses...' : 'Ya, Keluar'}</span>
             </button>
           </div>
+        </div>
+      </div>
+    )}
+
+    {/* Modal SOP Kepegawaian & PKB Resmi (Tersedia di seluruh halaman Karyawan) */}
+    {showSopModal && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 p-6 space-y-4 animate-in zoom-in-95 duration-150">
+          <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                  SOP Kepegawaian &amp; PKB Nexora 2024–2026
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Regulasi Resmi Presensi, Kerja Hybrid, Cuti &amp; Kompensasi
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSopModal(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="max-h-80 overflow-y-auto p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 space-y-3.5 leading-relaxed">
+            <div>
+              <p className="font-bold text-slate-900 mb-1">
+                1. Presensi Biometrik, Geofencing &amp; Core Hours
+              </p>
+              <p className="text-slate-600">
+                Core Hours berlaku pukul <strong>08:30 – 16:30 WIB</strong>. Presensi WFO wajib dilakukan di dalam radius geofence HQ SCBD dengan liveness kamera. Kuota koreksi lupa tap maksimal <strong>3x per bulan</strong>.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 mb-1">
+                2. Fleksibilitas Hybrid (WFO / WFH)
+              </p>
+              <p className="text-slate-600">
+                Karyawan menjaga kuota minimal kehadiran kantor (WFO) <strong>60% per pekan</strong> dan dapat mengatur preferensi WFH melalui kartu Jadwal Kerja Pekan Ini.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 mb-1">
+                3. Cuti Tahunan, Izin Sakit &amp; Cuti Khusus
+              </p>
+              <p className="text-slate-600">
+                Cuti tahunan adalah <strong>12 hari kerja/tahun</strong>. Pengajuan cuti berjalan berjenjang melalui persetujuan Atasan Langsung dan verifikasi HR Operations.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 mb-1">
+                4. Penggajian (PPh 21 TER) &amp; Klaim Asuransi
+              </p>
+              <p className="text-slate-600">
+                Payroll diproses setiap tanggal 25 menggunakan skema PP No. 58/2023. Slip gaji resmi dapat diunduh langsung dalam format PDF terverifikasi.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowSopModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+            >
+              Tutup
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                downloadSopPDF(currentUser.fullName || 'Karyawan Nexora', currentUser.employeeNumber || 'NX-ESS');
+                setShowSopModal(false);
+                if (onShowToast) {
+                  onShowToast('✓ Salinan Dokumen SOP & PKB (.pdf) berhasil diunduh!');
+                }
+              }}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Unduh Salinan PDF</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Modal Tiket Helpdesk HR & Kontak PIC Resmi */}
+    {showHelpdeskModal && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-6 space-y-4 animate-in zoom-in-95 duration-150">
+          <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                <Headphones className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                  Tiket Helpdesk &amp; Dukungan HR
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Layanan Bantuan Karyawan Nexora (ESS)
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowHelpdeskModal(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Direct Contact Info Bar */}
+          <div className="grid grid-cols-2 gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-[11px]">
+            <div className="flex items-center gap-2 text-slate-700">
+              <Phone className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+              <div>
+                <span className="text-[10px] text-slate-400 block">PIC HR / Absensi</span>
+                <strong className="font-semibold">Ext. 402 / 405</strong>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-slate-700">
+              <Mail className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 block">Email Resmi</span>
+                <strong className="font-semibold truncate block">helpdesk-hr@nexora.co.id</strong>
+              </div>
+            </div>
+          </div>
+
+          {sentTicketCode ? (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2.5">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <h4 className="text-sm font-bold text-emerald-900">Tiket Berhasil Dikirim!</h4>
+              <p className="text-xs text-emerald-800 leading-relaxed">
+                Laporan Anda telah diteruskan ke Admin HR Operations dengan nomor tiket{' '}
+                <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">
+                  {sentTicketCode}
+                </strong>
+                . Tim kami akan merespons maksimal 1×24 jam kerja.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowHelpdeskModal(false)}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs cursor-pointer transition-colors"
+              >
+                Selesai &amp; Tutup
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmitTicket} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Kategori Kendala
+                </label>
+                <select
+                  value={helpdeskCategory}
+                  onChange={(e) => setHelpdeskCategory(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                >
+                  <option value="Kendala Data Kehadiran atau Klaim">Kendala Data Kehadiran atau Klaim</option>
+                  <option value="Kendala Liveness Camera / Geofence">Kendala Liveness Camera / Geofence</option>
+                  <option value="Pertanyaan Slip Gaji & PPh 21">Pertanyaan Slip Gaji &amp; PPh 21</option>
+                  <option value="Klaim Asuransi & Medical Reimbursement">Klaim Asuransi &amp; Medical Reimbursement</option>
+                  <option value="Administrasi Cuti & Kontrak">Administrasi Cuti &amp; Kontrak</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Detail Kendala / Permohonan
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={helpdeskMessage}
+                  onChange={(e) => setHelpdeskMessage(e.target.value)}
+                  placeholder="Jelaskan kendala atau pertanyaan Anda secara singkat untuk tim HR..."
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none"
+                />
+              </div>
+
+              <div className="pt-1 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowHelpdeskModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingTicket}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60 transition-colors"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSendingTicket ? 'Mengirim...' : 'Kirim Tiket Bantuan'}</span>
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     )}
