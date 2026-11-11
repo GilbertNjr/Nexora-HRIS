@@ -190,6 +190,7 @@ export function EmployeeSidebar({
   }, []);
 
   const handleOpenSop = () => {
+    if (onCloseMobile) onCloseMobile();
     if (onOpenPkbModal) {
       onOpenPkbModal();
     } else {
@@ -198,6 +199,7 @@ export function EmployeeSidebar({
   };
 
   const handleHelpdeskClick = () => {
+    if (onCloseMobile) onCloseMobile();
     setSentTicketCode(null);
     setHelpdeskMessage('');
     setHelpdeskCategory(
@@ -543,11 +545,15 @@ export function EmployeeSidebar({
             type="button"
             onClick={handleHelpdeskClick}
             title={isCollapsed ? 'Bantuan & Kontak HR' : undefined}
-            className={`w-full flex items-center rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all text-left cursor-pointer ${
+            className={`w-full flex items-center rounded-xl text-xs transition-all text-left cursor-pointer ${
+              showHelpdeskModal
+                ? 'bg-blue-50 text-blue-700 font-bold'
+                : 'font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            } ${
               isCollapsed ? 'justify-start md:justify-center px-3.5 py-2.5 md:p-2.5 gap-3 md:gap-0' : 'px-3.5 py-2.5 gap-3'
             }`}
           >
-            <Headphones className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <Headphones className={`w-4 h-4 flex-shrink-0 ${showHelpdeskModal ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className={isCollapsed ? 'inline md:hidden' : 'inline'}>Bantuan &amp; Kontak HR</span>
           </button>
         </div>
