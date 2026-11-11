@@ -1252,7 +1252,7 @@ export default function EssLeaveOverhaulPage() {
 
                               {/* EXPANDABLE ACCORDION ROW: Alur Verifikasi Bertingkat 3-Tier & Catatan */}
                               {isExpanded && (
-                                <tr className="bg-gradient-to-r from-blue-50/40 via-slate-50/50 to-blue-50/20 border-b border-slate-200">
+                                <tr className="bg-blue-50/50 border-b border-slate-200">
                                   <td colSpan={7} className="p-4 sm:p-5">
                                     <div className="space-y-4">
                                       {/* Note Box */}

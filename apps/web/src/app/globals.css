@@ -61,10 +61,37 @@ a:active {
   transform: translateY(-1.5px);
 }
 
-/* Smooth Table Row Animations */
+/* Smooth Table Row Animations & Global Enterprise Table Theme (Admin & Karyawan) */
 tr {
   transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
     color 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+table thead tr,
+table thead th {
+  background-color: #E6F0FF !important;
+  color: #1E3A8A !important;
+  border-bottom: 1.5px solid #BFDBFE !important;
+}
+
+table thead th svg {
+  color: #2563EB;
+}
+
+table tbody > tr:not(:has(td[colspan])):nth-child(odd) {
+  background-color: #FFFFFF;
+}
+
+table tbody > tr:not(:has(td[colspan])):nth-child(even) {
+  background-color: #F8FAFF;
+}
+
+table tbody > tr:not(:has(td[colspan])):hover {
+  background-color: #EFF6FF !important;
+}
+
+table tbody > tr > td {
+  border-bottom: 1px solid #E2E8F0;
 }
 
 /* Ultra Smooth Page / Feature Entry Animation */
@@ -183,6 +210,33 @@ html.dark textarea {
   background-color: #1E293B !important;
   border-color: #334155 !important;
   color: #F8FAFC !important;
+}
+
+html.dark table thead tr,
+html.dark table thead th {
+  background-color: #1E293B !important;
+  color: #93C5FD !important;
+  border-bottom-color: #334155 !important;
+}
+
+html.dark table thead th svg {
+  color: #60A5FA;
+}
+
+html.dark table tbody > tr:not(:has(td[colspan])):nth-child(odd) {
+  background-color: #111827;
+}
+
+html.dark table tbody > tr:not(:has(td[colspan])):nth-child(even) {
+  background-color: #162032;
+}
+
+html.dark table tbody > tr:not(:has(td[colspan])):hover {
+  background-color: #1E3A5F !important;
+}
+
+html.dark table tbody > tr > td {
+  border-bottom-color: #1F2937;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
