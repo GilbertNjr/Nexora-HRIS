@@ -9,6 +9,7 @@ import { EmployeeSidebar } from '@/components/layout/EmployeeSidebar';
 import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
 import {
   User,
+  Users,
   ShieldCheck,
   CheckCircle2,
   Lock,
@@ -602,6 +603,27 @@ export default function EmployeeProfilePage() {
     }
   };
 
+  const handleCancelChanges = () => {
+    try {
+      const cached = localStorage.getItem('nexora_employee_profile');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setProfileData((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {}
+    showToast('Perubahan yang belum disimpan telah dibatalkan.');
+  };
+
+  const nowDate = new Date();
+  const formattedDayDate = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+  }).format(nowDate);
+  const formattedMonthYear = new Intl.DateTimeFormat('id-ID', {
+    month: 'long',
+    year: 'numeric',
+  }).format(nowDate);
+
   // Simulated SMS/WhatsApp Notification Test
   const handleTestNotification = () => {
     setIsTestingNotification(true);
@@ -676,8 +698,8 @@ export default function EmployeeProfilePage() {
             <div className="hidden lg:flex items-center gap-2 text-xs text-slate-600">
               <Calendar className="w-4 h-4 text-slate-400" />
               <div className="flex flex-col text-[11px] leading-tight text-left">
-                <span className="font-bold text-slate-800">Senin, 24</span>
-                <span className="text-slate-500 font-medium">Maret 2025</span>
+                <span className="font-bold text-slate-800 capitalize">{formattedDayDate}</span>
+                <span className="text-slate-500 font-medium capitalize">{formattedMonthYear}</span>
               </div>
             </div>
 
@@ -726,59 +748,39 @@ export default function EmployeeProfilePage() {
         </header>
 
         {/* MAIN PAGE CONTAINER */}
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto pb-36">
-          {/* 1. Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-            <Link href="/karyawan" className="flex items-center gap-1 hover:text-blue-600 transition-colors">
-              <Home className="w-3.5 h-3.5" />
-              <span>Portal ESS</span>
-            </Link>
-            <span>/</span>
-            <span>Akun &amp; Pengaturan</span>
-            <span>/</span>
-            <span className="text-slate-800 font-bold">Profil &amp; Pengaturan Akun Pribadi</span>
-          </div>
-
-          {/* 2. Top Title & Session Badges */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                Profil Karyawan &amp; Pengaturan Akun Mandiri
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
-                Kelola biodata resmi kepegawaian, verifikasi data legal &amp; perpajakan, preferensi keamanan
-                akun (2FA, kata sandi), serta riwayat log perangkat aktif terdaftar di sistem korporat Nexora HRIS.
-              </p>
+        <main className="p-4 sm:p-6 lg:p-8 space-y-5 flex-1 max-w-6xl w-full mx-auto pb-28">
+          {/* 1. Breadcrumb & Verification Pill */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              <Link href="/karyawan" className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                <Home className="w-3.5 h-3.5" />
+                <span>Portal ESS</span>
+              </Link>
+              <span>/</span>
+              <span>Akun &amp; Pengaturan</span>
+              <span>/</span>
+              <span className="text-slate-800 font-semibold">Profil Pribadi</span>
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
-              <div className="px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-medium text-slate-600 flex items-center gap-2">
-                <span className="flex items-center gap-1 text-slate-700 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Sesi Aktif: {profileData.employeeNumber || currentUser.employeeNumber || '-'}
-                </span>
-                <span className="text-slate-300">|</span>
-                <span className="text-blue-700 font-semibold">Terverifikasi Dukcapil &amp; HR Ops</span>
-              </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[11px] font-semibold text-emerald-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Terverifikasi Dukcapil &amp; HR</span>
             </div>
           </div>
 
-          {/* 3. HERO CARD (Matching Screenshot 1) */}
-          <div className="relative rounded-3xl bg-[#1E3A8A] text-white p-6 sm:p-7 shadow-xl shadow-blue-950/20 overflow-hidden">
-            {/* Top Right Security Badge */}
-            <div className="absolute top-4 right-4 sm:top-5 sm:right-6">
-              <span className="px-3 py-1 rounded-full bg-blue-900/80 border border-blue-400/30 text-[11px] font-bold text-blue-200 flex items-center gap-1.5 shadow-sm">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-300" />
-                <span>Level Keamanan: Enterprise Grade III</span>
-              </span>
-            </div>
+          {/* 2. Page Title */}
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+            Profil Karyawan &amp; Pengaturan Akun Mandiri
+          </h1>
 
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pt-4 lg:pt-0">
+          {/* 3. CLEAN LIGHT HERO PROFILE CARD (Matching New UI/UX Mockup) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
               {/* Left: Avatar + Details */}
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 text-center sm:text-left">
                 {/* Avatar with Online Dot & Upload Camera Overlay */}
                 <div className="relative group flex-shrink-0">
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-blue-900 border-2 border-white/40 shadow-lg relative flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-2xs relative flex items-center justify-center">
                     {(profileData.avatarUrl || currentUser.avatarUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -790,27 +792,25 @@ export default function EmployeeProfilePage() {
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 text-white font-extrabold text-2xl sm:text-3xl shadow-inner">
-                        {currentUser.initials || (profileData.fullName || currentUser.fullName || 'FT').slice(0, 2).toUpperCase()}
+                      <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white font-extrabold text-xl">
+                        {currentUser.initials || (profileData.fullName || currentUser.fullName || 'KR').slice(0, 2).toUpperCase()}
                       </div>
                     )}
                   </div>
 
                   {/* Green Online Status Dot */}
                   <div
-                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#1E3A8A] flex items-center justify-center shadow-sm"
+                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-xs"
                     title="Akun Aktif & Terverifikasi"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-white" />
-                  </div>
+                  />
 
                   {/* Photo Upload Trigger Overlay */}
                   <label
                     htmlFor="ess-avatar-input"
-                    className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white text-xs font-bold gap-1"
+                    className="absolute inset-0 rounded-2xl bg-slate-900/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white text-xs font-bold"
                     title="Ubah Foto Profil"
                   >
-                    <Camera className="w-5 h-5" />
+                    {isUploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
                   </label>
                   <input
                     ref={photoInputRef}
@@ -823,597 +823,344 @@ export default function EmployeeProfilePage() {
                 </div>
 
                 {/* Details */}
-                <div className="space-y-1.5 min-w-0">
+                <div className="space-y-1 min-w-0">
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                     <input
                       type="text"
                       value={profileData.fullName || currentUser.fullName || ''}
                       onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
-                      className="text-xl sm:text-2xl font-black tracking-tight text-white bg-transparent border-b border-transparent hover:border-white/40 focus:border-white focus:outline-none transition-colors"
+                      className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-600 focus:outline-none transition-colors w-auto max-w-full"
                       title="Klik untuk mengubah nama tampilan Anda"
                     />
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold flex items-center gap-1 shadow-2xs">
-                      <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                    <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/70 text-blue-700 text-[11px] font-semibold inline-flex items-center gap-1">
+                      <Check className="w-3 h-3 text-blue-600 stroke-[2.5]" />
                       {profileData.employmentType || 'Karyawan Tetap (PKWTT)'}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-center sm:justify-start">
-                    <span className="px-2 py-0.5 rounded-md bg-blue-900/60 border border-blue-400/30 text-[11px] font-bold text-blue-200">
-                      NIP: {profileData.employeeNumber || currentUser.employeeNumber || '-'}
-                    </span>
-                  </div>
-
-                  <p className="text-sm font-medium text-blue-100">
-                    {profileData.designation || currentUser.designation || 'Specialist'} / {profileData.division || (currentUser as any).division || 'Human Resource Department'}
+                  <p className="text-xs font-medium text-slate-500">
+                    NIP: {profileData.employeeNumber || currentUser.employeeNumber || '-'}
                   </p>
 
-                  {/* Meta Pills Line */}
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-1 text-xs text-blue-200/90 font-medium">
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-300" />
-                      Masa Kerja: <strong className="text-white font-bold">{profileData.tenure || 'Baru Bergabung'}</strong>
+                  <p className="text-xs sm:text-sm font-medium text-slate-700">
+                    {profileData.designation || currentUser.designation || 'Specialist'} / {profileData.division || (currentUser as any).division || 'Divisi Rekayasa & Arsitektur Cloud'}
+                  </p>
+
+                  {/* Meta Info Row */}
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 pt-1 text-xs text-slate-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      Masa Kerja: <strong className="text-slate-700 font-semibold">{profileData.tenure || 'Baru Bergabung'}</strong>
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-blue-300" />
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
                       {profileData.workLocation || 'Head Office Jakarta'}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-blue-300" />
-                      Atasan: <strong className="text-white font-bold">{profileData.manager || 'HR Operations Lead'}</strong>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      Atasan: <strong className="text-slate-700 font-semibold">{profileData.manager || 'HR Operations Lead'}</strong>
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Action Buttons on Banner (Hanya 1 tombol Unduh Biodata PDF sesuai permintaan user agar tidak ada 2 tombol simpan) */}
-              <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 flex-shrink-0 justify-center">
+              {/* Right Action Button */}
+              <div className="flex-shrink-0 flex justify-center sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setIsDownloadModalOpen(true)}
-                  className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-2xs flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  <Download className="w-4 h-4 text-slate-600" />
+                  <Download className="w-4 h-4 text-slate-500" />
                   <span>Unduh Biodata PDF</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* 4. Tab Bar (With Top Save Button Placed Beside Tabs) */}
-          <div className="bg-white border-b border-slate-200/90 rounded-2xl px-3 sm:px-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            {/* Tabs List */}
-            <div className="overflow-x-auto scrollbar-none flex items-center gap-2 flex-1">
-              <button
-                type="button"
-                onClick={() => setActiveTab('biodata')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'biodata'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <IdCard className="w-4 h-4" />
-                <span>Biodata &amp; Informasi Personal</span>
-              </button>
+          {/* 4. Clean Border-Bottom Tab Bar */}
+          <div className="border-b border-slate-200 flex items-center gap-1 sm:gap-4 overflow-x-auto scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setActiveTab('biodata')}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-3 text-xs whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                activeTab === 'biodata'
+                  ? 'border-blue-600 text-blue-600 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 font-medium'
+              }`}
+            >
+              <IdCard className="w-4 h-4" />
+              <span>Biodata &amp; Identitas</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('kepegawaian')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'kepegawaian'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Briefcase className="w-4 h-4" />
-                <span>Kepegawaian &amp; Jenjang Karir</span>
-              </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('kepegawaian')}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-3 text-xs whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                activeTab === 'kepegawaian'
+                  ? 'border-blue-600 text-blue-600 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 font-medium'
+              }`}
+            >
+              <Briefcase className="w-4 h-4" />
+              <span>Kepegawaian &amp; Karir</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('pajak_bank')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'pajak_bank'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>Data Pajak, Bank &amp; BPJS</span>
-              </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('pajak_bank')}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-3 text-xs whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                activeTab === 'pajak_bank'
+                  ? 'border-blue-600 text-blue-600 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 font-medium'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Pajak, Bank &amp; BPJS</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('keamanan')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'keamanan'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Keamanan Akun &amp; Sesi</span>
-              </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('keamanan')}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-3 text-xs whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                activeTab === 'keamanan'
+                  ? 'border-blue-600 text-blue-600 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 font-medium'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Keamanan &amp; Perangkat</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('preferensi')}
-                className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'preferensi'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Sliders className="w-4 h-4" />
-                <span>Preferensi &amp; Tampilan</span>
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-blue-100 text-blue-700 font-bold">
-                  Sinkron
-                </span>
-              </button>
-            </div>
-
-            {/* Simpan Perubahan Button - Placed at Top Beside Tabs */}
-            <div className="flex-shrink-0 py-2 sm:py-0 self-end sm:self-auto">
-              <button
-                type="button"
-                onClick={handleMasterSave}
-                disabled={isSaving}
-                className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
-                title="Simpan seluruh perubahan profil dan biodata ke database"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                ) : (
-                  <Save className="w-4 h-4 text-white" />
-                )}
-                <span className="whitespace-nowrap">{isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('preferensi')}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-3 text-xs whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                activeTab === 'preferensi'
+                  ? 'border-blue-600 text-blue-600 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 font-medium'
+              }`}
+            >
+              <Sliders className="w-4 h-4" />
+              <span>Preferensi</span>
+            </button>
           </div>
 
-          {/* 5. TAB 1 CONTENT: BIODATA & INFORMASI PERSONAL */}
+          {/* 5. TAB 1 CONTENT: BIODATA & IDENTITAS (Clean Single-Card Layout matching Mockup) */}
           {activeTab === 'biodata' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* LEFT 2 COLUMNS: DUKCAPIL NOTICE + DATA IDENTITAS KEPENDUDUKAN & KONTAK */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Notice Alert Box */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 border border-blue-200/80 flex items-start gap-3.5 shadow-2xs">
-                  <div className="p-2 rounded-xl bg-blue-100/80 text-blue-700 flex-shrink-0 mt-0.5">
-                    <ShieldCheck className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div className="space-y-1 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-xs font-bold text-slate-900">
-                        Data Induk Kependudukan Terverifikasi Resmi
-                      </h3>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                        Tersinkronisasi Dukcapil
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Data NIK KTP, NPWP 16-digit, dan Kepesertaan BPJS Anda telah terikat dengan arsip People
-                      Operations PT Nexora Global Digital. Setiap pengajuan perubahan data dapat disimpan
-                      langsung menggunakan tombol Simpan Perubahan di bawah form.
-                    </p>
-                  </div>
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs space-y-8">
+              {/* Section 1: Identitas Kependudukan (e-KTP) */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                    Identitas Kependudukan (e-KTP)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Data resmi yang telah diverifikasi dan disinkronkan dengan Dukcapil.
+                  </p>
                 </div>
 
-                {/* Data Identitas Kependudukan & Kontak */}
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-5">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-blue-50 text-blue-600 flex-shrink-0">
-                        <IdCard className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">
-                          Data Identitas Kependudukan &amp; Kontak
-                        </h3>
-                        <p className="text-[11px] text-slate-400">
-                          Identitas primer sesuai Kartu Tanda Penduduk Elektronik (e-KTP)
-                        </p>
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold">
-                      Format Aktif
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* NIK */}
+                  <div className="bg-slate-100/80 border border-slate-200/80 rounded-xl px-4 py-3 space-y-1">
+                    <span className="block text-[11px] font-medium text-slate-500">
+                      Nomor Induk Kependudukan (NIK)
                     </span>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-800 font-mono">
+                      {profileData.nik}
+                    </p>
                   </div>
 
-                  {/* 7 Verified Info Boxes with Direct Inline Input Capabilities */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* 1. NIK */}
-                    <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          NOMOR INDUK KEPENDUDUKAN (NIK)
-                        </span>
-                        <span className="px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[9px]">
-                          Valid
-                        </span>
-                      </div>
-                      <p className="text-sm font-extrabold text-slate-900 tracking-wide font-mono">
-                        {profileData.nik}
-                      </p>
-                    </div>
+                  {/* Tempat & Tanggal Lahir */}
+                  <div className="bg-slate-100/80 border border-slate-200/80 rounded-xl px-4 py-3 space-y-1">
+                    <span className="block text-[11px] font-medium text-slate-500">
+                      Tempat &amp; Tanggal Lahir
+                    </span>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                      {profileData.birthPlaceDate} ({profileData.age})
+                    </p>
+                  </div>
 
-                    {/* 2. Tempat & Tanggal Lahir */}
-                    <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          TEMPAT &amp; TANGGAL LAHIR
-                        </span>
-                        <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 font-bold text-[9px]">
-                          {profileData.age}
-                        </span>
-                      </div>
-                      <p className="text-sm font-bold text-slate-900">
-                        {profileData.birthPlaceDate}
-                      </p>
-                    </div>
+                  {/* Jenis Kelamin & Golongan Darah */}
+                  <div className="bg-slate-100/80 border border-slate-200/80 rounded-xl px-4 py-3 space-y-1">
+                    <span className="block text-[11px] font-medium text-slate-500">
+                      Jenis Kelamin &amp; Golongan Darah
+                    </span>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                      {profileData.genderReligion}
+                    </p>
+                  </div>
 
-                    {/* 3. Jenis Kelamin / Agama */}
-                    <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        JENIS KELAMIN / AGAMA
-                      </span>
-                      <p className="text-sm font-bold text-slate-900">
-                        {profileData.genderReligion}
-                      </p>
-                    </div>
+                  {/* Status Pernikahan & PTKP */}
+                  <div className="bg-slate-100/80 border border-slate-200/80 rounded-xl px-4 py-3 space-y-1">
+                    <span className="block text-[11px] font-medium text-slate-500">
+                      Status Pernikahan &amp; PTKP
+                    </span>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                      {profileData.maritalPtkp} ({profileData.ptkpBadge})
+                    </p>
+                  </div>
 
-                    {/* 4. Status Perkawinan & PTKP */}
-                    <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        STATUS PERKAWINAN &amp; PTKP
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900">
-                          {profileData.maritalPtkp}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px]">
-                          {profileData.ptkpBadge}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Alamat Domisili Sesuai KTP */}
+                  <div className="md:col-span-2 bg-slate-100/80 focus-within:bg-white border border-slate-200/80 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-500/20 rounded-xl px-4 py-3 space-y-1 transition-all">
+                    <label
+                      htmlFor="profile-address-ktp"
+                      className="block text-[11px] font-medium text-slate-500"
+                    >
+                      Alamat Domisili Sesuai KTP
+                    </label>
+                    <input
+                      id="profile-address-ktp"
+                      type="text"
+                      value={profileData.addressKtp}
+                      onChange={(e) =>
+                        setProfileData({ ...profileData, addressKtp: e.target.value })
+                      }
+                      className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
 
-                    {/* 5. Email Korporat */}
-                    <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          EMAIL KORPORAT (SSO NEXORA)
-                        </span>
-                        <CheckCheck className="w-3.5 h-3.5 text-blue-600" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-900 truncate">
+              {/* Section 2: Kontak & Jalur Komunikasi */}
+              <div className="pt-6 border-t border-slate-100 space-y-4">
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                    Kontak &amp; Jalur Komunikasi
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Data resmi kontak aktif yang digunakan untuk korespondensi HR dan notifikasi sistem.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Email Korporat (SSO) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Email Korporat (SSO)
+                    </label>
+                    <div className="bg-slate-100/80 border border-slate-200/80 rounded-xl px-4 py-2.5 flex items-center justify-between gap-2">
+                      <span className="text-xs sm:text-sm font-semibold text-slate-700 truncate">
                         {profileData.emailCompany}
-                      </p>
-                    </div>
-
-                    {/* 6. Email Pribadi Terdaftar (Directly Editable) */}
-                    <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        EMAIL PRIBADI TERDAFTAR
                       </span>
-                      <input
-                        type="email"
-                        value={profileData.emailPersonal}
-                        onChange={(e) =>
-                          setProfileData({ ...profileData, emailPersonal: e.target.value })
-                        }
-                        className="w-full text-xs font-bold text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      />
+                      <CheckCircle2 className="w-4 h-4 text-slate-500 flex-shrink-0" />
                     </div>
+                  </div>
 
-                    {/* 7. Nomor WhatsApp & Ponsel Aktif (Directly Editable) */}
-                    <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          NOMOR WHATSAPP &amp; PONSEL AKTIF
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Terhubung Notifikasi SMS &amp; WA Gateway
-                          </span>
-                          <button
-                            type="button"
-                            onClick={handleTestNotification}
-                            disabled={isTestingNotification}
-                            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline transition-colors disabled:opacity-50 cursor-pointer"
-                          >
-                            {isTestingNotification ? 'Mengirim...' : 'Uji Notifikasi'}
-                          </button>
-                        </div>
-                      </div>
+                  {/* Email Pribadi */}
+                  <div>
+                    <label
+                      htmlFor="profile-email-personal"
+                      className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    >
+                      Email Pribadi
+                    </label>
+                    <input
+                      id="profile-email-personal"
+                      type="email"
+                      placeholder="Email Pribadi"
+                      value={profileData.emailPersonal}
+                      onChange={(e) =>
+                        setProfileData({ ...profileData, emailPersonal: e.target.value })
+                      }
+                      className="w-full px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                    />
+                  </div>
+
+                  {/* Nomor Ponsel & WhatsApp */}
+                  <div>
+                    <label
+                      htmlFor="profile-phone-wa"
+                      className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    >
+                      Nomor Ponsel &amp; WhatsApp
+                    </label>
+                    <div className="flex items-center justify-between gap-2 bg-slate-100/70 focus-within:bg-white border border-slate-200 rounded-xl pl-4 pr-1.5 py-1.5 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-600 transition-all">
                       <input
+                        id="profile-phone-wa"
                         type="text"
                         value={profileData.phone}
                         onChange={(e) =>
                           setProfileData({ ...profileData, phone: e.target.value })
                         }
-                        className="w-full text-sm font-extrabold text-slate-900 font-mono bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none"
                       />
-                    </div>
-
-                    {/* 8. Alamat KTP (Directly Editable) */}
-                    <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        ALAMAT DOMISILI SESUAI KTP
-                      </span>
-                      <textarea
-                        rows={2}
-                        value={profileData.addressKtp}
-                        onChange={(e) =>
-                          setProfileData({ ...profileData, addressKtp: e.target.value })
-                        }
-                        className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      />
+                      <button
+                        type="button"
+                        onClick={handleTestNotification}
+                        disabled={isTestingNotification}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs whitespace-nowrap transition-colors disabled:opacity-50 cursor-pointer flex-shrink-0"
+                      >
+                        {isTestingNotification ? 'Mengirim...' : 'Uji Notifikasi'}
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* RIGHT 1 COLUMN: KEAMANAN AKUN ESS + PERANGKAT TERKONEKSI */}
-              <div className="space-y-6">
-                {/* Card 1: Keamanan Akun ESS */}
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                      <h3 className="text-sm font-bold text-slate-900">
-                        Keamanan Akun ESS
-                      </h3>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                      100% AMAN
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500 font-medium">Status Proteksi Akun</span>
-                      <span className="text-emerald-600 font-bold">Sangat Baik</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                      <div className="w-full h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" />
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed pt-0.5">
-                      Semua parameter proteksi enterprise aktif sesuai regulasi ISO 27001.
-                    </p>
-                  </div>
-
-                  {/* Checklist items */}
-                  <div className="space-y-3 pt-2 text-xs">
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div className="leading-tight">
-                        <strong className="block text-slate-800 font-bold text-xs">
-                          2-Factor Authentication (2FA)
-                        </strong>
-                        <span className="text-[11px] text-slate-400">
-                          Aktif via Google Authenticator (TOTP)
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div className="leading-tight">
-                        <strong className="block text-slate-800 font-bold text-xs">
-                          Kata Sandi Korporat
-                        </strong>
-                        <span className="text-[11px] text-slate-400">
-                          {profileData.lastPasswordChange}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div className="leading-tight">
-                        <strong className="block text-slate-800 font-bold text-xs">
-                          Kunci Perangkat Terverifikasi
-                        </strong>
-                        <span className="text-[11px] text-slate-400">
-                          Biometrik TouchID / FaceID Terdaftar
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Button Perbarui Kata Sandi */}
-                  <button
-                    type="button"
-                    onClick={() => setIsPasswordModalOpen(true)}
-                    className="w-full py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-2xs mt-2 cursor-pointer"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Perbarui Kata Sandi</span>
-                  </button>
-                </div>
-
-                {/* Card 2: Perangkat Terkoneksi (Real-time Multi-Device Tracking) */}
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Laptop className="w-4 h-4 text-slate-600" />
-                      <h4 className="text-xs font-bold text-slate-800">Perangkat Terkoneksi</h4>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold">
-                      {connectedSessions.length} Sesi Aktif
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-xs">
-                    {isLoadingSessions && connectedSessions.length === 0 ? (
-                      <div className="py-4 flex flex-col items-center justify-center gap-2 text-slate-400">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                        <span className="text-[10px]">Memeriksa perangkat aktif...</span>
-                      </div>
-                    ) : connectedSessions.length === 0 ? (
-                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center text-slate-400 text-[11px]">
-                        Tidak ada sesi perangkat lain yang terdeteksi.
-                      </div>
-                    ) : (
-                      connectedSessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
-                            session.isCurrent
-                              ? 'bg-blue-50/40 border-blue-200/80 shadow-2xs'
-                              : 'bg-slate-50 border-slate-100 hover:border-slate-200'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                            <div
-                              className={`p-1.5 rounded-lg shrink-0 ${
-                                session.deviceType === 'mobile'
-                                  ? 'bg-amber-50 text-amber-600 border border-amber-200/60'
-                                  : session.deviceType === 'tablet'
-                                  ? 'bg-purple-50 text-purple-600 border border-purple-200/60'
-                                  : 'bg-blue-50 text-blue-600 border border-blue-200/60'
-                              }`}
-                            >
-                              {session.deviceType === 'mobile' ? (
-                                <Smartphone className="w-3.5 h-3.5" />
-                              ) : session.deviceType === 'tablet' ? (
-                                <Tablet className="w-3.5 h-3.5" />
-                              ) : (
-                                <Laptop className="w-3.5 h-3.5" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-bold text-slate-800 text-[11px] truncate">
-                                  {session.deviceName}
-                                </p>
-                                {session.isCurrent && (
-                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[8px] font-bold bg-blue-100 text-blue-700">
-                                    Ini
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[9px] text-slate-400 truncate">
-                                {session.location} • {session.lastActiveText}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                                session.isOnline
-                                  ? 'text-emerald-700 bg-emerald-50 border border-emerald-200/60'
-                                  : 'text-slate-500 bg-slate-100'
-                              }`}
-                            >
-                              {session.statusText}
-                            </span>
-                            {!session.isCurrent && (
-                              <button
-                                type="button"
-                                title="Putus Sesi Perangkat Ini"
-                                disabled={revokingSessionId === session.id}
-                                onClick={() => handleRevokeSession(session.id, session.deviceName)}
-                                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
-                              >
-                                {revokingSessionId === session.id ? (
-                                  <Loader2 className="w-3 h-3 animate-spin text-rose-500" />
-                                ) : (
-                                  <Trash2 className="w-3 h-3" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Action buttons: Segarkan & Tambah Sesi Mobile */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fetchActiveSessions()}
-                      disabled={isLoadingSessions}
-                      className="text-[10px] text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium transition-colors cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isLoadingSessions ? 'animate-spin text-blue-500' : ''}`} />
-                      <span>Segarkan</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleSimulateMobileLogin}
-                      disabled={isSimulatingMobile}
-                      className="text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50/70 hover:bg-blue-100/70 px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold transition-colors cursor-pointer border border-blue-200/50"
-                    >
-                      {isSimulatingMobile ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Plus className="w-3 h-3" />
-                      )}
-                      <span>+ Simulasi Mobile</span>
-                    </button>
-                  </div>
-                </div>
+              {/* Footer Actions */}
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCancelChanges}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMasterSave}
+                  disabled={isSaving}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                </button>
               </div>
             </div>
           )}
 
           {/* TAB 2: KEPEGAWAIAN & JENJANG KARIR */}
           {activeTab === 'kepegawaian' && (
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-6">
               <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
                   Struktur Organisasi &amp; Status Hubungan Kerja
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Data penempatan kerja, jenjang jabatan, dan lini pelaporan resmi di Nexora HRIS.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    DEPARTEMEN
-                  </span>
-                  <p className="text-xs font-bold text-slate-900">{profileData.department}</p>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">DEPARTEMEN</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-800">{profileData.department}</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    DIVISI / SQUAD
-                  </span>
-                  <p className="text-xs font-bold text-slate-900">{profileData.division}</p>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">DIVISI / SQUAD</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-800">{profileData.division}</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    JABATAN &amp; LEVEL
-                  </span>
-                  <p className="text-xs font-bold text-slate-900">{profileData.level}</p>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">JABATAN &amp; LEVEL</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-800">{profileData.level}</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    LOKASI PENEMPATAN
-                  </span>
-                  <p className="text-xs font-bold text-slate-900">{profileData.workLocation}</p>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">LOKASI PENEMPATAN</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-800">{profileData.workLocation}</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    MODEL KERJA
-                  </span>
-                  <p className="text-xs font-bold text-slate-900">{profileData.workModel}</p>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">MODEL KERJA</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-800">{profileData.workModel}</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    JADWAL KERJA
-                  </span>
-                  <p className="text-xs font-bold text-slate-900">{profileData.schedule}</p>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">JADWAL KERJA</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-800">{profileData.schedule}</p>
                 </div>
               </div>
             </div>
@@ -1421,27 +1168,27 @@ export default function EmployeeProfilePage() {
 
           {/* TAB 3: DATA PAJAK, BANK & BPJS */}
           {activeTab === 'pajak_bank' && (
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-6">
               <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
                   Kompensasi, Rekening Penggajian &amp; Jaminan Sosial
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Data kepesertaan jaminan ketenagakerjaan dan nomor rekening payroll karyawan.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    NOMOR POKOK WAJIB PAJAK (NPWP)
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Nomor Pokok Wajib Pajak (NPWP)
                   </span>
-                  <p className="text-xs font-mono font-bold text-slate-900">{profileData.npwp}</p>
+                  <p className="text-xs sm:text-sm font-mono font-semibold text-slate-800">{profileData.npwp}</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    NOMOR REKENING BANK PAYROLL
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1.5">
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Nomor Rekening Bank Payroll
                   </span>
                   <input
                     type="text"
@@ -1449,75 +1196,253 @@ export default function EmployeeProfilePage() {
                     onChange={(e) =>
                       setProfileData({ ...profileData, bankAccountNumber: e.target.value })
                     }
-                    className="w-full text-xs font-bold text-slate-900 font-mono bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full text-xs sm:text-sm font-semibold text-slate-900 font-mono bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                   />
-                  <p className="text-[10px] text-slate-500 font-medium pt-0.5">
+                  <p className="text-[11px] text-slate-500 font-medium">
                     {profileData.bankName} a/n {profileData.fullName}
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    STATUS PTKP
-                  </span>
-                  <p className="text-xs font-bold text-slate-900">{profileData.ptkpBadge}</p>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">Status PTKP</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-800">{profileData.ptkpBadge}</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    BPJS KETENAGAKERJAAN
-                  </span>
-                  <p className="text-xs font-mono font-bold text-slate-900">{profileData.bpjsTkNumber}</p>
-                  <span className="text-[9px] font-bold text-emerald-600">Aktif Ditanggung Perusahaan</span>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">BPJS Ketenagakerjaan</span>
+                  <p className="text-xs sm:text-sm font-mono font-semibold text-slate-800">{profileData.bpjsTkNumber}</p>
+                  <span className="text-[10px] font-semibold text-emerald-600 block">Aktif Ditanggung Perusahaan</span>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    BPJS KESEHATAN
-                  </span>
-                  <p className="text-xs font-mono font-bold text-slate-900">{profileData.bpjsKesNumber}</p>
-                  <span className="text-[9px] font-bold text-emerald-600">Kelas 1 (Keluarga Inti)</span>
+                <div className="p-4 rounded-xl bg-slate-100/80 border border-slate-200/70 space-y-1">
+                  <span className="text-[11px] font-medium text-slate-500">BPJS Kesehatan</span>
+                  <p className="text-xs sm:text-sm font-mono font-semibold text-slate-800">{profileData.bpjsKesNumber}</p>
+                  <span className="text-[10px] font-semibold text-emerald-600 block">Kelas 1 (Keluarga Inti)</span>
                 </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleCancelChanges}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMasterSave}
+                  disabled={isSaving}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                </button>
               </div>
             </div>
           )}
 
-          {/* TAB 4: KEAMANAN AKUN & SESI */}
+          {/* TAB 4: KEAMANAN & PERANGKAT (Left: Keamanan Akun ESS matching Image 2, Right: Perangkat Terkoneksi) */}
           {activeTab === 'keamanan' && (
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
-              <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Pengaturan Keamanan &amp; Log Aktivitas Akun
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Kelola kredensial masuk korporat, autentikasi dua faktor, dan perangkat terpercaya.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-800">Autentikasi Dua Faktor (2FA)</h4>
-                    <p className="text-[11px] text-slate-400">
-                      Memerlukan kode OTP 6-digit dari aplikasi authenticator setiap login di perangkat baru.
-                    </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              {/* Card 1: Keamanan Akun ESS (Exact match to Image 2) */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <h3 className="text-base font-bold text-slate-900">
+                      Keamanan Akun ESS
+                    </h3>
                   </div>
-                  <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
-                    Aktif
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/70 text-emerald-700 text-[11px] font-bold">
+                    100% AMAN
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-800">Kata Sandi Korporat</h4>
-                    <p className="text-[11px] text-slate-400">{profileData.lastPasswordChange}</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-slate-500 font-medium">Status Proteksi Akun</span>
+                    <span className="text-emerald-600 font-bold">Sangat Baik</span>
                   </div>
+                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="w-full h-full bg-emerald-500 rounded-full" />
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed pt-0.5">
+                    Semua parameter proteksi enterprise aktif sesuai regulasi ISO 27001.
+                  </p>
+                </div>
+
+                {/* Checklist Items */}
+                <div className="space-y-4 pt-1">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <div className="leading-snug">
+                      <strong className="block text-slate-900 font-bold text-xs sm:text-sm">
+                        2-Factor Authentication (2FA)
+                      </strong>
+                      <span className="text-xs text-slate-400">
+                        Aktif via Google Authenticator (TOTP)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <div className="leading-snug">
+                      <strong className="block text-slate-900 font-bold text-xs sm:text-sm">
+                        Kata Sandi Korporat
+                      </strong>
+                      <span className="text-xs text-slate-400">
+                        {profileData.lastPasswordChange}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <div className="leading-snug">
+                      <strong className="block text-slate-900 font-bold text-xs sm:text-sm">
+                        Kunci Perangkat Terverifikasi
+                      </strong>
+                      <span className="text-xs text-slate-400">
+                        Biometrik TouchID / FaceID Terdaftar
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full-width Soft Blue CTA Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="w-full py-3 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 text-blue-600 text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4 text-blue-600" />
+                  <span>Perbarui Kata Sandi</span>
+                </button>
+              </div>
+
+              {/* Card 2: Perangkat Terkoneksi (Real-time Multi-Device Tracking) */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Laptop className="w-5 h-5 text-slate-600" />
+                    <h4 className="text-base font-bold text-slate-900">Perangkat Terkoneksi</h4>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 text-[11px] font-bold">
+                    {connectedSessions.length} Sesi Aktif
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  {isLoadingSessions && connectedSessions.length === 0 ? (
+                    <div className="py-6 flex flex-col items-center justify-center gap-2 text-slate-400">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                      <span className="text-xs">Memeriksa perangkat aktif...</span>
+                    </div>
+                  ) : connectedSessions.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 text-center text-slate-500 text-xs">
+                      Tidak ada sesi perangkat lain yang terdeteksi.
+                    </div>
+                  ) : (
+                    connectedSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                          session.isCurrent
+                            ? 'bg-blue-50/50 border-blue-200'
+                            : 'bg-slate-50 border-slate-200/70 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                          <div
+                            className={`p-2 rounded-lg shrink-0 ${
+                              session.deviceType === 'mobile'
+                                ? 'bg-amber-50 text-amber-600 border border-amber-200/70'
+                                : session.deviceType === 'tablet'
+                                ? 'bg-purple-50 text-purple-600 border border-purple-200/70'
+                                : 'bg-blue-50 text-blue-600 border border-blue-200/70'
+                            }`}
+                          >
+                            {session.deviceType === 'mobile' ? (
+                              <Smartphone className="w-4 h-4" />
+                            ) : session.deviceType === 'tablet' ? (
+                              <Tablet className="w-4 h-4" />
+                            ) : (
+                              <Laptop className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-bold text-slate-800 text-xs truncate">
+                                {session.deviceName}
+                              </p>
+                              {session.isCurrent && (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700">
+                                  Ini
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                              {session.location} • {session.lastActiveText}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                              session.isOnline
+                                ? 'text-emerald-700 bg-emerald-50 border border-emerald-200/70'
+                                : 'text-slate-500 bg-slate-100'
+                            }`}
+                          >
+                            {session.statusText}
+                          </span>
+                          {!session.isCurrent && (
+                            <button
+                              type="button"
+                              title="Putus Sesi Perangkat Ini"
+                              disabled={revokingSessionId === session.id}
+                              onClick={() => handleRevokeSession(session.id, session.deviceName)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {revokingSessionId === session.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Action buttons: Segarkan & Tambah Sesi Mobile */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsPasswordModalOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                    onClick={() => fetchActiveSessions()}
+                    disabled={isLoadingSessions}
+                    className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
                   >
-                    Ganti Sandi
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingSessions ? 'animate-spin text-blue-500' : ''}`} />
+                    <span>Segarkan</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSimulateMobileLogin}
+                    disabled={isSimulatingMobile}
+                    className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50/80 hover:bg-blue-100/80 px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold transition-colors cursor-pointer border border-blue-200/60"
+                  >
+                    {isSimulatingMobile ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="w-3.5 h-3.5" />
+                    )}
+                    <span>Simulasi Mobile</span>
                   </button>
                 </div>
               </div>
@@ -1528,7 +1453,7 @@ export default function EmployeeProfilePage() {
           {activeTab === 'preferensi' && (
             <div className="space-y-6">
               {/* Sync Status Banner */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-sky-500/10 border border-blue-200/80 flex items-start gap-4">
+              <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 border border-blue-200/80 flex items-start gap-4">
                 <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-sm flex-shrink-0">
                   <Sliders className="w-5 h-5" />
                 </div>
@@ -1959,6 +1884,10 @@ export default function EmployeeProfilePage() {
                   if (!res.ok || !data.success) {
                     throw new Error(data?.error?.message || 'Gagal mengubah kata sandi');
                   }
+                  setProfileData((prev) => ({
+                    ...prev,
+                    lastPasswordChange: 'Baru saja diperbarui',
+                  }));
                   setIsPasswordModalOpen(false);
                   setCurrentPwd('');
                   setNewPwd('');
