@@ -202,11 +202,12 @@ export default function UnifiedLoginPage() {
           </div>
 
           {/* Right Column: Clean Interactive Login Form */}
-          <div className="flex flex-col justify-center">
+          <div className="flex flex-col justify-center relative z-10">
             {/* Role Switcher Tabs (Portal Karyawan vs Admin HR & Direksi) */}
-            <div className="inline-flex p-1 rounded-xl bg-slate-100/90 border border-slate-200/70 mb-5 w-fit">
+            <div className="inline-flex p-1 rounded-xl bg-slate-100/90 border border-slate-200/70 mb-5 w-fit relative z-10">
               <button
                 type="button"
+                aria-pressed={activeRole === 'karyawan'}
                 onClick={() => handleRoleSwitch('karyawan')}
                 className={`py-2 px-4 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
                   activeRole === 'karyawan'
@@ -219,6 +220,7 @@ export default function UnifiedLoginPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={activeRole === 'admin'}
                 onClick={() => handleRoleSwitch('admin')}
                 className={`py-2 px-4 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
                   activeRole === 'admin'
